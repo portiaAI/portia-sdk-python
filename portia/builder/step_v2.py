@@ -876,7 +876,7 @@ class LoopStep(StepV2):
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
-    loop_block_type: LoopStepType
+    loop_step_type: LoopStepType
     start_index: int = Field(description="The start index of the loop.")
     end_index: int | None = Field(default=None, description="The end index of the loop.")
 
@@ -927,7 +927,7 @@ class LoopStep(StepV2):
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Run the loop step."""
         args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
-        match self.loop_block_type, self.loop_type:
+        match self.loop_step_type, self.loop_type:
             case (LoopStepType.END, LoopType.DO_WHILE) | (LoopStepType.START, LoopType.WHILE):
                 return await self._handle_conditional_loop(run_data, args)
             case LoopStepType.START, LoopType.FOR_EACH:
@@ -936,7 +936,7 @@ class LoopStep(StepV2):
                 value = self._current_loop_variable(run_data)
                 self.index += 1
                 return LoopStepResult(
-                    step_type=self.loop_block_type,
+                    step_type=self.loop_step_type,
                     loop_result=value is not None,
                     value=value,
                     start_index=self.start_index_value,
@@ -946,7 +946,7 @@ class LoopStep(StepV2):
                 # conditional loops are evaluated at end of loop execution
                 # for-each loops are evaluated at end of loop execution
                 return LoopStepResult(
-                    step_type=self.loop_block_type,
+                    step_type=self.loop_step_type,
                     loop_result=True,
                     value=True,
                     start_index=self.start_index_value,
@@ -967,7 +967,7 @@ class LoopStep(StepV2):
         else:
             conditional_result = self.condition(**args)
         return LoopStepResult(
-            step_type=self.loop_block_type,
+            step_type=self.loop_step_type,
             loop_result=conditional_result,
             value=conditional_result,
             start_index=self.start_index_value,

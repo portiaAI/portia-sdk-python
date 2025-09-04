@@ -2296,7 +2296,7 @@ def test_loop_step_initialization_with_condition() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         args={"x": 10},
@@ -2305,7 +2305,7 @@ def test_loop_step_initialization_with_condition() -> None:
     assert step.step_name == "test_loop"
     assert step.condition is not None
     assert step.loop_type == LoopType.DO_WHILE
-    assert step.loop_block_type == LoopStepType.END
+    assert step.loop_step_type == LoopStepType.END
     assert step.start_index == 0
     assert step.end_index == 5
     assert step.args == {"x": 10}
@@ -2319,7 +2319,7 @@ def test_loop_step_initialization_with_over() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
         index=0,
@@ -2328,7 +2328,7 @@ def test_loop_step_initialization_with_over() -> None:
     assert step.step_name == "test_loop"
     assert step.over is not None
     assert step.loop_type == LoopType.FOR_EACH
-    assert step.loop_block_type == LoopStepType.START
+    assert step.loop_step_type == LoopStepType.START
     assert step.start_index == 0
     assert step.end_index == 3
     assert step.index == 0
@@ -2343,7 +2343,7 @@ def test_loop_step_validation_error_both_none() -> None:
             condition=None,
             over=None,
             loop_type=LoopType.DO_WHILE,
-            loop_block_type=LoopStepType.END,
+            loop_step_type=LoopStepType.END,
             start_index=0,
             end_index=5,
         )
@@ -2355,7 +2355,7 @@ def test_loop_step_validation_success() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
     )
@@ -2371,7 +2371,7 @@ def test_current_loop_variable_with_over() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
         index=1,
@@ -2398,7 +2398,7 @@ def test_current_loop_variable_with_over_none() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
     )
@@ -2415,7 +2415,7 @@ def test_current_loop_variable_with_non_sequence() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
         index=0,
@@ -2443,7 +2443,7 @@ def test_current_loop_variable_index_out_of_range() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
         index=5,
@@ -2471,7 +2471,7 @@ async def test_loop_step_run_conditional_end_with_callable() -> None:
         step_name="test_loop",
         condition=lambda x: x > 5,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
         args={"x": 10},
@@ -2480,7 +2480,7 @@ async def test_loop_step_run_conditional_end_with_callable() -> None:
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.END
+    assert result.step_type == LoopStepType.END
     assert result.loop_result is True
     assert result.start_index == 0
     assert result.end_index == 10
@@ -2493,7 +2493,7 @@ async def test_loop_step_run_conditional_end_with_string() -> None:
         step_name="test_loop",
         condition="x > 5",
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
         args={"x": 10},
@@ -2509,7 +2509,7 @@ async def test_loop_step_run_conditional_end_with_string() -> None:
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result.block_type == LoopStepType.END
+        assert result.step_type == LoopStepType.END
         assert result.loop_result is True
         assert result.start_index == 0
         assert result.end_index == 10
@@ -2523,7 +2523,7 @@ async def test_loop_step_run_conditional_end_missing_condition() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
     )
@@ -2544,7 +2544,7 @@ async def test_loop_step_run_for_each_start() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
         index=0,
@@ -2563,7 +2563,7 @@ async def test_loop_step_run_for_each_start() -> None:
 
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.START
+    assert result.step_type == LoopStepType.START
     assert result.loop_result is True
     assert result.value == "a"
     assert result.start_index == 0
@@ -2580,7 +2580,7 @@ async def test_loop_step_run_for_each_start_missing_over() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
     )
@@ -2601,7 +2601,7 @@ async def test_loop_step_run_for_each_start_no_value() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=3,
         index=5,  # Out of range
@@ -2620,7 +2620,7 @@ async def test_loop_step_run_for_each_start_no_value() -> None:
 
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.START
+    assert result.step_type == LoopStepType.START
     assert result.loop_result is False
     assert result.value is None
     assert result.start_index == 0
@@ -2634,7 +2634,7 @@ async def test_loop_step_run_default_case() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.WHILE,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=5,
         args={"x": 10},  # Provide the required argument
@@ -2643,7 +2643,7 @@ async def test_loop_step_run_default_case() -> None:
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.START
+    assert result.step_type == LoopStepType.START
     assert result.loop_result is True
     assert result.start_index == 0
     assert result.end_index == 5
@@ -2656,7 +2656,7 @@ async def test_loop_step_run_with_none_indexes() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,  # Provide at least one index
         end_index=0,  # Set to 0 instead of None to avoid validation error
         args={"x": 10},
@@ -2675,7 +2675,7 @@ def test_loop_step_to_legacy_step_with_callable_condition() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         args={"x": 10},
@@ -2697,7 +2697,7 @@ def test_loop_step_to_legacy_step_with_string_condition() -> None:
         step_name="test_loop",
         condition="x > 0",
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         args={"x": 10},
@@ -2719,7 +2719,7 @@ def test_loop_step_to_legacy_step_with_reference_args() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         args={"x": StepOutput(0), "y": Input("test_input")},
@@ -2746,7 +2746,7 @@ def test_loop_step_validation_error_condition_with_for_each() -> None:
             condition=lambda x: x > 0,
             over=StepOutput(0),
             loop_type=LoopType.FOR_EACH,
-            loop_block_type=LoopStepType.START,
+            loop_step_type=LoopStepType.START,
             start_index=0,
             end_index=5,
         )
@@ -2760,7 +2760,7 @@ def test_loop_step_validation_error_condition_and_over_both_set() -> None:
             condition=lambda x: x > 0,
             over=StepOutput(0),
             loop_type=LoopType.DO_WHILE,
-            loop_block_type=LoopStepType.END,
+            loop_step_type=LoopStepType.END,
             start_index=0,
             end_index=5,
         )
@@ -2774,7 +2774,7 @@ def test_loop_step_validation_error_over_with_while() -> None:
             condition=None,
             over=StepOutput(0),
             loop_type=LoopType.WHILE,
-            loop_block_type=LoopStepType.START,
+            loop_step_type=LoopStepType.START,
             start_index=0,
             end_index=5,
         )
@@ -2788,7 +2788,7 @@ def test_loop_step_validation_error_over_with_do_while() -> None:
             condition=None,
             over=StepOutput(0),
             loop_type=LoopType.DO_WHILE,
-            loop_block_type=LoopStepType.END,
+            loop_step_type=LoopStepType.END,
             start_index=0,
             end_index=5,
         )
@@ -2801,7 +2801,7 @@ async def test_loop_step_run_while_start_with_callable() -> None:
         step_name="test_loop",
         condition=lambda x: x > 5,
         loop_type=LoopType.WHILE,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=10,
         args={"x": 10},
@@ -2810,7 +2810,7 @@ async def test_loop_step_run_while_start_with_callable() -> None:
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.START
+    assert result.step_type == LoopStepType.START
     assert result.loop_result is True
     assert result.start_index == 0
     assert result.end_index == 10
@@ -2823,7 +2823,7 @@ async def test_loop_step_run_while_start_with_string() -> None:
         step_name="test_loop",
         condition="x > 5",
         loop_type=LoopType.WHILE,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=10,
         args={"x": 10},
@@ -2839,7 +2839,7 @@ async def test_loop_step_run_while_start_with_string() -> None:
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result.block_type == LoopStepType.START
+        assert result.step_type == LoopStepType.START
         assert result.loop_result is True
         assert result.start_index == 0
         assert result.end_index == 10
@@ -2852,7 +2852,7 @@ async def test_loop_step_run_do_while_end_with_callable() -> None:
         step_name="test_loop",
         condition=lambda x: x > 5,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
         args={"x": 10},
@@ -2861,7 +2861,7 @@ async def test_loop_step_run_do_while_end_with_callable() -> None:
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.END
+    assert result.step_type == LoopStepType.END
     assert result.loop_result is True
     assert result.start_index == 0
     assert result.end_index == 10
@@ -2874,7 +2874,7 @@ async def test_loop_step_run_do_while_end_with_string() -> None:
         step_name="test_loop",
         condition="x > 5",
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
         args={"x": 10},
@@ -2890,7 +2890,7 @@ async def test_loop_step_run_do_while_end_with_string() -> None:
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result.block_type == LoopStepType.END
+        assert result.step_type == LoopStepType.END
         assert result.loop_result is True
         assert result.start_index == 0
         assert result.end_index == 10
@@ -2904,7 +2904,7 @@ async def test_loop_step_run_while_start_missing_condition() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.WHILE,
-        loop_block_type=LoopStepType.START,
+        loop_step_type=LoopStepType.START,
         start_index=0,
         end_index=10,
     )
@@ -2925,7 +2925,7 @@ async def test_loop_step_run_for_each_end() -> None:
         condition=None,
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=3,
         index=1,
@@ -2934,7 +2934,7 @@ async def test_loop_step_run_for_each_end() -> None:
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.block_type == LoopStepType.END
+    assert result.step_type == LoopStepType.END
     assert result.loop_result is True
     assert result.value is True
     assert result.start_index == 0
@@ -2948,7 +2948,7 @@ def test_current_loop_variable_with_none_over() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -2970,7 +2970,7 @@ def test_current_loop_variable_with_sequence_over() -> None:
         condition=None,
         over=[["item1", "item2"], ["item3", "item4"]],
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -2989,7 +2989,7 @@ def test_current_loop_variable_with_sequence_over_different_index() -> None:
         condition=None,
         over=[["item1", "item2"], ["item3", "item4"]],
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=1,
@@ -3008,7 +3008,7 @@ def test_current_loop_variable_with_reference_over() -> None:
         condition=None,
         over=StepOutput("previous_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -3033,7 +3033,7 @@ def test_current_loop_variable_with_reference_over_different_index() -> None:
         condition=None,
         over=StepOutput("previous_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=1,
@@ -3055,7 +3055,7 @@ def test_current_loop_variable_with_non_sequence_resolved_value() -> None:
         condition=None,
         over=StepOutput("previous_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -3078,7 +3078,7 @@ def test_current_loop_variable_with_index_out_of_bounds() -> None:
         condition=None,
         over=[["item1", "item2"], ["item3", "item4"], ["item5", "item6"]],
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=2,  # Valid index for outer sequence
@@ -3099,7 +3099,7 @@ def test_current_loop_variable_with_empty_sequence() -> None:
         condition=None,
         over=[[]],
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -3118,7 +3118,7 @@ def test_current_loop_variable_with_nested_sequences() -> None:
         condition=None,
         over=[[{"key": "value1"}, {"key": "value2"}], [{"key": "value3"}]],
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -3137,7 +3137,7 @@ def test_current_loop_variable_with_mixed_types() -> None:
         condition=None,
         over=[["string", 42, {"dict": "value"}, [1, 2, 3]]],
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
         index=0,
@@ -3156,7 +3156,7 @@ def test_start_index_value_with_valid_index() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=5,
         end_index=10,
     )
@@ -3173,7 +3173,7 @@ def test_start_index_value_with_zero_index() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
     )
@@ -3190,7 +3190,7 @@ def test_start_index_value_with_negative_index() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=-1,
         end_index=10,
     )
@@ -3207,7 +3207,7 @@ def test_start_index_value_with_none_raises_error() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=10,
     )
@@ -3226,7 +3226,7 @@ def test_end_index_value_with_valid_index() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=15,
     )
@@ -3243,7 +3243,7 @@ def test_end_index_value_with_zero_index() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=0,
     )
@@ -3260,7 +3260,7 @@ def test_end_index_value_with_negative_index() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=-5,
     )
@@ -3277,7 +3277,7 @@ def test_end_index_value_with_none_raises_error() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=None,
     )
@@ -3293,7 +3293,7 @@ def test_start_index_value_with_large_number() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=1000000,
         end_index=2000000,
     )
@@ -3310,7 +3310,7 @@ def test_end_index_value_with_large_number() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=999999,
     )
@@ -3327,7 +3327,7 @@ def test_both_index_values_together() -> None:
         condition=None,
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=3,
         end_index=7,
     )
@@ -3346,7 +3346,7 @@ def test_index_values_with_while_loop() -> None:
         step_name="test_loop",
         condition=lambda x: x > 0,
         loop_type=LoopType.WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=0,
         end_index=5,
     )
@@ -3364,7 +3364,7 @@ def test_index_values_with_do_while_loop() -> None:
         step_name="test_loop",
         condition=lambda x: x < 10,
         loop_type=LoopType.DO_WHILE,
-        loop_block_type=LoopStepType.END,
+        loop_step_type=LoopStepType.END,
         start_index=1,
         end_index=8,
     )
