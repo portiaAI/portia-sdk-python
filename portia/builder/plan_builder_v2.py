@@ -200,7 +200,7 @@ class PlanBuilderV2:
         PlanBuilderV2().loop(over=Input("items")).llm_step(task="Process item").end_loop()
         .llm_step(task="Runs after all items processed")
 
-        Failing to call end_loop() after opening a loop block with loop() will result in an
+        Failing to call end_loop( 0/182)  ) after opening a loop block with loop() will result in an
         error when building the plan.
 
         Args:

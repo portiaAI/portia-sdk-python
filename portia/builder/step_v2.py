@@ -868,7 +868,7 @@ class LoopStep(StepV2):
             "The boolean predicate to check. If evaluated to true, the loop will continue."
         )
     )
-    over: Reference | Sequence[Any] | None = Field(
+    over: Reference | str | BaseModel | Sequence[Any] | None = Field(
         default=None, description="The reference to loop over."
     )
     loop_type: LoopType
@@ -911,13 +911,18 @@ class LoopStep(StepV2):
         """Get the current loop variable if over is set."""
         if self.over is None:
             return None
-        if isinstance(self.over, Sequence):
-            values = self.over[self.index]
+        values = self._resolve_references(self.over, run_data)
+        if isinstance(values, str | BaseModel):
+            values = [values]
+        elif isinstance(values, Sequence):
+            values = values
         else:
-            values = self._resolve_references(self.over, run_data)
+            raise TypeError("Loop variable is not indexable")
         if not isinstance(values, Sequence):
             raise TypeError("Loop variable is not indexable")
         try:
+            print("-------------------")
+            print(values)
             return values[self.index]
         except IndexError:
             return None

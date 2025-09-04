@@ -37,7 +37,7 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.run_context import RunContext
+    from portia.run_context import RunContext, StepOutputValue
 
 
 def default_step_name(step_index: int) -> str:
@@ -131,10 +131,11 @@ class StepOutput(Reference):
         "used to find the step by name. If an integer is provided, this will be used to find the "
         "step by index (steps are 0-indexed)."
     )
+    full: bool = Field(default=False, description="Whether to return the list of all step outputs")
 
-    def __init__(self, step: str | int) -> None:
+    def __init__(self, step: str | int, full: bool = False) -> None:
         """Initialize a reference to a step's output."""
-        super().__init__(step=step)  # type: ignore[call-arg]
+        super().__init__(step=step, full=full)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -158,13 +159,23 @@ class StepOutput(Reference):
             The step is matched by either name (string) or index (integer).
 
         """
-        for step_output in run_data.step_output_values[::-1]:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
-                return step_output.value
-            if isinstance(self.step, str) and step_output.step_name == self.step:
-                return step_output.value
-        logger().warning(f"Output value for step {self.step} not found")
-        return None
+        values: list[StepOutputValue] = [
+            step_output
+            for step_output in run_data.step_output_values
+            if self._match_output(step_output)
+        ]
+        if self.full:
+            return [step_output.value for step_output in values]
+        if not values:
+            logger().warning(f"Output value for step {self.step} not found")
+            return None
+        return values[-1].value
+
+    def _match_output(self, step_output: StepOutputValue) -> bool:
+        return (
+            (isinstance(self.step, int) and step_output.step_num == self.step)
+            or (isinstance(self.step, str) and step_output.step_name == self.step)
+        )
 
     def get_description(self, run_data: RunContext) -> str:
         """Get the description of the step output."""
