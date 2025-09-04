@@ -544,21 +544,29 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
 class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
     """Generic OpenAI-compatible model implementation using a configurable base_url.
 
-    Subclasses should set the `provider` enum and call super().__init__ with a `base_url`.
+    Subclasses should set the `provider` enum and `base_url` class variables.
+    For dynamic base_url (like Meta), pass it via constructor.
     """
+
+    base_url: str | None = None  # Override in subclasses for fixed endpoints
 
     def __init__(
         self,
         *,
         model_name: str,
         api_key: SecretStr,
-        base_url: str,
+        base_url: str | None = None,
         seed: int = 343,
         max_retries: int = 3,
         temperature: float = 0,
         **kwargs: Any,
     ) -> None:
         """Initialize an OpenAI-compatible client with the provided base_url."""
+        # Use provided base_url or fall back to class variable
+        effective_base_url = base_url or self.base_url
+        if not effective_base_url:
+            raise ValueError(f"base_url must be provided either in constructor or as class variable for {self.__class__.__name__}")
+        
         self._model_kwargs = kwargs.copy()
         if "disabled_params" not in kwargs:
             # Some OpenAI-compatible endpoints do not support parallel tool calls
@@ -571,19 +579,19 @@ class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
             api_key=api_key,
             max_retries=max_retries,
             temperature=temperature,
-            base_url=base_url,
+            base_url=effective_base_url,
             **kwargs,
         )
         super(OpenAIGenerativeModel, self).__init__(client, model_name)
         self._instructor_client = instructor.from_openai(
             client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url=base_url)
+                OpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
             ),
             mode=instructor.Mode.JSON,
         )
         self._instructor_client_async = instructor.from_openai(
             client=wrappers.wrap_openai(
-                AsyncOpenAI(api_key=api_key.get_secret_value(), base_url=base_url)
+                AsyncOpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
             ),
             mode=instructor.Mode.JSON,
         )
@@ -594,6 +602,7 @@ class OpenRouterGenerativeModel(OpenAICompatibleGenerativeModel):
     """OpenRouter model implementation."""
 
     provider: LLMProvider = LLMProvider.OPENROUTER
+    base_url: str = "https://openrouter.ai/api/v1"
 
     def __init__(
         self,
@@ -611,7 +620,6 @@ class OpenRouterGenerativeModel(OpenAICompatibleGenerativeModel):
         super().__init__(
             model_name=model_name,
             api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
             seed=seed,
             max_retries=max_retries,
             temperature=temperature,
@@ -623,6 +631,7 @@ class GroqGenerativeModel(OpenAICompatibleGenerativeModel):
     """Groq model implementation."""
 
     provider: LLMProvider = LLMProvider.GROQ
+    base_url: str = "https://api.groq.com/openai/v1"
 
     def __init__(
         self,
@@ -638,7 +647,6 @@ class GroqGenerativeModel(OpenAICompatibleGenerativeModel):
         super().__init__(
             model_name=model_name,
             api_key=api_key,
-            base_url="https://api.groq.com/openai/v1",
             seed=seed,
             max_retries=max_retries,
             temperature=temperature,
