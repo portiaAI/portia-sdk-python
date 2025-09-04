@@ -191,7 +191,7 @@ class StepOutput(Reference):
         """
         # Get the base step output value
         base_value = None
-        for step_output in run_data.step_output_values:
+        for step_output in run_data.step_output_values[::-1]:
             if isinstance(self.step, int) and step_output.step_num == self.step:
                 base_value = step_output.value
                 break
