@@ -2035,7 +2035,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "pytest-mock" },
     { name = "python-dotenv" },
-    { name = "testcontainers", extra = ["redis"], marker = "python_full_version < '4'" },
     { name = "toml" },
     { name = "testcontainers", extra = ["redis"], marker = "python_full_version < '4.0'" },
 ]
