@@ -31,6 +31,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, override
 
+import pydash
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.logger import logger
@@ -114,14 +115,26 @@ class StepOutput(Reference):
 
         builder = PlanBuilderV2()
 
-        # Create a step that produces some output
-        builder.step("search", tools=[search_tool], inputs={"query": "Python tutorials"})
+        # Create a step that produces some output using a search tool
+        builder.single_tool_agent_step("search", "search_tool",
+                                      inputs=["Find Python tutorials"])
 
         # Reference the output by name
-        builder.step("analyze", tools=[llm_tool], inputs={"data": StepOutput("search")})
+        builder.llm_step("analyze", task="Analyze the search results",
+                        inputs=[StepOutput("search")])
 
         # Reference the output by index (0 = first step)
-        builder.step("summarize", tools=[llm_tool], inputs={"data": StepOutput(0)})
+        builder.llm_step("summarize", task="Summarize the data",
+                        inputs=[StepOutput(0)])
+
+        # Access nested fields using path notation (i.e. take the .title attribute from the output
+        # of the search step)
+        builder.llm_step("process", task="Extract title from results",
+                        inputs=[StepOutput("search", path="title")])
+
+        # Access deeply nested fields
+        builder.llm_step("extract", task="Get street address",
+                        inputs=[StepOutput("user_data", path="address.street")])
         ```
 
     """
@@ -131,10 +144,21 @@ class StepOutput(Reference):
         "used to find the step by name. If an integer is provided, this will be used to find the "
         "step by index (steps are 0-indexed)."
     )
+    path: str | None = Field(
+        default=None,
+        description=(
+            "Optional path to extract a specific field or substructure from the step output. "
+            "Uses dot notation for all access types: "
+            "1. Object attributes: 'field.subfield' to access object properties, "
+            "2. Array indexes: 'items.0.name' to access list/array elements by index, "
+            "3. Dict keys: 'data.key' to access dictionary values. "
+            "These can be combined: 'results.0.user.address.street'."
+        ),
+    )
 
-    def __init__(self, step: str | int) -> None:
+    def __init__(self, step: str | int, path: str | None = None) -> None:
         """Initialize a reference to a step's output."""
-        super().__init__(step=step)  # type: ignore[call-arg]
+        super().__init__(step=step, path=path)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -147,24 +171,40 @@ class StepOutput(Reference):
         # used in PlanBuilderV2 steps.
         # The double braces are used when the plan is running to template the StepOutput value so it
         # can be substituted at runtime.
-        return f"{{{{ StepOutput({self.step}) }}}}"
+        step_repr = f"'{self.step}'" if isinstance(self.step, str) else str(self.step)
+        if self.path:
+            return f"{{{{ StepOutput({step_repr}, path='{self.path}') }}}}"
+        return f"{{{{ StepOutput({step_repr}) }}}}"
 
     @override
     def get_value(self, run_data: RunContext) -> Any | None:
         """Resolve and return the output value from the referenced step.
 
+        If a path is provided, it will be used to navigate the step output
+        to extract the desired substructure.
+
         Note:
             If the step cannot be found, a warning is logged and None is returned.
             The step is matched by either name (string) or index (integer).
+            If the path navigation fails, the exception is propagated.
 
         """
+        # Get the base step output value
+        base_value = None
         for step_output in run_data.step_output_values:
             if isinstance(self.step, int) and step_output.step_num == self.step:
-                return step_output.value
+                base_value = step_output.value
+                break
             if isinstance(self.step, str) and step_output.step_name == self.step:
-                return step_output.value
-        logger().warning(f"Output value for step {self.step} not found")
-        return None
+                base_value = step_output.value
+                break
+
+        if base_value is None:
+            logger().warning(f"Output value for step {self.step} not found")
+            return None
+
+        # If there is a path, use pydash to traverse the object
+        return pydash.get(base_value, self.path) if self.path else base_value
 
     def get_description(self, run_data: RunContext) -> str:
         """Get the description of the step output."""
@@ -213,12 +253,23 @@ class Input(Reference):
     """
 
     name: str = Field(description="The name of the input as defined in the plan.")
+    path: str | None = Field(
+        default=None,
+        description=(
+            "Optional path to extract a specific field or substructure from the input value. "
+            "Uses dot notation for all access types: "
+            "1. Object attributes: 'field.subfield' to access object properties, "
+            "2. Array indexes: 'items.0.name' to access list/array elements by index, "
+            "3. Dict keys: 'data.key' to access dictionary values. "
+            "These can be combined: 'results.0.user.address.street'."
+        ),
+    )
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, path: str | None = None) -> None:
         """Initialize a reference to a plan input."""
         # We have this __init__ method so users can create an Input reference without having to
         # specify name= in the constructor.
-        super().__init__(name=name)  # type: ignore[call-arg]
+        super().__init__(name=name, path=path)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -247,11 +298,18 @@ class Input(Reference):
             logger().warning(f"Value not found for input {self.name}")
             return None
         value = local_data_value.get_value()
-        return value.get_value(run_data=run_data) if isinstance(value, Reference) else value
+        resolved_value = (
+            value.get_value(run_data=run_data) if isinstance(value, Reference) else value
+        )
+
+        # If there is a path, use pydash to traverse the object
+        return pydash.get(resolved_value, self.path) if self.path else resolved_value
 
     def __str__(self) -> str:
         """Get the string representation of the input."""
         # We use double braces around the Input to allow string interpolation for Inputs used
         # in PlanBuilderV2 steps. The double braces are used when the plan is running to template
         # the input value so it can be substituted at runtime.
-        return f"{{{{ Input({self.name}) }}}}"
+        if self.path:
+            return f"{{{{ Input('{self.name}', path='{self.path}') }}}}"
+        return f"{{{{ Input('{self.name}') }}}}"

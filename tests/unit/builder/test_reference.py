@@ -39,6 +39,13 @@ def test_step_output_initialization_with_string() -> None:
     assert step_output.step == "my_step"
 
 
+def test_step_output_with_path_initialization() -> None:
+    """Test StepOutput initialization with path."""
+    step_output = StepOutput("my_step", path="field.name")
+    assert step_output.step == "my_step"
+    assert step_output.path == "field.name"
+
+
 def test_step_output_str_representation_int() -> None:
     """Test StepOutput string representation with integer step."""
     step_output = StepOutput(3)
@@ -50,7 +57,14 @@ def test_step_output_str_representation_string() -> None:
     """Test StepOutput string representation with string step."""
     step_output = StepOutput("custom_step")
     result = str(step_output)
-    assert result == "{{ StepOutput(custom_step) }}"
+    assert result == "{{ StepOutput('custom_step') }}"
+
+
+def test_step_output_with_path_str_representation() -> None:
+    """Test StepOutput string representation with path."""
+    step_output = StepOutput("my_step", path="field.name")
+    result = str(step_output)
+    assert result == "{{ StepOutput('my_step', path='field.name') }}"
 
 
 def test_get_legacy_name_with_int_step() -> None:
@@ -112,6 +126,88 @@ def test_get_value_with_string_step_success() -> None:
     assert result == "test result"
 
 
+def test_get_value_with_path_success() -> None:
+    """Test get_value method with path - successful case."""
+
+    class MockData:
+        def __init__(self) -> None:
+            self.field_a = MockDataFieldA()
+
+    class MockDataFieldA:
+        def __init__(self) -> None:
+            self.field_b = "extracted_value"
+
+    step_output = StepOutput(0, path="field_a.field_b")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=MockData(), description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == "extracted_value"
+
+
+def test_get_value_with_path_dict_access() -> None:
+    """Test get_value method with path - successful dict access."""
+    step_output = StepOutput("search", path="results.0.title")
+
+    mock_data = {"results": [{"title": "First Result"}, {"title": "Second Result"}]}
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="search", value=mock_data, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == "First Result"
+
+
+def test_get_value_with_path_array_access() -> None:
+    """Test get_value method with path - array indexing."""
+    step_output = StepOutput(0, path="items.1.name")
+
+    mock_data = {"items": [{"name": "first"}, {"name": "second"}, {"name": "third"}]}
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=mock_data, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == "second"
+
+
+def test_get_value_with_path_complex_key() -> None:
+    """Test get_value method with path - complex key access with dot notation."""
+    step_output = StepOutput(0, path="data.complex-key.value")
+
+    mock_data = {"data": {"complex-key": {"value": "found_it"}}}
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=mock_data, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == "found_it"
+
+
+def test_get_value_with_path_mixed_notation() -> None:
+    """Test get_value method with path - mixed object and array access."""
+
+    class MockResult:
+        def __init__(self) -> None:
+            self.results = [{"title": "First"}, {"title": "Second"}]
+
+    step_output = StepOutput(0, path="results.0.title")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=MockResult(), description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == "First"
+
+
 def test_get_value_with_int_step_index_error() -> None:
     """Test get_value method with integer step - IndexError case."""
     step_output = StepOutput(5)  # Index out of range
@@ -150,6 +246,71 @@ def test_get_value_with_string_step_value_error() -> None:
     result = step_output.get_value(mock_run_data)
 
     assert result is None
+
+
+def test_get_value_with_path_attribute_error() -> None:
+    """Test get_value method with path - returns None for missing attributes."""
+
+    class MockData:
+        def __init__(self) -> None:
+            self.field_a = "simple_value"  # No field_b attribute
+
+    step_output = StepOutput(0, path="field_a.field_b")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=MockData(), description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result is None
+
+
+def test_get_value_with_path_key_error() -> None:
+    """Test get_value method with path - returns None for missing keys."""
+    step_output = StepOutput(0, path="nonexistent_key")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=0, step_name="step_0", value={"existing_key": "value"}, description=""
+        ),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result is None
+
+
+def test_get_value_with_path_index_error() -> None:
+    """Test get_value method with path - returns None for index out of range."""
+    step_output = StepOutput(0, path="10")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value=[1, 2, 3], description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result is None
+
+
+def test_get_value_with_path_step_not_found() -> None:
+    """Test get_value method with path when base step is not found."""
+    step_output = StepOutput("nonexistent_step", path="field_name")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+    ]
+
+    with patch("portia.builder.reference.logger") as mock_logger:
+        result = step_output.get_value(mock_run_data)
+
+        assert result is None
+        # Should log the step not found error, not the path error
+        mock_logger().warning.assert_called_once_with(
+            "Output value for step nonexistent_step not found"
+        )
 
 
 def test_get_description_with_int_step() -> None:
@@ -218,7 +379,21 @@ def test_input_str_representation() -> None:
     """Test Input string representation."""
     input_ref = Input("api_key")
     result = str(input_ref)
-    assert result == "{{ Input(api_key) }}"
+    assert result == "{{ Input('api_key') }}"
+
+
+def test_input_with_path_initialization() -> None:
+    """Test Input initialization with path."""
+    input_ref = Input("user_data", path="profile.name")
+    assert input_ref.name == "user_data"
+    assert input_ref.path == "profile.name"
+
+
+def test_input_with_path_str_representation() -> None:
+    """Test Input string representation with path."""
+    input_ref = Input("user_data", path="profile.name")
+    result = str(input_ref)
+    assert result == "{{ Input('user_data', path='profile.name') }}"
 
 
 def test_get_legacy_name() -> None:
@@ -342,6 +517,124 @@ def test_get_value_value_is_none_in_run_inputs() -> None:
 
         assert result is None
         mock_logger().warning.assert_called_once_with("Value not found for input optional_input")
+
+
+def test_input_get_value_with_path_success() -> None:
+    """Test Input get_value method with path - successful case."""
+
+    class MockUserData:
+        def __init__(self) -> None:
+            self.profile = MockProfile()
+
+    class MockProfile:
+        def __init__(self) -> None:
+            self.name = "John Doe"
+
+    input_ref = Input("user_data", path="profile.name")
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_data", description="User data")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_data": LocalDataValue(value=MockUserData())}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result == "John Doe"
+
+
+def test_input_get_value_with_path_dict_access() -> None:
+    """Test Input get_value method with path - successful dict access."""
+    input_ref = Input("user_data", path="profile.email")
+
+    mock_data = {"profile": {"email": "john@example.com", "name": "John"}}
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_data", description="User profile data")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_data": LocalDataValue(value=mock_data)}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result == "john@example.com"
+
+
+def test_input_get_value_with_path_array_access() -> None:
+    """Test Input get_value method with path - array indexing."""
+    input_ref = Input("user_data", path="preferences.0.category")
+
+    mock_data = {"preferences": [{"category": "tech"}, {"category": "sports"}]}
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_data", description="User preferences")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_data": LocalDataValue(value=mock_data)}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result == "tech"
+
+
+def test_input_get_value_with_path_missing_attribute() -> None:
+    """Test Input get_value method with path - returns None for missing attributes."""
+
+    class MockUserData:
+        def __init__(self) -> None:
+            self.profile = "simple_value"  # No name attribute
+
+    input_ref = Input("user_data", path="profile.name")
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_data", description="User data")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_data": LocalDataValue(value=MockUserData())}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result is None
+
+
+def test_input_get_value_with_path_missing_key() -> None:
+    """Test Input get_value method with path - returns None for missing keys."""
+    input_ref = Input("user_data", path="nonexistent_key")
+
+    mock_data = {"existing_key": "value"}
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_data", description="User data")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_data": LocalDataValue(value=mock_data)}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result is None
+
+
+def test_input_get_value_with_path_index_out_of_range() -> None:
+    """Test Input get_value method with path - returns None for index out of range."""
+    input_ref = Input("user_data", path="items.5")
+
+    mock_data = {"items": [1, 2, 3]}
+
+    # Create mock plan input
+    mock_plan_input = PlanInput(name="user_data", description="User data")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+    mock_run_data.plan_run.plan_run_inputs = {"user_data": LocalDataValue(value=mock_data)}
+
+    result = input_ref.get_value(mock_run_data)
+    assert result is None
 
 
 # Integration tests for reference classes
