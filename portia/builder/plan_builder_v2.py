@@ -8,12 +8,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
+from portia.builder.loops import LoopBlock, LoopStepType, LoopType
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import default_step_name
+from portia.builder.reference import Reference, default_step_name
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
     LLMStep,
+    LoopStep,
     ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
@@ -26,7 +28,7 @@ from portia.telemetry.views import PlanV2BuildTelemetryEvent
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Sequence
 
     from pydantic import BaseModel
 
@@ -52,7 +54,7 @@ class PlanBuilderV2:
 
         """
         self.plan = PlanV2(steps=[], label=label)
-        self._conditional_block_stack: list[ConditionalBlock] = []
+        self._block_stack: list[ConditionalBlock | LoopBlock] = []
 
     def input(
         self,
@@ -81,6 +83,154 @@ class PlanBuilderV2:
         self.plan.plan_inputs.append(
             PlanInput(name=name, description=description, value=default_value)
         )
+        return self
+
+    @property
+    def _current_conditional_block(self) -> ConditionalBlock | None:
+        """Get the current conditional block."""
+        if len(self._block_stack) == 0:
+            return None
+        last_block = self._block_stack[-1]
+        return last_block if isinstance(last_block, ConditionalBlock) else None
+
+    @property
+    def _current_loop_block(self) -> LoopBlock | None:
+        """Get the current loop block."""
+        if len(self._block_stack) == 0:
+            return None
+        last_block = self._block_stack[-1]
+        return last_block if isinstance(last_block, LoopBlock) else None
+
+    def loop(
+        self,
+        while_: Callable[..., bool] | str | None = None,
+        do_while_: Callable[..., bool] | str | None = None,
+        over: Reference | Sequence[Any] | None = None,
+        args: dict[str, Any] | None = None,
+        step_name: str | None = None,
+    ) -> PlanBuilderV2:
+        """Start a new loop block.
+
+        This creates a loop that can iterate over a sequence of values or repeat while a condition
+        is true. You must specify exactly one of the loop types: while_, do_while_, or over.
+
+        For 'while' loops, the condition is checked before each iteration:
+        PlanBuilderV2()
+            .loop(while_=lambda: some_condition)
+            .llm_step(task="Repeats while true")
+            .end_loop()
+
+        For 'do_while' loops, the condition is checked after each iteration:
+        PlanBuilderV2()
+            .loop(do_while_=lambda: some_condition)
+            .llm_step(task="Runs at least once")
+            .end_loop()
+
+        For 'for_each' loops, iterate over a sequence or reference:
+        PlanBuilderV2().loop(over=Input("items")).llm_step(task="Process each item").end_loop()
+
+        After opening a loop block with this loop method, you must close the block with
+        .end_loop() later in the plan.
+
+        Args:
+            while_: Condition function or string to check before each iteration. The loop continues
+                while this condition evaluates to True.
+            do_while_: Condition function or string to check after each iteration. The loop
+                continues while this condition evaluates to True, but always runs at least once.
+            over: Reference or sequence to iterate over. Each iteration will process one item
+                from this sequence.
+            args: Arguments passed to condition functions if they are functions. These are unused
+                if the condition is a string.
+            step_name: Optional explicit name for the step. This allows its output to be referenced
+                via StepOutput("name_of_step") rather than by index.
+
+        """
+        # Validate that exactly one of while_, do_while_, or over is set
+        loop_params = [while_, do_while_, over]
+        set_params = [param for param in loop_params if param is not None]
+
+        if len(set_params) == 0:
+            raise PlanBuilderError("Exactly one of while_, do_while_, or over must be set.")
+        if len(set_params) > 1:
+            raise PlanBuilderError("Only one of while_, do_while_, or over can be set.")
+
+        # Determine loop type and condition
+        if over is not None:
+            loop_type = LoopType.FOR_EACH
+            condition = None
+        elif while_ is not None:
+            loop_type = LoopType.WHILE
+            condition = while_
+        else:  # do_while_ is not None
+            loop_type = LoopType.DO_WHILE
+            condition = do_while_
+
+        loop_block = LoopBlock(
+            start_step_index=len(self.plan.steps),
+            end_step_index=None,
+        )
+        self._block_stack.append(loop_block)
+        self.plan.steps.append(
+            LoopStep(
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                over=over,
+                condition=condition,
+                args=args or {},
+                loop_block=loop_block,
+                loop_step_type=LoopStepType.START,
+                loop_type=loop_type,
+                start_index=len(self.plan.steps),
+                end_index=None,
+            )
+        )
+        return self
+
+    def end_loop(self, step_name: str | None = None) -> PlanBuilderV2:
+        """Close the most recently opened loop block.
+
+        This method must be called to properly close any loop block that was opened with
+        loop(). It marks the end of the loop logic and allows the plan to continue with
+        steps outside the loop. For example:
+
+        # Simple while loop
+        PlanBuilderV2().loop(while_=lambda: some_condition).llm_step(task="Repeats").end_loop()
+        .llm_step(task="Runs after loop")
+
+        # For-each loop over input items
+        PlanBuilderV2().loop(over=Input("items")).llm_step(task="Process item").end_loop()
+        .llm_step(task="Runs after all items processed")
+
+        Failing to call end_loop() after opening a loop block with loop() will result in an
+        error when building the plan.
+
+        Args:
+            step_name: Optional explicit name for the step. This allows its output to be referenced
+                via StepOutput("name_of_step") rather than by index.
+
+        """
+        if len(self._block_stack) == 0 or not (loop_block := self._current_loop_block):
+            raise PlanBuilderError(
+                "endloop must be called from a loop block. Please add a loop first."
+            )
+        loop_block.end_step_index = len(self.plan.steps)
+        start_loop_step = self.plan.steps[loop_block.start_step_index]
+        if not isinstance(start_loop_step, LoopStep):
+            raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
+        start_loop_step.end_index = len(self.plan.steps)
+        self.plan.steps.append(
+            LoopStep(
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                condition=start_loop_step.condition,
+                over=start_loop_step.over,
+                index=start_loop_step.index,
+                loop_step_type=LoopStepType.END,
+                loop_type=start_loop_step.loop_type,
+                args=start_loop_step.args,
+                start_index=start_loop_step.start_index,
+                end_index=len(self.plan.steps),
+            )
+        )
+        self._block_stack.pop()
         return self
 
     def if_(
@@ -117,7 +267,7 @@ class PlanBuilderV2:
             clause_step_indexes=[len(self.plan.steps)],
             parent_conditional_block=parent_block,
         )
-        self._conditional_block_stack.append(conditional_block)
+        self._block_stack.append(conditional_block)
         self.plan.steps.append(
             ConditionalStep(
                 condition=condition,
@@ -167,19 +317,18 @@ class PlanBuilderV2:
               if the condition is a string.
 
         """
-        if len(self._conditional_block_stack) == 0:
+        if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], ConditionalBlock):
             raise PlanBuilderError(
                 "else_if_ must be called from a conditional block. Please add an if_ first."
             )
-        self._conditional_block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
+        self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
         self.plan.steps.append(
             ConditionalStep(
                 condition=condition,
                 args=args or {},
                 step_name=default_step_name(len(self.plan.steps)),
-                conditional_block=self._conditional_block_stack[-1],
-                clause_index_in_block=len(self._conditional_block_stack[-1].clause_step_indexes)
-                - 1,
+                conditional_block=self._block_stack[-1],
+                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes) - 1,
                 block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
             )
         )
@@ -205,19 +354,18 @@ class PlanBuilderV2:
         Note: it is else_() rather than else() because else is a keyword in Python.
 
         """
-        if len(self._conditional_block_stack) == 0:
+        if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], ConditionalBlock):
             raise PlanBuilderError(
                 "else_ must be called from a conditional block. Please add an if_ first."
             )
-        self._conditional_block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
+        self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
         self.plan.steps.append(
             ConditionalStep(
                 condition=lambda: True,
                 args={},
                 step_name=default_step_name(len(self.plan.steps)),
-                conditional_block=self._conditional_block_stack[-1],
-                clause_index_in_block=len(self._conditional_block_stack[-1].clause_step_indexes)
-                - 1,
+                conditional_block=self._block_stack[-1],
+                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes) - 1,
                 block_clause_type=ConditionalBlockClauseType.ALTERNATE_CLAUSE,
             )
         )
@@ -245,23 +393,22 @@ class PlanBuilderV2:
         error when building the plan.
 
         """
-        if len(self._conditional_block_stack) == 0:
+        if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], ConditionalBlock):
             raise PlanBuilderError(
                 "endif must be called from a conditional block. Please add an if_ first."
             )
-        self._conditional_block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
+        self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
         self.plan.steps.append(
             ConditionalStep(
                 condition=lambda: True,
                 args={},
                 step_name=default_step_name(len(self.plan.steps)),
-                conditional_block=self._conditional_block_stack[-1],
-                clause_index_in_block=len(self._conditional_block_stack[-1].clause_step_indexes)
-                - 1,
+                conditional_block=self._block_stack[-1],
+                clause_index_in_block=len(self._block_stack[-1].clause_step_indexes) - 1,
                 block_clause_type=ConditionalBlockClauseType.END_CONDITION_BLOCK,
             )
         )
-        self._conditional_block_stack.pop()
+        self._block_stack.pop()
         return self
 
     def llm_step(
@@ -641,9 +788,9 @@ class PlanBuilderV2:
                 opened without being closed).
 
         """
-        if len(self._conditional_block_stack) > 0:
+        if len(self._block_stack) > 0:
             raise PlanBuilderError(
-                "An endif must be called for all if_ steps. Please add an endif for all if_ steps."
+                "All blocks must be closed. Please add an endif or endloop for all blocks."
             )
 
         step_type_counts: dict[str, int] = {}
@@ -659,8 +806,3 @@ class PlanBuilderV2:
         )
 
         return self.plan
-
-    @property
-    def _current_conditional_block(self) -> ConditionalBlock | None:
-        """Return the current conditional block if one is active."""
-        return self._conditional_block_stack[-1] if len(self._conditional_block_stack) > 0 else None
