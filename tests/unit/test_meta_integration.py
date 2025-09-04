@@ -112,14 +112,19 @@ def test_meta_default_models(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_meta_missing_base_url_error() -> None:
     """Test error handling when no base_url is provided to OpenAICompatibleGenerativeModel."""
-    from portia.model import OpenAICompatibleGenerativeModel
     from pydantic import SecretStr
-    
-    # Create a test class that inherits from OpenAICompatibleGenerativeModel but doesn't set base_url
+
+    from portia.model import OpenAICompatibleGenerativeModel
+
+    # Create a test class that inherits from OpenAICompatibleGenerativeModel but
+    # doesn't set base_url
     class TestModelWithoutBaseUrl(OpenAICompatibleGenerativeModel):
         pass  # No base_url class variable set
-    
-    with pytest.raises(ValueError, match="base_url must be provided either in constructor or as class variable"):
+
+    with pytest.raises(
+        ValueError,
+        match="base_url must be provided either in constructor or as class variable"
+    ):
         TestModelWithoutBaseUrl(
             model_name="test-model",
             api_key=SecretStr("test-key")
