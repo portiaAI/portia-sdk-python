@@ -36,17 +36,17 @@ from portia.model import (
 try:
     from portia.model import AmazonBedrockGenerativeModel
 except ImportError:
-    AmazonBedrockGenerativeModel = None  # type: ignore
+    AmazonBedrockGenerativeModel = None  # type: ignore[misc]
 
 try:
     from portia.model import GoogleGenAiGenerativeModel
 except ImportError:
-    GoogleGenAiGenerativeModel = None  # type: ignore
+    GoogleGenAiGenerativeModel = None  # type: ignore[misc]
 
 try:
     from portia.model import MistralAIGenerativeModel
 except ImportError:
-    MistralAIGenerativeModel = None  # type: ignore
+    MistralAIGenerativeModel = None  # type: ignore[misc]
 
 PROVIDER_ENV_VARS = [
     "OPENAI_API_KEY",
@@ -204,17 +204,22 @@ test_params = [
 
 # Add optional dependency models if they're available
 if MistralAIGenerativeModel is not None:
-    test_params.append(("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]))
+    test_params.append(
+        ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"])
+    )
 
 if GoogleGenAiGenerativeModel is not None:
     test_params.append(("google/gemini-1.5-flash", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]))
 
 if AmazonBedrockGenerativeModel is not None:
-    test_params.append((
-        "amazon/anthropic.claude-3-sonnet-v1:0",
-        AmazonBedrockGenerativeModel,
-        ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"],
-    ))
+    test_params.append(
+        (
+            "amazon/anthropic.claude-3-sonnet-v1:0",
+            AmazonBedrockGenerativeModel,
+            ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"],
+        )
+    )
+
 
 @pytest.mark.parametrize(
     ("model_string", "model_type", "present_env_vars"),

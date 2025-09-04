@@ -565,8 +565,12 @@ class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
         # Use provided base_url or fall back to class variable
         effective_base_url = base_url or self.base_url
         if not effective_base_url:
-            raise ValueError(f"base_url must be provided either in constructor or as class variable for {self.__class__.__name__}")
-        
+            class_name = self.__class__.__name__
+            raise ValueError(
+                f"base_url must be provided either in constructor "
+                f"or as class variable for {class_name}"
+            )
+
         self._model_kwargs = kwargs.copy()
         if "disabled_params" not in kwargs:
             # Some OpenAI-compatible endpoints do not support parallel tool calls
