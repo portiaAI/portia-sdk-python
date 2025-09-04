@@ -1089,7 +1089,7 @@ def test_add_steps_with_input_values_invalid_input_name_error() -> None:
 
 # Loop tests
 
-
+def test_basic_loop_with_condition() -> None:
 def test_basic_loop_over_condition() -> None:
     """Test basic loop with condition."""
     builder = PlanBuilderV2()
