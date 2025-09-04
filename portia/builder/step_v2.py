@@ -16,7 +16,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
-from portia.builder.loops import LoopBlock, LoopBlockType, LoopStepResult, LoopType
+from portia.builder.loops import LoopBlock, LoopStepType, LoopStepResult, LoopType
 from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
@@ -876,7 +876,7 @@ class LoopStep(StepV2):
     args: dict[str, Reference | Any] = Field(
         default_factory=dict, description="The args to check the condition with."
     )
-    loop_block_type: LoopBlockType
+    loop_block_type: LoopStepType
     start_index: int = Field(description="The start index of the loop.")
     end_index: int | None = Field(default=None, description="The end index of the loop.")
 
@@ -928,9 +928,9 @@ class LoopStep(StepV2):
         """Run the loop step."""
         args = {k: self._resolve_references(v, run_data) for k, v in self.args.items()}
         match self.loop_block_type, self.loop_type:
-            case (LoopBlockType.END, LoopType.DO_WHILE) | (LoopBlockType.START, LoopType.WHILE):
+            case (LoopStepType.END, LoopType.DO_WHILE) | (LoopStepType.START, LoopType.WHILE):
                 return await self._handle_conditional_loop(run_data, args)
-            case LoopBlockType.START, LoopType.FOR_EACH:
+            case LoopStepType.START, LoopType.FOR_EACH:
                 if self.over is None:
                     raise ValueError("Over is required for for-each loop")
                 value = self._current_loop_variable(run_data)

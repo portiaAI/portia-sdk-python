@@ -16,7 +16,7 @@ from portia.builder.step_v2 import (
     InvokeToolStep,
     LLMStep,
     LoopBlock,
-    LoopBlockType,
+    LoopStepType,
     LoopStep,
     LoopType,
     ReActAgentStep,
@@ -1161,7 +1161,7 @@ def test_basic_loop_with_condition() -> None:
     assert len(plan.steps) == 3
     assert isinstance(plan.steps[0], LoopStep)
     assert plan.steps[0].loop_type == LoopType.WHILE
-    assert plan.steps[0].loop_block_type == LoopBlockType.START
+    assert plan.steps[0].loop_block_type == LoopStepType.START
 
 
 def test_basic_loop_over_condition() -> None:
@@ -1182,7 +1182,7 @@ def test_basic_loop_over_condition() -> None:
     assert loop_step.condition is test_condition
     assert loop_step.over is None
     assert loop_step.loop_type == LoopType.WHILE
-    assert loop_step.loop_block_type == LoopBlockType.START
+    assert loop_step.loop_block_type == LoopStepType.START
     assert loop_step.step_name == "step_0"
 
     # Check LLM step inside loop
@@ -1193,7 +1193,7 @@ def test_basic_loop_over_condition() -> None:
     # Check end_loop step
     end_loop_step = builder.plan.steps[2]
     assert isinstance(end_loop_step, LoopStep)
-    assert end_loop_step.loop_block_type == LoopBlockType.END
+    assert end_loop_step.loop_block_type == LoopStepType.END
     assert end_loop_step.loop_type == LoopType.WHILE
     assert end_loop_step.condition is test_condition
 
@@ -1223,7 +1223,7 @@ def test_basic_loop_over_reference() -> None:
     assert loop_step.over == StepOutput("items")
     assert loop_step.condition is None
     assert loop_step.loop_type == LoopType.FOR_EACH
-    assert loop_step.loop_block_type == LoopBlockType.START
+    assert loop_step.loop_block_type == LoopStepType.START
 
     # Check LLM step inside loop
     llm_step = builder.plan.steps[2]
@@ -1233,7 +1233,7 @@ def test_basic_loop_over_reference() -> None:
     # Check end_loop step
     end_loop_step = builder.plan.steps[3]
     assert isinstance(end_loop_step, LoopStep)
-    assert end_loop_step.loop_block_type == LoopBlockType.END
+    assert end_loop_step.loop_block_type == LoopStepType.END
     assert end_loop_step.loop_type == LoopType.FOR_EACH
 
 
@@ -1716,7 +1716,7 @@ def test_end_loop_sets_end_index() -> None:
     # Find the start loop step
     start_loop_step = None
     for step in plan.steps:
-        if isinstance(step, LoopStep) and step.loop_block_type == LoopBlockType.START:
+        if isinstance(step, LoopStep) and step.loop_block_type == LoopStepType.START:
             start_loop_step = step
             break
 
@@ -1733,7 +1733,7 @@ def test_end_loop_sets_end_index() -> None:
     # Verify the end_loop step is at the expected index
     end_loop_step = plan.steps[start_loop_step.end_index]
     assert isinstance(end_loop_step, LoopStep)
-    assert end_loop_step.loop_block_type == LoopBlockType.END
+    assert end_loop_step.loop_block_type == LoopStepType.END
 
 
 def test_end_loop_no_loop_block_error() -> None:

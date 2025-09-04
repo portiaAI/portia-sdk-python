@@ -30,7 +30,7 @@ from langsmith import get_current_run_tree, traceable
 from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
-from portia.builder.loops import LoopBlockType, LoopStepResult
+from portia.builder.loops import LoopStepType, LoopStepResult
 from portia.builder.plan_v2 import PlanV2
 from portia.clarification import (
     Clarification,
@@ -2849,10 +2849,10 @@ class Portia:
     def _handle_loop_step(self, result: LoopStepResult) -> int | None:
         """Handle a loop step."""
         match result.block_type, result.loop_result:
-            case LoopBlockType.START, True:
+            case LoopStepType.START, True:
                 logger().debug("Running loop")
                 return None  # just iterate the loop as usual
-            case LoopBlockType.END, True:
+            case LoopStepType.END, True:
                 logger().debug("Returning to loop start")
                 return result.start_index
             case (_, False):

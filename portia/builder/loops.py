@@ -24,7 +24,7 @@ class LoopBlock(BaseModel):
     )
 
 
-class LoopBlockType(StrEnum):
+class LoopStepType(StrEnum):
     """The type of loop block."""
 
     START = "START"
@@ -50,7 +50,7 @@ class LoopStepResult(BaseModel):
 
     """
 
-    block_type: LoopBlockType
+    block_type: LoopStepType
     value: Any = Field(description="The value of the loop step.")
     loop_result: bool
     start_index: int
