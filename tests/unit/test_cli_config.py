@@ -1,10 +1,8 @@
 """Integration tests for the CLI (template-aligned)."""
-
 import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
-
 import pytest
 import toml
 from click.testing import CliRunner

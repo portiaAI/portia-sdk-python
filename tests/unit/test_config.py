@@ -1,12 +1,10 @@
 """Tests for portia classes."""
-
 import os
-from unittest.mock import MagicMock
-
+from unittest.mock import MagicMock, patch
+import toml
 import pytest
 from langchain_core.caches import InMemoryCache
 from pydantic import SecretStr
-
 from portia.config import (
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
     SUPPORTED_OPENAI_MODELS,
@@ -18,7 +16,7 @@ from portia.config import (
     PlanningAgentType,
     StorageClass,
     parse_str_to_enum,
-    default_config
+    default_config,
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
@@ -33,7 +31,7 @@ from portia.model import (
     OpenRouterGenerativeModel,
     _llm_cache,
 )
-
+from portia.config_loader import ConfigLoader,ensure_config_directory
 PROVIDER_ENV_VARS = [
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
@@ -47,15 +45,11 @@ PROVIDER_ENV_VARS = [
     "AWS_DEFAULT_REGION",
     "OPENROUTER_API_KEY",
 ]
-
-
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unset the provider env vars."""
     for env_var in PROVIDER_ENV_VARS:
         monkeypatch.delenv(env_var, raising=False)
-
-
 def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test from default."""
     monkeypatch.delenv("LLM_REDIS_CACHE_URL", raising=False)
@@ -72,8 +66,6 @@ def test_from_default(monkeypatch: pytest.MonkeyPatch) -> None:
         assert c.storage_class == StorageClass.MEMORY
     assert c.llm_redis_cache_url is None
     assert _llm_cache.get() is None
-
-
 def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setting keys."""
     monkeypatch.setenv("PORTIA_API_KEY", "test-key")
@@ -85,8 +77,6 @@ def test_set_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     assert c.openai_api_key == SecretStr("test-openai-key")
     assert c.anthropic_api_key == SecretStr("test-anthropic-key")
     assert c.mistralai_api_key == SecretStr("test-mistral-key")
-
-
 def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test setting keys as string."""
     monkeypatch.setenv("PORTIA_API_KEY", "test-key")
@@ -96,33 +86,26 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     # storage
     c = Config.from_default(storage_class="MEMORY")
     assert c.storage_class == StorageClass.MEMORY
-
     c = Config.from_default(storage_class="DISK", storage_dir="/test")
     assert c.storage_class == StorageClass.DISK
     assert c.storage_dir == "/test"
-
     c = Config.from_default(storage_class="DISK")
     assert c.storage_class == StorageClass.DISK
     assert c.storage_dir is None  # Will default to .portia in DiskFileStorage
-
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(storage_class="OTHER")
-
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(storage_class=123)
-
     # log level
     c = Config.from_default(default_log_level="CRITICAL")
     assert c.default_log_level == LogLevel.CRITICAL
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(default_log_level="some level")
-
     # execution_agent_type
     c = Config.from_default(execution_agent_type="default")
     assert c.execution_agent_type == ExecutionAgentType.DEFAULT
     with pytest.raises(InvalidConfigError):
         c = Config.from_default(execution_agent_type="my agent")
-
     # Large output threshold value
     c = Config.from_default(
         large_output_threshold_tokens=100,
@@ -140,32 +123,25 @@ def test_set_with_strings(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert c.large_output_threshold_tokens == 100
     assert not c.exceeds_output_threshold("Test " * 1000)
-
-
 def test_llm_redis_cache_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url is read from environment variable."""
     mock_redis_cache_instance = MagicMock()
     mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
     monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
-
     monkeypatch.setenv("LLM_REDIS_CACHE_URL", "redis://localhost:6379/0")
     config = Config.from_default(openai_api_key=SecretStr("123"))
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
     assert _llm_cache.get() is mock_redis_cache_instance
-
-
 def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     """llm_redis_cache_url can be set via kwargs."""
     mock_redis_cache_instance = InMemoryCache()
     mock_redis_cache = MagicMock(return_value=mock_redis_cache_instance)
     monkeypatch.setattr("langchain_redis.RedisCache", mock_redis_cache)
-
     config = Config.from_default(
         openai_api_key=SecretStr("123"), llm_redis_cache_url="redis://localhost:6379/0"
     )
     assert config.llm_redis_cache_url == "redis://localhost:6379/0"
     assert _llm_cache.get() is mock_redis_cache_instance
-
 
 @pytest.mark.parametrize(
     ("model_string", "model_type", "present_env_vars"),
@@ -752,26 +728,23 @@ def test_fill_default_models_introspection_model_only(monkeypatch):
     from portia.config import Config, GenerativeModelsConfig, LLMProvider
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     
-    # Create config with default_model set but introspection_model None
+    
     models = GenerativeModelsConfig(
         default_model="openai/gpt-4.1",
-        introspection_model=None  # Explicitly None to trigger the fill logic
+        introspection_model=None 
     )
     c = Config.from_default(
         llm_provider=LLMProvider.OPENAI,
         models=models,
         openai_api_key="test-key"
     )
-    # Should set introspection_model from provider default
+    
     assert c.models.introspection_model == "openai/o4-mini"
 
 def test_default_config_all_env_overrides(monkeypatch):
     """Test all environment variable overrides in default_config final block."""
-    
-    # Set the required API key so config doesn't fail
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    
-    # Set ALL the environment variables that are checked in the final override block
+
     monkeypatch.setenv("PORTIA_API_ENDPOINT", "https://api.env.test")
     monkeypatch.setenv("PORTIA_DASHBOARD_URL", "https://dash.env.test") 
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.env.test")
@@ -793,3 +766,212 @@ def test_default_config_all_env_overrides(monkeypatch):
     assert cfg.aws_credentials_profile_name == "my_aws_profile"
     assert cfg.llm_redis_cache_url == "redis://localhost:6379/1"
     
+
+def make_minimal_config():
+    return Config(
+        llm_provider="openai",
+        openai_api_key=SecretStr("test-key"),
+        models=GenerativeModelsConfig(default_model="openai/gpt-4.1")
+    )
+
+def test_must_get_api_key(monkeypatch):
+    config = make_minimal_config()
+    monkeypatch.setattr(config, "portia_api_key", SecretStr("secret"))
+    assert config.must_get_api_key("portia_api_key").get_secret_value() == "secret"
+
+def test_must_get():
+    config = make_minimal_config()
+    assert config.must_get("openai_api_key", SecretStr) == SecretStr("test-key")
+    with pytest.raises(ConfigNotFoundError):
+        config.must_get("not_present", str)
+
+def test_get_default_model():
+    config = make_minimal_config()
+    model = config.get_default_model()
+    assert model is not None
+    
+def test_env_var_mapping_iterates(monkeypatch):
+    """Test that merge_with_env iterates through ENV_VAR_MAPPING and picks up env vars."""
+    loader = ConfigLoader()
+    monkeypatch.setenv("OPENAI_API_KEY", "env-value")
+    config = {}
+    merged = loader.merge_with_env(config)
+    assert merged["openai_api_key"] == "env-value"
+
+def test_ensure_config_directory_creates_dir(tmp_path, monkeypatch):
+    """Test that ensure_config_directory creates and returns the config dir."""
+    monkeypatch.setattr(ConfigLoader, "DEFAULT_CONFIG_DIR", tmp_path / "mycfg")
+    config_dir = ensure_config_directory()
+    assert config_dir.exists()
+    assert config_dir.is_dir()
+def test_fill_default_models_both_none(monkeypatch):
+    """Test that both planning_model and introspection_model are set when None."""
+    from portia.config import Config, GenerativeModelsConfig, LLMProvider
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    models = GenerativeModelsConfig(
+        default_model="openai/gpt-4.1",
+        planning_model=None,
+        introspection_model=None,
+    )
+    c = Config.from_default(
+        llm_provider=LLMProvider.OPENAI,
+        models=models,
+        openai_api_key="test-key"
+    )
+    assert c.models.planning_model == "openai/o3-mini"
+    assert c.models.introspection_model == "openai/o4-mini"
+  
+
+def make_openai_config(exec_model=None, default_model="openai/gpt-4o"):
+    models = GenerativeModelsConfig(
+        default_model=default_model,
+        execution_model=exec_model
+    )
+    return Config(
+        llm_provider=LLMProvider.OPENAI,
+        models=models,
+        openai_api_key=SecretStr("test-key"),
+    )
+
+def test_get_execution_model_returns_specified():
+    """Test get_execution_model returns the specified execution_model."""
+    config = make_openai_config(exec_model="openai/gpt-4o")
+    model = config.get_execution_model()
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+
+def test_get_execution_model_falls_back_to_default():
+    """Test get_execution_model falls back to default_model if execution_model is None."""
+    config = make_openai_config(exec_model=None, default_model="openai/gpt-4o")
+    model = config.get_execution_model()
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+
+def test_get_generative_model_none_returns_none():
+    """Test get_generative_model returns None if passed None."""
+    config = make_openai_config()
+    assert config.get_generative_model(None) is None
+
+def test_get_generative_model_string_parses():
+    """Test get_generative_model parses string and returns correct model."""
+    config = make_openai_config()
+    model = config.get_generative_model("openai/gpt-4o")
+    assert isinstance(model, OpenAIGenerativeModel)
+    assert str(model) == "openai/gpt-4o"
+
+def test_get_generative_model_instance_returns_instance():
+    """Test get_generative_model returns instance if passed a model instance."""
+    config = make_openai_config()
+    inst = OpenAIGenerativeModel(model_name="gpt-4o", api_key=SecretStr("test-key"))
+    assert config.get_generative_model(inst) is inst
+def test_from_local_config_with_profile(tmp_path, monkeypatch):
+    
+    config_file = tmp_path / "config.toml"
+    data = {
+        "profile": {
+            "openai": {
+                "llm_provider": "openai",
+                "default_model": "openai/gpt-4o",
+                "openai_api_key": "test-key"
+            }
+        }
+    }
+    with open(config_file, "w") as f:
+        toml.dump(data, f)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    
+    config = Config.from_local_config(profile="openai", config_file=config_file)
+    assert config.llm_provider == LLMProvider.OPENAI
+    assert config.models.default_model == "openai/gpt-4o"
+    assert config.openai_api_key.get_secret_value() == "test-key"
+    
+def test_enum_parsing_for_agent_types():
+    config = Config.from_default(
+        execution_agent_type="ONE_SHOT",
+        planning_agent_type="DEFAULT",
+        portia_api_key="dummy",
+        openai_api_key="dummy",
+    )
+    assert config.execution_agent_type == ExecutionAgentType.ONE_SHOT
+    assert config.planning_agent_type == PlanningAgentType.DEFAULT
+    
+@patch('portia.config_loader.get_config')
+def test_execution_agent_type_parsing(mock_get_config):
+        """Test line 814: execution_agent_type string to enum parsing."""
+      
+        mock_get_config.return_value = {
+            'llm_provider': 'openai',
+            'openai_api_key': 'dummy',
+            'execution_agent_type': 'ONE_SHOT'
+        }
+        config = Config.from_local_config()
+        assert config.execution_agent_type == ExecutionAgentType.ONE_SHOT
+
+        mock_get_config.return_value = {
+            'llm_provider': 'openai',
+            'openai_api_key': 'dummy',
+            'execution_agent_type': 'one_shot'
+        }
+        config = Config.from_local_config()
+        assert config.execution_agent_type == ExecutionAgentType.ONE_SHOT
+
+        mock_get_config.return_value = {
+            'llm_provider': 'openai',
+            'openai_api_key': 'dummy',
+            'execution_agent_type': 'one-shot'
+        }
+        config = Config.from_local_config()
+        assert config.execution_agent_type == ExecutionAgentType.ONE_SHOT
+
+@patch('portia.config_loader.get_config')
+def test_planning_agent_type_parsing(mock_get_config):
+        """Test line 817: planning_agent_type string to enum parsing."""
+        mock_get_config.return_value = {
+            'llm_provider': 'openai',
+            'openai_api_key': 'dummy',
+            'planning_agent_type': 'DEFAULT'
+        }
+        config = Config.from_local_config()
+        assert config.planning_agent_type == PlanningAgentType.DEFAULT
+        
+        
+        mock_get_config.return_value = {
+            'llm_provider': 'openai',
+            'openai_api_key': 'dummy',
+            'planning_agent_type': 'default'
+        }
+        config = Config.from_local_config()
+        assert config.planning_agent_type == PlanningAgentType.DEFAULT
+
+@patch('portia.config_loader.get_config')
+def test_invalid_execution_agent_type(mock_get_config):
+        """Test line 814: invalid execution_agent_type raises error."""
+        mock_get_config.return_value = {
+            'execution_agent_type': 'INVALID_TYPE'
+        }
+        with pytest.raises(Exception):  
+            Config.from_local_config()
+
+@patch('portia.config_loader.get_config')
+def test_invalid_planning_agent_type( mock_get_config):
+        """Test line 817: invalid planning_agent_type raises error."""
+        mock_get_config.return_value = {
+            'planning_agent_type': 'INVALID_TYPE'
+        }
+        with pytest.raises(Exception):  
+            Config.from_local_config()
+
+@patch('portia.config_loader.get_config')
+def test_both_together(mock_get_config):
+        """Test both lines 814 and 817 working together."""
+        mock_get_config.return_value = {
+            'llm_provider': 'openai',
+            'openai_api_key': 'dummy',
+            'execution_agent_type': 'DEFAULT',
+            'planning_agent_type': 'DEFAULT'
+        }
+        config = Config.from_local_config()
+        assert config.execution_agent_type == ExecutionAgentType.DEFAULT
+        assert config.planning_agent_type == PlanningAgentType.DEFAULT
