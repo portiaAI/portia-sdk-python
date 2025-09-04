@@ -16,7 +16,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
-from portia.builder.loops import LoopBlock, LoopStepType, LoopStepResult, LoopType
+from portia.builder.loops import LoopBlock, LoopStepResult, LoopStepType, LoopType
 from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
