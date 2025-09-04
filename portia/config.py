@@ -1046,7 +1046,7 @@ class Config(BaseModel):
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
 
-def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911
+def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911, C901
     """Get the default LLM provider from the API keys.
 
     Returns:

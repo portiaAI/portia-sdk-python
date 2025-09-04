@@ -2163,7 +2163,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], marker = "python_full_version >= '3.9' and python_full_version < '4.0'", specifier = ">=4.10.0" },
 ]
-provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "groq", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
+provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "groq", "meta", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
 
 [package.metadata.requires-dev]
 dev = [

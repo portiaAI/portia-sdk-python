@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from langchain_core.caches import InMemoryCache
 from pydantic import SecretStr
+from typing import TYPE_CHECKING, TypeVar
 
 from portia.config import (
     FEATURE_FLAG_AGENT_MEMORY_ENABLED,
@@ -21,17 +22,32 @@ from portia.config import (
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
-    AmazonBedrockGenerativeModel,
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
-    GoogleGenAiGenerativeModel,
+    GrokGenerativeModel,
+    LangChainGenerativeModel,
     LLMProvider,
-    MistralAIGenerativeModel,
     OpenAIGenerativeModel,
     OpenRouterGenerativeModel,
-    _llm_cache,
+    MetaLlamaGenerativeModel,
+    MistralAIGenerativeModel,
+    GoogleGenAiGenerativeModel,
+    AmazonBedrockGenerativeModel,
+    OllamaGenerativeModel,
 )
+
+if TYPE_CHECKING:
+    from portia.model import (
+        AmazonBedrockGenerativeModel,
+        GoogleGenAiGenerativeModel,
+        MetaLlamaGenerativeModel,
+        MistralAIGenerativeModel,
+        OllamaGenerativeModel,
+    )
+
+
+T = TypeVar("T")
 
 PROVIDER_ENV_VARS = [
     "OPENAI_API_KEY",
