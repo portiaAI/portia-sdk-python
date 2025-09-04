@@ -936,7 +936,7 @@ class LoopStep(StepV2):
                 value = self._current_loop_variable(run_data)
                 self.index += 1
                 return LoopStepResult(
-                    block_type=self.loop_block_type,
+                    step_type=self.loop_block_type,
                     loop_result=value is not None,
                     value=value,
                     start_index=self.start_index_value,
@@ -946,7 +946,7 @@ class LoopStep(StepV2):
                 # conditional loops are evaluated at end of loop execution
                 # for-each loops are evaluated at end of loop execution
                 return LoopStepResult(
-                    block_type=self.loop_block_type,
+                    step_type=self.loop_block_type,
                     loop_result=True,
                     value=True,
                     start_index=self.start_index_value,
@@ -967,7 +967,7 @@ class LoopStep(StepV2):
         else:
             conditional_result = self.condition(**args)
         return LoopStepResult(
-            block_type=self.loop_block_type,
+            step_type=self.loop_block_type,
             loop_result=conditional_result,
             value=conditional_result,
             start_index=self.start_index_value,

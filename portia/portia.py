@@ -2848,7 +2848,7 @@ class Portia:
 
     def _handle_loop_step(self, result: LoopStepResult) -> int | None:
         """Handle a loop step."""
-        match result.block_type, result.loop_result:
+        match result.step_type, result.loop_result:
             case LoopStepType.START, True:
                 logger().debug("Running loop")
                 return None  # just iterate the loop as usual

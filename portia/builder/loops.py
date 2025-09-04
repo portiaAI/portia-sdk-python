@@ -50,7 +50,7 @@ class LoopStepResult(BaseModel):
 
     """
 
-    block_type: LoopStepType
+    step_type: LoopStepType
     value: Any = Field(description="The value of the loop step.")
     loop_result: bool
     start_index: int
