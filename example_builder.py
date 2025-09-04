@@ -137,7 +137,7 @@ class WhileCondition:
 
     def run(self) -> bool:  # noqa: D102
         self.counter += 1
-        return self.counter <= 4
+        return self.counter <= 4  # noqa: PLR2004
 
 
 while_condition = WhileCondition()
@@ -147,7 +147,8 @@ plan = (
         while_=while_condition.run, step_name="Loop"
     )  # name the loop, iterate while the condition is true
     .function_step(
-        function=lambda: print("Hello"), step_name="test_function"
+        function=lambda: print("Hello"),  # noqa: T201
+        step_name="test_function",
     )  # call the loop step to access current item
     .end_loop(step_name="end_loop")
 ).build()
@@ -169,7 +170,9 @@ iterator = Iterator()
 plan = (
     PlanBuilderV2("Buy some gold")
     .loop(
-        do_while_=lambda x: x < 4, args={"x": StepOutput("test_function")}, step_name="Loop"
+        do_while_=lambda x: x < 4,  # noqa: PLR2004
+        args={"x": StepOutput("test_function")},
+        step_name="Loop",
     )  # can access the item from the loop as a variable as it gets evaluated at end of loop
     .function_step(function=lambda: iterator.run(), step_name="test_function")
     .end_loop(step_name="end_loop")
