@@ -207,7 +207,7 @@ if MistralAIGenerativeModel is not None:
     test_params.append(("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]))
 
 if GoogleGenAiGenerativeModel is not None:
-    test_params.append(("google/gemini-2.5-preview", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]))
+    test_params.append(("google/gemini-1.5-flash", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]))
 
 if AmazonBedrockGenerativeModel is not None:
     test_params.append((
