@@ -179,8 +179,6 @@ class PlanBuilderV2:
                 loop_block=loop_block,
                 loop_step_type=LoopStepType.START,
                 loop_type=loop_type,
-                start_index=len(self.plan.steps),
-                end_index=None,
             )
         )
         return self
@@ -216,18 +214,16 @@ class PlanBuilderV2:
         start_loop_step = self.plan.steps[loop_block.start_step_index]
         if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
-        start_loop_step.end_index = len(self.plan.steps)
         self.plan.steps.append(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 condition=start_loop_step.condition,
                 over=start_loop_step.over,
                 index=start_loop_step.index,
+                loop_block=loop_block,
                 loop_step_type=LoopStepType.END,
                 loop_type=start_loop_step.loop_type,
                 args=start_loop_step.args,
-                start_index=start_loop_step.start_index,
-                end_index=len(self.plan.steps),
             )
         )
         self._block_stack.pop()
