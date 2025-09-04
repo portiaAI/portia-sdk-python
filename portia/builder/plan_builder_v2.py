@@ -115,10 +115,16 @@ class PlanBuilderV2:
         is true. You must specify exactly one of the loop types: while_, do_while_, or over.
 
         For 'while' loops, the condition is checked before each iteration:
-        PlanBuilderV2().loop(while_=lambda: some_condition).llm_step(task="Repeats while true").end_loop()
+        PlanBuilderV2()
+            .loop(while_=lambda: some_condition)
+            .llm_step(task="Repeats while true")
+            .end_loop()
 
         For 'do_while' loops, the condition is checked after each iteration:
-        PlanBuilderV2().loop(do_while_=lambda: some_condition).llm_step(task="Runs at least once").end_loop()
+        PlanBuilderV2()
+            .loop(do_while_=lambda: some_condition)
+            .llm_step(task="Runs at least once")
+            .end_loop()
 
         For 'for_each' loops, iterate over a sequence or reference:
         PlanBuilderV2().loop(over=Input("items")).llm_step(task="Process each item").end_loop()
@@ -129,8 +135,8 @@ class PlanBuilderV2:
         Args:
             while_: Condition function or string to check before each iteration. The loop continues
                 while this condition evaluates to True.
-            do_while_: Condition function or string to check after each iteration. The loop continues
-                while this condition evaluates to True, but always runs at least once.
+            do_while_: Condition function or string to check after each iteration. The loop
+                continues while this condition evaluates to True, but always runs at least once.
             over: Reference or sequence to iterate over. Each iteration will process one item
                 from this sequence.
             args: Arguments passed to condition functions if they are functions. These are unused
