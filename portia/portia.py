@@ -69,14 +69,13 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.logger import logger, logger_manager
+from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
-    MAX_OUTPUT_LOG_LENGTH,
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
@@ -2191,13 +2190,8 @@ class Portia:
             summary = plan_run.outputs.final_output.get_summary()
             if not summary:
                 summary = str(plan_run.outputs.final_output.get_value())
-            if len(summary) > MAX_OUTPUT_LOG_LENGTH:
-                summary = (  # pragma: no cover
-                    summary[:MAX_OUTPUT_LOG_LENGTH]
-                    + "...[truncated - only first 1000 characters shown]"
-                )
             logger().info(
-                f"Final output: {summary!s}",
+                f"Final output: {truncate_message(summary)!s}",
             )
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
@@ -2609,10 +2603,17 @@ class Portia:
                 or step.tool_id.startswith(LOCAL_FUNCTION_PREFIX)
             ):
                 continue
-            tools_remaining.add(step.tool_id)
 
+            if "," in step.tool_id:
+                # A comma can only appear in the tool ID with PlanV2 ReAct agent steps where they
+                # are using more than one tool in a single step.
+                tools_remaining.update(step.tool_id.split(","))
+            else:
+                tools_remaining.add(step.tool_id)
+
+        for tool_id in tools_remaining:
             tool = ToolCallWrapper.from_tool_id(
-                step.tool_id,
+                tool_id,
                 self.tool_registry,
                 self.storage,
                 plan_run,
@@ -2620,7 +2621,7 @@ class Portia:
             if not tool:
                 continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
             if tool.id.startswith("portia:"):
-                portia_cloud_tool_ids_remaining.add(step.tool_id)
+                portia_cloud_tool_ids_remaining.add(tool_id)
             else:
                 ready_response = tool.ready(tool_run_context)
                 if not ready_response.ready:
@@ -2706,6 +2707,7 @@ class Portia:
             tool_registry=self.tool_registry,
             storage=self.storage,
             execution_hooks=self.execution_hooks,
+            telemetry=self.telemetry,
         )
 
         try:
@@ -2725,7 +2727,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
@@ -2779,15 +2781,20 @@ class Portia:
                 case _:
                     jump_to_step_index = None
 
-            output_value = LocalDataValue(value=result)
+            # Some steps output a LocalDataValue so they can attach a summary to the output, but
+            # we don't enforce that all steps do this so we need to handle both cases.
+            if not isinstance(result, LocalDataValue):
+                local_output_value = LocalDataValue(value=result)
+            else:
+                local_output_value = result
             # This may persist the output to memory - store the memory value if it does
-            output_value = self._set_step_output(output_value, run_data.plan_run, legacy_step)
+            output_value = self._set_step_output(local_output_value, run_data.plan_run, legacy_step)
             if not is_clarification(result):
                 run_data.step_output_values.append(
                     StepOutputValue(
                         step_name=step.step_name,
                         step_num=index,
-                        value=result,
+                        value=local_output_value.value,
                         description=(f"Output from step '{step.step_name}' (Description: {step})"),
                     )
                 )

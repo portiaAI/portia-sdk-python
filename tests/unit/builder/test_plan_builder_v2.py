@@ -19,6 +19,7 @@ from portia.builder.step_v2 import (
     LoopBlockType,
     LoopStep,
     LoopType,
+    ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
     UserInputStep,
@@ -356,6 +357,63 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
     assert step.inputs == inputs
     assert step.output_schema == OutputSchema
     assert step.step_name == "agent_step"
+
+
+def test_react_agent_step_method_basic() -> None:
+    """Test the react_agent_step() method with basic parameters."""
+    builder = PlanBuilderV2()
+    tools = ["search_tool", "calculator_tool"]
+
+    result = builder.react_agent_step(task="Research and calculate", tools=tools)
+
+    assert result is builder  # Should return self for chaining
+    assert len(builder.plan.steps) == 1
+    assert isinstance(builder.plan.steps[0], ReActAgentStep)
+    assert builder.plan.steps[0].task == "Research and calculate"
+    assert builder.plan.steps[0].tools == tools
+    assert builder.plan.steps[0].inputs == []
+    assert builder.plan.steps[0].output_schema is None
+    assert builder.plan.steps[0].step_name == "step_0"
+    assert builder.plan.steps[0].tool_call_limit == 25
+    assert builder.plan.steps[0].allow_agent_clarifications is False
+
+
+def test_react_agent_step_method_with_all_parameters() -> None:
+    """Test the react_agent_step() method with all parameters."""
+    builder = PlanBuilderV2()
+    tools = ["search_tool", "calculator_tool", "weather_tool"]
+    inputs = ["context", StepOutput(0), Input("user_query")]
+
+    builder.react_agent_step(
+        task="Complex multi-tool analysis",
+        tools=tools,
+        inputs=inputs,
+        output_schema=OutputSchema,
+        step_name="react_analysis",
+        allow_agent_clarifications=True,
+        tool_call_limit=50,
+    )
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.task == "Complex multi-tool analysis"
+    assert step.tools == tools
+    assert step.inputs == inputs
+    assert step.output_schema == OutputSchema
+    assert step.step_name == "react_analysis"
+    assert step.allow_agent_clarifications is True
+    assert step.tool_call_limit == 50
+
+
+def test_react_agent_step_method_single_tool() -> None:
+    """Test the react_agent_step() method with a single tool."""
+    builder = PlanBuilderV2()
+
+    builder.react_agent_step(task="Simple task", tools=["single_tool"])
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.tools == ["single_tool"]
 
 
 def test_user_verify_step_method() -> None:

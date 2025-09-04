@@ -2510,11 +2510,17 @@ def test_custom_tool_ready_resume_multiple_custom_tools() -> None:
     outstanding_clarifications = output_plan_run.get_outstanding_clarifications()
     assert isinstance(outstanding_clarifications[0], ActionClarification)
     assert outstanding_clarifications[0].plan_run_id == plan_run.id
-    assert str(outstanding_clarifications[0].action_url) == ready_tool.auth_url
+    assert str(outstanding_clarifications[0].action_url) in [
+        ready_tool.auth_url,
+        ready_tool_2.auth_url,
+    ]
     assert outstanding_clarifications[0].resolved is False
     assert isinstance(outstanding_clarifications[1], ActionClarification)
     assert outstanding_clarifications[1].plan_run_id == plan_run.id
-    assert str(outstanding_clarifications[1].action_url) == ready_tool_2.auth_url
+    assert str(outstanding_clarifications[1].action_url) in [
+        ready_tool.auth_url,
+        ready_tool_2.auth_url,
+    ]
     assert outstanding_clarifications[1].resolved is False
 
 
