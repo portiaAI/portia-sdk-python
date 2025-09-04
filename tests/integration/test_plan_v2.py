@@ -841,11 +841,9 @@ async def test_example_builder_plan_scenarios(
         execution_hooks=ExecutionHooks(clarification_handler=ExampleBuilderClarificationHandler()),
     )
 
-    def calculate_total_price(
-        price_with_currency: CommodityPriceWithCurrency, purchase_quantity: str | int
-    ) -> float:
+    def calculate_total_price(price: float, purchase_quantity: str | int) -> float:
         """Calculate total price with string to int conversion."""
-        return price_with_currency.price * int(purchase_quantity)
+        return price * int(purchase_quantity)
 
     plan = (
         PlanBuilderV2("Buy some gold")
@@ -875,7 +873,7 @@ async def test_example_builder_plan_scenarios(
             step_name="Calculate total price",
             function=calculate_total_price,
             args={
-                "price_with_currency": StepOutput("Search gold price"),
+                "price": StepOutput("Search gold price", path="price"),
                 "purchase_quantity": StepOutput("Purchase quantity"),
             },
         )
