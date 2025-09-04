@@ -21,7 +21,7 @@ from tests.utils import (
 
 
 class TestError(Exception):
-    """Test error for async tests."""
+    pass
 
 
 def test_summarizer_model_normal_output() -> None:

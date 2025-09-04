@@ -651,6 +651,8 @@ def test_llm_provider_default_from_api_keys_env_vars(
     ):
         pytest.skip(f"{provider.value} extras not installed")
     for env_var_name, env_var_value in env_vars.items():
+        if not os.getenv(env_var_name):
+            pytest.skip(f"Environment variable {env_var_name} not set")
         monkeypatch.setenv(env_var_name, env_var_value)
 
     c = Config.from_default()
@@ -692,6 +694,12 @@ def test_llm_provider_default_from_api_keys_config_kwargs(
         provider.value, raise_error=False
     ):
         pytest.skip(f"{provider.value} extras not installed")
+
+    for key in config_kwargs:
+        env_key = key.upper()
+        if not os.getenv(env_key):
+            pytest.skip(f"Environment variable {env_key} not set for kwarg test")
+
     c = Config.from_default(**config_kwargs)
     assert c.llm_provider == provider
 

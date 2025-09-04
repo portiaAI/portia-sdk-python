@@ -166,3 +166,4 @@ async def test_groq_model_aget_structured_response() -> None:
 
         assert isinstance(result, _StructuredOutputTestModel)
         assert getattr(result, "test_field", "") == "Groq structured response"
+ 
