@@ -1740,7 +1740,7 @@ def test_plan_v2_do_while_loop_string_condition(local_portia: Portia) -> None:
     assert counter > 0
 
 
-@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.parametrize("llm_provider", MODEL_PROVIDERS)
 @pytest.mark.asyncio
 async def test_react_agent_weather_research_and_poem(
@@ -1833,7 +1833,6 @@ class CountryClarificationHandler(ClarificationHandler):
         on_resolution(clarification, True)  # noqa: FBT003
 
 
-@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
 @pytest.mark.asyncio
 async def test_react_agent_weather_with_clarifications() -> None:
     """Test react agent weather lookup with clarification for country input."""
@@ -1849,7 +1848,7 @@ async def test_react_agent_weather_with_clarifications() -> None:
     ) -> UserVerificationClarification | None:
         nonlocal before_step_already_called
         before_step_already_called = True
-        if before_step_already_called:
+        if not before_step_already_called:
             return UserVerificationClarification(
                 plan_run_id=plan_run.id,
                 user_guidance="Are you happy to proceed with the search call?",
