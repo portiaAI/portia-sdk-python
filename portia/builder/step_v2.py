@@ -518,10 +518,16 @@ class SingleToolAgentStep(StepV2):
 
 
 class ReActAgentStep(StepV2):
-    """A step that uses a ReAct agent to complete a task."""
+    """A step where an LLM agent uses ReAct reasoning to complete a task with multiple tools.
 
-    task: str = Field(description="The task to perform.")
-    tools: list[str] = Field(description="The tools to use.")
+    Unlike SingleToolAgentStep which is limited to one specific tool and one tool call, this step
+    allows an LLM agent to reason about which tools to use and when to use them. The agent
+    follows the ReAct (Reasoning and Acting) pattern, iteratively thinking about the
+    problem and taking actions until the task is complete.
+    """
+
+    task: str = Field(description="Natural language description of the task to accomplish.")
+    tools: list[str] = Field(description="IDs of the tools the agent can use to complete the task.")
     inputs: list[Any] = Field(
         default_factory=list,
         description=(
@@ -531,16 +537,23 @@ class ReActAgentStep(StepV2):
         ),
     )
     output_schema: type[BaseModel] | None = Field(
-        default=None, description="The schema of the output."
+        default=None,
+        description=(
+            "Pydantic model class defining the expected structure of the agent's output. "
+            "If provided, the output from the agent will be coerced to match this schema."
+        ),
     )
     tool_call_limit: int = Field(
-        default=25, description="The maximum number of tool calls to make."
+        default=25,
+        description="The maximum number of tool calls to make before the agent stops.",
     )
     allow_agent_clarifications: bool = Field(
         default=False,
         description=(
             "Whether to allow the agent to ask clarifying questions to the user "
-            "if it is unable to proceed."
+            "if it is unable to proceed. When set to true, the agent can output clarifications "
+            "that can be resolved by the user to get input. In order to use this, make sure you "
+            "clarification handler set up that is capable of handling InputClarifications."
         ),
     )
 
