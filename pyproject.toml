@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.7.2"
+version = "0.7.3"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -39,7 +39,6 @@ dependencies = [
     "litellm>=1.74.9.post1",
     "openai<1.99",
     "toml>=0.10.0"
-]
 
 [project.optional-dependencies]
 mistral = [
@@ -59,6 +58,7 @@ amazon = [
     "boto3>=1.39.9"
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
+groq = ["groq>=0.12.0,<1.0"]
 tools-browser-local = [
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
@@ -76,6 +76,7 @@ all = [
     "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
     "google-genai>=1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
+    "groq>=0.12.0,<1.0",
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
@@ -180,9 +181,6 @@ omit = [
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
     "portia/cli.py",  # Best effort test coverage
-    "portia/portia.py", # TODO: Remove this once testing has been added for new PlanV2
-    "portia/builder/step_v2.py", # TODO: Remove this once testing has been added for string templating
-    "portia/builder/plan_builder_v2.py", # TODO: Remove this once testing has been added for string templating
 ]
 
 [tool.coverage.report]

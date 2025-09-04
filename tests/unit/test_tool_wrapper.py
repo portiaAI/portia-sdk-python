@@ -4,16 +4,20 @@ import pytest
 
 from portia.clarification import Clarification
 from portia.end_user import EndUser
-from portia.errors import ToolHardError
+from portia.errors import ToolHardError, ToolNotFoundError
 from portia.execution_agents.output import LocalDataValue
-from portia.storage import AdditionalStorage, ToolCallRecord, ToolCallStatus
+from portia.open_source_tools.calculator_tool import CalculatorTool
+from portia.open_source_tools.llm_tool import LLMTool
+from portia.storage import AdditionalStorage, InMemoryStorage, ToolCallRecord, ToolCallStatus
 from portia.tool import Tool
+from portia.tool_registry import DefaultToolRegistry, InMemoryToolRegistry
 from portia.tool_wrapper import ToolCallWrapper
 from tests.utils import (
     AdditionTool,
     ClarificationTool,
     ErrorTool,
     NoneTool,
+    get_test_config,
     get_test_plan_run,
     get_test_tool_context,
 )
@@ -247,3 +251,47 @@ async def test_tool_call_wrapper_arun_returns_none(mock_storage: MockStorage) ->
     expected_output = LocalDataValue(value=None).model_dump(mode="json")
     assert mock_storage.async_save_calls[0].output == expected_output
     assert len(mock_storage.async_end_user_calls) == 1
+
+
+def test_get_tool_in_registry() -> None:
+    """Test retrieval of a tool in a registry."""
+    _, plan_run = get_test_plan_run()
+    tool = ToolCallWrapper.from_tool_id(
+        CalculatorTool().id,
+        DefaultToolRegistry(get_test_config()),
+        InMemoryStorage(),
+        plan_run,
+    )
+    assert tool is not None
+    assert isinstance(tool._child_tool, CalculatorTool)
+
+
+def test_portia_get_tool_for_step_none_tool_id() -> None:
+    """Test that when step.tool_id is None, LLMTool is used as fallback."""
+    _, plan_run = get_test_plan_run()
+    tool = ToolCallWrapper.from_tool_id(
+        None, DefaultToolRegistry(get_test_config()), InMemoryStorage(), plan_run
+    )
+    assert tool is None
+
+
+def test_get_llm_tool_not_in_registry() -> None:
+    """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
+    _, plan_run = get_test_plan_run()
+    tool = ToolCallWrapper.from_tool_id(
+        LLMTool.LLM_TOOL_ID, InMemoryToolRegistry.from_local_tools([]), InMemoryStorage(), plan_run
+    )
+    assert tool is not None
+    assert isinstance(tool._child_tool, LLMTool)
+
+
+def test_get_tool_not_in_registry() -> None:
+    """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
+    _, plan_run = get_test_plan_run()
+    with pytest.raises(ToolNotFoundError):
+        ToolCallWrapper.from_tool_id(
+            "not_in_registry",
+            InMemoryToolRegistry.from_local_tools([]),
+            InMemoryStorage(),
+            plan_run,
+        )

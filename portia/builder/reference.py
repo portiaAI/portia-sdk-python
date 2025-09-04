@@ -1,27 +1,69 @@
-"""References to values in a plan."""
+"""References to values in a plan.
+
+This module provides reference classes that allow you to reference variables in your plan whose
+values are not known when the plan is built, such as outputs from previous steps or user-provided
+inputs. When the plan is run, these references are then resolved to their actual values.
+
+The Reference class provides an interface for all reference types. It then has the following
+implementations:
+    StepOutput: References the output value from a previous step.
+    Input: References a user-provided input value.
+
+Example:
+    ```python
+    from portia.builder import PlanBuilderV2
+    from portia.builder.reference import StepOutput, Input
+
+    builder = PlanBuilderV2()
+    builder.input("user_query", description="The user's search query")
+
+    # Step 1: Search for information
+    builder.step("search", tools=[search_tool], inputs={"query": Input("user_query")})
+
+    # Step 2: Process the search results
+    builder.step("process", tools=[llm_tool], inputs={"data": StepOutput("search")})
+    ```
+
+"""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.execution_agents.output import Output
 from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.portia import RunContext
+    from portia.run_context import RunContext
 
 
 def default_step_name(step_index: int) -> str:
-    """Return the default name for the step."""
+    """Generate a default name for a step based on its index.
+
+    Args:
+        step_index: The zero-based index of the step in the plan.
+
+    Returns:
+        A string in the format "step_{index}" (e.g., "step_0", "step_1").
+
+    """
     return f"step_{step_index}"
 
 
 class Reference(BaseModel, ABC):
-    """A reference to a value."""
+    """Abstract base class for all reference types in Portia plans.
+
+    References allow you to dynamically reference values that will be resolved at runtime,
+    such as outputs from previous steps or user-provided inputs. This enables building
+    flexible workflows where later steps can depend on the results of earlier operations.
+
+    This is an abstract base class that defines the interface all reference types must
+    implement. Concrete implementations include StepOutput and Input.
+
+    """
 
     # Allow setting temporary/mock attributes in tests (e.g. patch.object(..., "get_value"))
     # Without this, Pydantic v2 prevents setting non-field attributes on instances.
@@ -29,37 +71,74 @@ class Reference(BaseModel, ABC):
 
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
-        """Get the name of the reference to use with legacy Portia plans."""
+        """Get the reference name for compatibility with legacy Portia plans.
+
+        Args:
+            plan: The PlanV2 instance containing the reference.
+
+        """
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
-    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
-        """Get the value of the reference."""
+    def get_value(self, run_data: RunContext) -> Any | None:  # noqa: ANN401
+        """Resolve and return the value this reference points to.
+
+        Args:
+            run_data: The runtime context containing step outputs, inputs, and other
+                execution data needed to resolve the reference.
+
+        Returns:
+            The resolved value, or None if the reference cannot be resolved.
+
+        Raises:
+            NotImplementedError: This method must be implemented by subclasses.
+
+        """
         raise NotImplementedError  # pragma: no cover
 
 
 class StepOutput(Reference):
-    """A reference to the output of a previous step.
+    """A reference to the output of a previous step in the plan.
 
-    When building your plan, you can use this class to reference the output of a previous step.
-    The output from the specified step will then be substituted in when the plan is run.
+    StepOutput allows you to reference the output value produced by an earlier step,
+    enabling you to create workflows where later steps depend on the results of
+    previous operations. The reference is resolved at runtime during plan execution.
 
-    See the example usage in example_builder.py for more details.
+    You can reference a step either by its name (string) or by its position (integer index).
+    Step indices are zero-based, so the first step is index 0.
+
+    Example:
+        ```python
+        from portia.builder import PlanBuilderV2
+        from portia.builder.reference import StepOutput
+
+        builder = PlanBuilderV2()
+
+        # Create a step that produces some output
+        builder.step("search", tools=[search_tool], inputs={"query": "Python tutorials"})
+
+        # Reference the output by name
+        builder.step("analyze", tools=[llm_tool], inputs={"data": StepOutput("search")})
+
+        # Reference the output by index (0 = first step)
+        builder.step("summarize", tools=[llm_tool], inputs={"data": StepOutput(0)})
+        ```
+
     """
 
     step: str | int = Field(
-        description="The step to reference the output of. If a string is provided, this will be"
-        "used to find the step by name. If an integer is provided, this will be used to find the"
+        description="The step to reference the output of. If a string is provided, this will be "
+        "used to find the step by name. If an integer is provided, this will be used to find the "
         "step by index (steps are 0-indexed)."
     )
 
     def __init__(self, step: str | int) -> None:
-        """Initialize the step output."""
+        """Initialize a reference to a step's output."""
         super().__init__(step=step)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
-        """Get the name of the reference to use with legacy Portia plans."""
+        """Get the reference name for compatibility with legacy Portia plans."""
         return plan.step_output_name(self.step)
 
     def __str__(self) -> str:
@@ -71,59 +150,104 @@ class StepOutput(Reference):
         return f"{{{{ StepOutput({self.step}) }}}}"
 
     @override
-    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
-        """Get the value of the step output."""
-        try:
-            if isinstance(self.step, int):
-                return run_data.step_output_values[self.step]
-            step_index = run_data.plan.idx_by_name(self.step)
-            val = run_data.step_output_values[step_index]
-        except (ValueError, IndexError):
-            logger().warning(f"Output value for step {self.step} not found")
-            return None
-        return val
+    def get_value(self, run_data: RunContext) -> Any | None:
+        """Resolve and return the output value from the referenced step.
+
+        Note:
+            If the step cannot be found, a warning is logged and None is returned.
+            The step is matched by either name (string) or index (integer).
+
+        """
+        for step_output in run_data.step_output_values:
+            if isinstance(self.step, int) and step_output.step_num == self.step:
+                return step_output.value
+            if isinstance(self.step, str) and step_output.step_name == self.step:
+                return step_output.value
+        logger().warning(f"Output value for step {self.step} not found")
+        return None
+
+    def get_description(self, run_data: RunContext) -> str:
+        """Get the description of the step output."""
+        for step_output in run_data.step_output_values:
+            if isinstance(self.step, int) and step_output.step_num == self.step:
+                return step_output.description
+            if isinstance(self.step, str) and step_output.step_name == self.step:
+                return step_output.description
+        return ""
 
 
 class Input(Reference):
-    """A reference to a plan input.
+    """A reference to a user-provided plan input.
 
-    When building your plan, you can specify plan inputs using the PlanBuilder.input() method. These
-    are inputs whose values you provide when running the plan, rather than when building the plan.
-    You can then use this to reference those inputs later in your plan. When you do this, the values
-    will be substituted in when the plan is run.
+    Input allows you to reference values that are provided at runtime when the plan
+    is executed, rather than when the plan is built. This enables creating reusable
+    plans that can work with different input values each time they run.
 
-    See the example usage in example_builder.py for more details.
+    Plan inputs are defined using the PlanBuilder.input() method when building your
+    plan, and their values are provided when calling portia.run() or portia.arun().
+    The Input reference is then resolved to the actual value during execution.
+
+    Example:
+        ```python
+        from portia.builder import PlanBuilderV2
+        from portia.builder.reference import Input
+
+        builder = PlanBuilderV2()
+
+        # Define an input that will be provided at runtime
+        builder.input("user_query", description="The user's search query")
+        builder.input("max_results", description="Maximum number of results")
+
+        # Use the inputs in steps
+        builder.step("search",
+                    tools=[search_tool],
+                    inputs={
+                        "query": Input("user_query"),
+                        "limit": Input("max_results")
+                    })
+
+        # When running the plan, provide the input values:
+        # portia.run(plan, inputs={"user_query": "Python tutorials", "max_results": 10})
+        ```
+
     """
 
-    name: str = Field(description="The name of the input.")
+    name: str = Field(description="The name of the input as defined in the plan.")
 
     def __init__(self, name: str) -> None:
-        """Initialize the input."""
+        """Initialize a reference to a plan input."""
+        # We have this __init__ method so users can create an Input reference without having to
+        # specify name= in the constructor.
         super().__init__(name=name)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
-        """Get the name of the reference to use with legacy Portia plans."""
+        """Get the reference name for compatibility with legacy Portia plans."""
         return self.name
 
     @override
-    def get_value(self, run_data: RunContext) -> ReferenceValue | None:
-        """Get the value of the input."""
+    def get_value(self, run_data: RunContext) -> Any | None:
+        """Resolve and return the user-provided input value.
+
+        Returns:
+            The user-provided value for this input, or None if not found.
+
+        Note:
+            If the input value is itself a Reference, it will be recursively resolved.
+
+        """
         plan_input = next(
             (_input for _input in run_data.plan.plan_inputs if _input.name == self.name), None
         )
         if not plan_input:
             logger().warning(f"Input {self.name} not found in plan")
             return None
-        value = run_data.plan_run.plan_run_inputs.get(self.name)
-        if not value:
+        local_data_value = run_data.plan_run.plan_run_inputs.get(self.name)
+        if not local_data_value:
             logger().warning(f"Value not found for input {self.name}")
             return None
-
-        return ReferenceValue(
-            value=value,
-            description=plan_input.description or "Input to plan",
-        )
+        value = local_data_value.get_value()
+        return value.get_value(run_data=run_data) if isinstance(value, Reference) else value
 
     def __str__(self) -> str:
         """Get the string representation of the input."""
@@ -131,10 +255,3 @@ class Input(Reference):
         # in PlanBuilderV2 steps. The double braces are used when the plan is running to template
         # the input value so it can be substituted at runtime.
         return f"{{{{ Input({self.name}) }}}}"
-
-
-class ReferenceValue(BaseModel):
-    """Value that can be referenced."""
-
-    value: Output = Field(description="The referenced value.")
-    description: str = Field(description="Description of the referenced value.", default="")

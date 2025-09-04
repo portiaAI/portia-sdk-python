@@ -45,7 +45,7 @@ from portia.execution_agents.output import (
     LocalDataValue,
     Output,
 )
-from portia.logger import logger
+from portia.logger import logger, truncate_message
 from portia.plan import Plan, PlanUUID
 from portia.plan_run import (
     PlanRun,
@@ -60,8 +60,6 @@ if TYPE_CHECKING:
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
-
-MAX_OUTPUT_LOG_LENGTH = 1000
 
 
 class PlanStorage(ABC):
@@ -402,10 +400,6 @@ class AdditionalStorage(ABC):
         return await asyncio.to_thread(self.get_end_user, external_id)
 
 
-class Storage(PlanStorage, RunStorage, AdditionalStorage):
-    """Combined base class for Plan Run + Additional storages."""
-
-
 class AgentMemory(ABC):
     """Abstract base class for storing items in agent memory."""
 
@@ -484,6 +478,10 @@ class AgentMemory(ABC):
         return await asyncio.to_thread(self.get_plan_run_output, output_name, plan_run_id)
 
 
+class Storage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
+    """Combined base class for Plan Run + Additional storages."""
+
+
 MAX_STORAGE_OBJECT_BYTES = 32_000_000
 
 
@@ -505,13 +503,7 @@ def log_tool_call(tool_call: ToolCallRecord) -> None:
     logger().debug(
         f"Tool {tool_call.tool_name!s} executed in {tool_call.latency_seconds:.2f} seconds",
     )
-    # Limit log to just first 1000 characters
-    output = tool_call.output
-    if len(str(tool_call.output)) > MAX_OUTPUT_LOG_LENGTH:
-        output = (
-            str(tool_call.output)[:MAX_OUTPUT_LOG_LENGTH]
-            + "...[truncated - only first 1000 characters shown]"
-        )
+    output = truncate_message(tool_call.output)
     match tool_call.status:
         case ToolCallStatus.SUCCESS:
             logger().debug(
@@ -524,7 +516,7 @@ def log_tool_call(tool_call: ToolCallRecord) -> None:
             logger().debug("Tool returned clarifications", output=output)
 
 
-class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
+class InMemoryStorage(Storage):
     """Simple storage class that keeps plans + runs in memory.
 
     Tool Calls are logged via the LogAdditionalStorage.
@@ -726,7 +718,7 @@ class InMemoryStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
         return None
 
 
-class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
+class DiskFileStorage(Storage):
     """Disk-based implementation of the Storage interface.
 
     Stores serialized Plan and Run objects as JSON files on disk.
@@ -982,7 +974,7 @@ class DiskFileStorage(PlanStorage, RunStorage, AdditionalStorage, AgentMemory):
             return None
 
 
-class PortiaCloudStorage(Storage, AgentMemory):
+class PortiaCloudStorage(Storage):
     """Save plans, runs and tool calls to portia cloud."""
 
     DEFAULT_MAX_CACHE_SIZE = 20

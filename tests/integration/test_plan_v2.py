@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel, Field
@@ -10,9 +11,26 @@ from pydantic import BaseModel, Field
 from portia import Config, LogLevel, Portia
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
+from portia.clarification import UserVerificationClarification
+from portia.clarification_handler import ClarificationHandler
 from portia.config import StorageClass
-from portia.plan_run import PlanRunState
+from portia.execution_hooks import ExecutionHooks
+from portia.model import LLMProvider
+from portia.plan_run import PlanRun, PlanRunState
 from portia.tool import Tool, ToolRunContext
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from portia.clarification import (
+        Clarification,
+        InputClarification,
+        MultipleChoiceClarification,
+    )
+    from portia.plan import Step
+
+
+MODEL_PROVIDERS = [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
 
 
 class CommodityPrice(BaseModel):
@@ -26,6 +44,12 @@ class CommodityPriceWithCurrency(BaseModel):
 
     price: float
     currency: str
+
+
+class GoldPurchaseFinalOutput(BaseModel):
+    """Final output of the gold purchase plan."""
+
+    receipt: str
 
 
 class CurrencyConversionResult(BaseModel):
@@ -71,7 +95,7 @@ class FinalOutput(BaseModel):
 
 
 @pytest.mark.parametrize("is_async", [False, True])
-def test_example_builder(is_async: bool) -> None:
+def test_simple_builder(is_async: bool) -> None:
     """Test the example from example_builder.py."""
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
@@ -81,12 +105,12 @@ def test_example_builder(is_async: bool) -> None:
 
     plan = (
         PlanBuilderV2("Calculate gold purchase cost and write a poem")
-        .input(name="purchase_quantity", description="The quantity of gold to purchase in ounces")
+        .input(name="purchase_quantity", description="The quantity of gold to purchase in kilos")
         .invoke_tool_step(
             step_name="Search gold price",
             tool="search_tool",
             args={
-                "search_query": "What is the price of gold per ounce in USD?",
+                "search_query": "What is the price of gold per kilo in USD?",
             },
             output_schema=CommodityPriceWithCurrency,
         )
@@ -413,6 +437,39 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
         )
 
 
+def test_plan_v2_else_if_before_if_raises_error() -> None:
+    """Test that using else_if before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_if_(condition=lambda: True)
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_else_before_if_raises_error() -> None:
+    """Test that using else before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .else_()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
+def test_plan_v2_endif_before_if_raises_error() -> None:
+    """Test that using endif before if raises a PlanBuilderError."""
+    with pytest.raises(PlanBuilderError):
+        (
+            PlanBuilderV2(label="Invalid conditional order")
+            .endif()
+            .function_step(function=lambda: None)
+            .build()
+        )
+
+
 def test_plan_v2_conditional_if_without_else_if() -> None:
     """Test else_if is optional."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
@@ -629,3 +686,518 @@ def test_conditional_plan_with_record_functions(input_value: int, expected_outpu
     final_output = plan_run.outputs.final_output.get_value()
     assert isinstance(final_output, ConditionalTestOutput)
     assert final_output.value_being_processed == expected_output
+
+
+class TestClarificationHandler(ClarificationHandler):
+    """Test clarification handler that automatically selects the laser-sharks-ballad poem."""
+
+    def handle_multiple_choice_clarification(
+        self,
+        clarification: MultipleChoiceClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle multiple choice clarification by selecting the laser-sharks-ballad poem."""
+        if clarification.argument_name == "filename" and "poem.txt" in str(clarification.options):
+            # Select the first option that contains laser-sharks
+            for option in clarification.options:
+                if "laser-sharks" in option:
+                    on_resolution(clarification, option)
+                    return
+        raise RuntimeError("Received unexpected clarification")
+
+
+def test_plan_v2_with_tool_clarification() -> None:
+    """Test PlanV2 with a tool that requires clarification handling."""
+    portia = Portia(
+        config=Config.from_default(
+            default_log_level=LogLevel.DEBUG,
+        ),
+        execution_hooks=ExecutionHooks(clarification_handler=TestClarificationHandler()),
+    )
+
+    plan = (
+        PlanBuilderV2()
+        # This step will throw a clarification as there are two poem.txt in the repo
+        .single_tool_agent_step(
+            tool="file_reader_tool",
+            task="Read the poem in poem.txt from file.",
+            step_name="read_poem",
+        )
+        .llm_step(
+            task="Write a review of the poem",
+            inputs=[StepOutput("read_poem")],
+            step_name="review_poem",
+        )
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify that the poem was read successfully
+    read_poem_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert read_poem_output is not None
+    poem_content = read_poem_output.get_value()
+    assert isinstance(poem_content, str)
+    assert len(poem_content) > 0
+    assert "laser-shark" in poem_content.lower()
+
+    # Verify that a review was written
+    review_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert review_output is not None
+    review_content = review_output.get_value()
+    assert isinstance(review_content, str)
+    assert len(review_content) > 0
+
+
+class ExampleBuilderClarificationHandler(ClarificationHandler):
+    """Test clarification handler for the example_builder.py plan."""
+
+    def handle_multiple_choice_clarification(
+        self,
+        clarification: MultipleChoiceClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle multiple choice clarification by selecting 100."""
+        if "How many ounces of gold" in clarification.user_guidance:
+            on_resolution(clarification, 2)
+            return
+        raise RuntimeError("Received unexpected multiple choice clarification")
+
+    def handle_input_clarification(
+        self,
+        clarification: InputClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle input clarification by returning '2' as string."""
+        if "How many ounces of gold" in clarification.user_guidance:
+            on_resolution(clarification, "2")
+            return
+        raise RuntimeError("Received unexpected input clarification")
+
+    def handle_user_verification_clarification(
+        self,
+        clarification: UserVerificationClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle user verification clarification by accepting."""
+        if "Do you want to proceed with the purchase" in clarification.user_guidance:
+            on_resolution(clarification, True)  # noqa: FBT003
+            return
+        raise RuntimeError("Received unexpected user verification clarification")
+
+
+# Rerun as occasionally Tavily doesn't give back the gold price
+@pytest.mark.flaky(reruns=3)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    (
+        "storage_class",
+        "user_input_options",
+        "country_override",
+        "expected_currency",
+        "expected_user_input",
+    ),
+    [
+        # Test disk storage class with multi-choice clarification
+        (StorageClass.DISK, [1, 2, 5], "Spain", "EUR", 2),
+        # Test input clarification
+        (StorageClass.CLOUD, None, "USA", "USD", "2"),
+        # Test with default country (UK)
+        (StorageClass.CLOUD, [1, 2, 5], None, "GBP", 2),
+    ],
+)
+async def test_example_builder_plan_scenarios(
+    storage_class: StorageClass,
+    user_input_options: list[int] | None,
+    country_override: str | None,
+    expected_currency: str,
+    expected_user_input: int | str,
+) -> None:
+    """Test the gold purchase plan from example_builder.py with different scenarios."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=storage_class,
+    )
+
+    portia = Portia(
+        config=config,
+        execution_hooks=ExecutionHooks(clarification_handler=ExampleBuilderClarificationHandler()),
+    )
+
+    def calculate_total_price(
+        price_with_currency: CommodityPriceWithCurrency, purchase_quantity: str | int
+    ) -> float:
+        """Calculate total price with string to int conversion."""
+        return price_with_currency.price * int(purchase_quantity)
+
+    plan = (
+        PlanBuilderV2("Buy some gold")
+        .input(
+            name="country", description="The country to purchase the gold in", default_value="UK"
+        )
+        .invoke_tool_step(
+            step_name="Search currency",
+            tool="search_tool",
+            args={
+                "search_query": f"What is the currency in {Input('country')}?",
+            },
+        )
+        .react_agent_step(
+            step_name="Search gold price",
+            tools=["search_tool", "calculator_tool"],
+            task=f"What is the price of gold per ounce in {Input('country')}?",
+            inputs=[StepOutput(0)],
+            output_schema=CommodityPriceWithCurrency,
+        )
+        .user_input(
+            step_name="Purchase quantity",
+            message="How many ounces of gold do you want to purchase?",
+            options=user_input_options,
+        )
+        .function_step(
+            step_name="Calculate total price",
+            function=calculate_total_price,
+            args={
+                "price_with_currency": StepOutput("Search gold price"),
+                "purchase_quantity": StepOutput("Purchase quantity"),
+            },
+        )
+        .user_verify(
+            message=(
+                f"Do you want to proceed with the purchase? Price is "
+                f"{StepOutput('Calculate total price')}"
+            )
+        )
+        .if_(
+            condition=lambda total_price: total_price > 100,
+            args={"total_price": StepOutput("Calculate total price")},
+        )
+        .function_step(function=lambda: "Hey big spender!")
+        .else_()
+        .function_step(function=lambda: "We need more gold!")
+        .endif()
+        .llm_step(
+            task="Create a fake receipt for the purchase of gold.",
+            inputs=[StepOutput("Calculate total price"), Input("country")],
+            step_name="Generate receipt",
+        )
+        .final_output(
+            output_schema=GoldPurchaseFinalOutput,
+        )
+        .build()
+    )
+
+    plan_run_inputs = {}
+    if country_override is not None:
+        plan_run_inputs["country"] = country_override
+
+    plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify the currency search was successful
+    currency_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert currency_output is not None
+
+    # Verify the gold price was found with correct currency (step 1 is now react_agent_step)
+    gold_price_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert gold_price_output is not None
+    gold_price_data = gold_price_output.get_value()
+    assert isinstance(gold_price_data, CommodityPriceWithCurrency)
+    assert gold_price_data.price > 0
+    assert gold_price_data.currency == expected_currency
+
+    # Verify user input was correct type and value
+    user_input_output = plan_run.outputs.step_outputs["$step_2_output"]
+    assert user_input_output is not None
+    assert user_input_output.get_value() == expected_user_input
+
+    # Verify total price calculation
+    total_price_output = plan_run.outputs.step_outputs["$step_3_output"]
+    assert total_price_output is not None
+    total_price = total_price_output.get_value()
+    assert total_price == gold_price_data.price * 2
+
+    # Verify final output structure
+    final_output = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_output, GoldPurchaseFinalOutput)
+    assert isinstance(final_output.receipt, str)
+    assert len(final_output.receipt) > 0
+
+
+def collect_fn(
+    top_no_def: str,
+    top_with_def: str,
+    sub_no_def_1: str,
+    sub_no_def_2: str,
+    sub_with_def_1: str,
+    sub_with_def_2: str,
+) -> dict[str, str]:
+    """Collect all input values."""
+    return {
+        "top_input_no_default": top_no_def,
+        "top_input_with_default": top_with_def,
+        "sub_input_no_default_1": sub_no_def_1,
+        "sub_input_no_default_2": sub_no_def_2,
+        "sub_input_with_default_1": sub_with_def_1,
+        "sub_input_with_default_2": sub_with_def_2,
+    }
+
+
+def test_plan_v2_input_linking_with_add_steps() -> None:
+    """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
+    config = Config.from_default()
+    portia = Portia(config=config)
+
+    # Create sub-plan with 4 inputs (2 with defaults, 2 without)
+    sub_plan = (
+        PlanBuilderV2("Sub-plan with multiple inputs")
+        .input(name="sub_input_no_default_1", description="Sub input 1 without default")
+        .input(name="sub_input_no_default_2", description="Sub input 2 without default")
+        .input(
+            name="sub_input_with_default_1",
+            description="Sub input 1 with default",
+            default_value="original_default_1",
+        )
+        .input(
+            name="sub_input_with_default_2",
+            description="Sub input 2 with default",
+            default_value="original_default_2",
+        )
+        .function_step(
+            function=lambda: "sub_plan_executed",
+            step_name="sub_execution_step",
+        )
+        .build()
+    )
+
+    # Create top-level plan with 2 inputs (1 with default, 1 without)
+    plan = (
+        PlanBuilderV2("Top-level plan with input linking")
+        .input(name="top_input_no_default", description="Top input without default")
+        .input(
+            name="top_input_with_default",
+            description="Top input with default",
+            default_value="top_default_value",
+        )
+        .function_step(
+            function=lambda: 100,
+            step_name="first_number",
+        )
+        .function_step(
+            function=lambda: 200,
+            step_name="second_number",
+        )
+        # Add sub-plan steps with input values for 2 of the 4 sub-plan inputs
+        .add_steps(
+            sub_plan,
+            input_values={
+                "sub_input_no_default_1": (
+                    f"Number 1: {StepOutput('first_number')}. "
+                    f"Number 2: {StepOutput('second_number')}"
+                ),
+                "sub_input_with_default_1": StepOutput("second_number"),
+            },
+        )
+        # Final step that outputs all input values for verification
+        .function_step(
+            function=collect_fn,
+            args={
+                "top_no_def": Input("top_input_no_default"),
+                "top_with_def": Input("top_input_with_default"),
+                "sub_no_def_1": Input("sub_input_no_default_1"),
+                "sub_no_def_2": Input("sub_input_no_default_2"),
+                "sub_with_def_1": Input("sub_input_with_default_1"),
+                "sub_with_def_2": Input("sub_input_with_default_2"),
+            },
+            step_name="collect_all_inputs",
+        )
+        .build()
+    )
+
+    # Run the plan with only 2 input values:
+    # - One for top-level plan without default
+    # - One for sub-plan without default that wasn't set via input_values
+    plan_run = portia.run_plan(
+        plan,
+        plan_run_inputs={
+            "top_input_no_default": "top_value",
+            "sub_input_no_default_2": "sub_value",
+        },
+    )
+
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Verify final step collected all input values correctly
+    final_output = plan_run.outputs.step_outputs["$step_3_output"]
+    all_inputs = final_output.get_value()
+
+    # Verify all input values are as expected
+    assert all_inputs is not None
+    assert all_inputs.get("top_input_no_default", "") == "top_value"
+    assert all_inputs.get("top_input_with_default") == "top_default_value"
+    assert all_inputs.get("sub_input_no_default_1", "") == "Number 1: 100. Number 2: 200"
+    assert all_inputs.get("sub_input_no_default_2", "") == "sub_value"
+    assert all_inputs.get("sub_input_with_default_1", "") == 200
+    assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"
+
+
+@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
+@pytest.mark.parametrize("llm_provider", MODEL_PROVIDERS)
+@pytest.mark.asyncio
+async def test_react_agent_weather_research_and_poem(
+    llm_provider: LLMProvider,
+) -> None:
+    """Test react agent researching weather in European capitals and writing a poem."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_log_level=LogLevel.DEBUG,
+    )
+
+    portia = Portia(config=config)
+
+    class CapitalWeatherInfo(BaseModel):
+        """Weather information for a capital city."""
+
+        uk_capital_weather: str
+        france_capital_weather: str
+        germany_capital_weather: str
+
+    plan = (
+        PlanBuilderV2("Research weather in European capitals and write a poem")
+        .react_agent_step(
+            task=(
+                "Find the current weather in the capitals of the United Kingdom, France, "
+                "and Germany. First use the search tool to find the capital city of each country, "
+                "then use the weather tool to get the current weather for each capital. "
+                "Provide a summary of the weather information for all three capitals."
+            ),
+            tools=["search_tool", "weather_tool"],
+            step_name="weather_research",
+            output_schema=CapitalWeatherInfo,
+        )
+        .llm_step(
+            task=(
+                "Write a beautiful poem about the weather in the capitals of UK, France, "
+                "and Germany based on the weather information provided. The poem should "
+                "capture the atmosphere and mood of each city's weather."
+            ),
+            inputs=[StepOutput("weather_research")],
+            step_name="weather_poem",
+        )
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert isinstance(plan_run.outputs.final_output.get_value(), str)
+    assert plan_run.outputs.final_output.get_value()
+
+    # Verify we got weather information
+    weather_step_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert weather_step_output is not None
+    weather_info_value = weather_step_output.get_value()
+    assert isinstance(weather_info_value, CapitalWeatherInfo)
+    assert weather_info_value.uk_capital_weather is not None
+    assert weather_info_value.france_capital_weather is not None
+    assert weather_info_value.germany_capital_weather is not None
+    assert weather_step_output.summary is not None
+
+    poem_step_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert poem_step_output is not None
+    poem_content = poem_step_output.get_value()
+    assert isinstance(poem_content, str)
+    # Check our poem is at least 10 characters long
+    assert len(poem_content) > 10
+
+
+class CountryClarificationHandler(ClarificationHandler):
+    """Test clarification handler that provides a country for react agent."""
+
+    def handle_input_clarification(
+        self,
+        clarification: InputClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle input clarification by returning 'United Kingdom'."""
+        on_resolution(clarification, "United Kingdom")
+
+    def handle_user_verification_clarification(
+        self,
+        clarification: UserVerificationClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle user verification clarification by returning 'United Kingdom'."""
+        on_resolution(clarification, True)  # noqa: FBT003
+
+
+@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
+@pytest.mark.asyncio
+async def test_react_agent_weather_with_clarifications() -> None:
+    """Test react agent weather lookup with clarification for country input."""
+    config = Config.from_default(default_log_level=LogLevel.DEBUG)
+
+    before_step_already_called = False
+
+    def before_tool_call_execution_hook(
+        tool: Tool,  # noqa: ARG001
+        args: dict[str, Any],  # noqa: ARG001
+        plan_run: PlanRun,
+        _step: Step,
+    ) -> UserVerificationClarification | None:
+        nonlocal before_step_already_called
+        before_step_already_called = True
+        if before_step_already_called:
+            return UserVerificationClarification(
+                plan_run_id=plan_run.id,
+                user_guidance="Are you happy to proceed with the search call?",
+                source="Test",
+            )
+        return None
+
+    portia = Portia(
+        config=config,
+        execution_hooks=ExecutionHooks(
+            before_tool_call=before_tool_call_execution_hook,
+            clarification_handler=CountryClarificationHandler(),
+        ),
+    )
+
+    plan = (
+        PlanBuilderV2("Get weather for capital city")
+        .react_agent_step(
+            task="Find the current weather in the capital of the provided country",
+            tools=["search_tool", "weather_tool"],
+            step_name="weather_lookup",
+            allow_agent_clarifications=True,
+        )
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify we got weather information from the step
+    weather_step_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert weather_step_output is not None
+    weather_content = weather_step_output.get_value()
+    assert isinstance(weather_content, str)
+    weather_lower = weather_content.lower()
+    assert "london" in weather_lower or "uk" in weather_lower or "united kingdom" in weather_lower
+
+    # Verify step has summary
+    assert weather_step_output.get_summary() is not None

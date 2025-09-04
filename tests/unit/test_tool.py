@@ -155,6 +155,52 @@ def test_run_signature_validation_no_args() -> None:
         mock_logger.return_value.warning.assert_not_called()
 
 
+def test_tool_id_validation_no_comma() -> None:
+    """Test that tool IDs cannot contain commas."""
+
+    # Valid tool should initialize without error
+    class ValidTool(Tool):
+        def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+            return "valid"
+
+    # Test valid IDs with various allowed characters
+    for valid_id in [
+        "valid_tool_id",
+        "tool123",
+        "tool-name",
+        "tool.name",
+        "tool:name",
+        "mcp:server:tool",
+    ]:
+        valid_tool = ValidTool(
+            id=valid_id,
+            name="Valid Tool",
+            description="A tool with a valid ID",
+            output_schema=("str", "output"),
+        )
+        assert valid_tool.id == valid_id
+
+    # Invalid tool should raise ValidationError for commas
+    class InvalidTool(Tool):
+        def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+            return "invalid"
+
+    # Test various invalid cases with commas
+    for invalid_id in [
+        "invalid,tool",
+        "tool,with,many,commas",
+        ",leading_comma",
+        "trailing_comma,",
+    ]:
+        with pytest.raises(ValueError, match="Tool ID cannot contain commas"):
+            InvalidTool(
+                id=invalid_id,
+                name="Invalid Tool",
+                description="A tool with an invalid ID",
+                output_schema=("str", "output"),
+            )
+
+
 def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
