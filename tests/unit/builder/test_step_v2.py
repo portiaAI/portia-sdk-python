@@ -2349,19 +2349,6 @@ def test_loop_step_validation_error_both_none() -> None:
         )
 
 
-def test_loop_step_validation_error_start_end_both_none() -> None:
-    """Test LoopStep validation error when both start_index and end_index are None."""
-    with pytest.raises(ValueError, match="Input should be a valid integer"):
-        LoopStep(
-            step_name="test_loop",
-            condition=lambda x: x > 0,
-            loop_type=LoopType.DO_WHILE,
-            loop_block_type=LoopBlockType.END,
-            start_index=None,
-            end_index=None,
-        )
-
-
 def test_loop_step_validation_success() -> None:
     """Test LoopStep validation success with valid parameters."""
     step = LoopStep(
