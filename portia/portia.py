@@ -22,6 +22,7 @@ complex queries using various planning and execution agent configurations.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -2751,9 +2752,25 @@ class Portia:
                 run_data.plan_run.current_step_index = index + 1
                 continue
 
+            success = True
             try:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
+                if step.on_error is not None:
+                    try:
+                        handler_result = step.on_error(e)
+                        if inspect.isawaitable(handler_result):
+                            handler_result = await handler_result
+                        result = handler_result
+                    except Exception as handler_error:  # noqa: BLE001
+                        success = False
+                        error = handler_error
+                    else:
+                        success = True
+                else:
+                    success = False
+                    error = e
+            if not success:
                 self.telemetry.capture(
                     PlanV2StepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
@@ -2762,7 +2779,7 @@ class Portia:
                     )
                 )
                 return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, index, legacy_step, e
+                    run_data.plan_run, run_data.legacy_plan, index, legacy_step, error
                 )
             else:
                 self.telemetry.capture(

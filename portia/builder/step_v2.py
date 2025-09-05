@@ -64,6 +64,15 @@ class StepV2(BaseModel, ABC):
     loop_block: LoopBlock | None = Field(
         default=None, description="The loop block this step is part of, if any."
     )
+    on_error: Callable[[Exception], Any] | None = Field(
+        default=None,
+        description=(
+            "Optional error handler. If provided, any exception raised during step"
+            " execution will be passed to this callable. The handler can re-raise"
+            " the exception to propagate the error or return a value to use as the"
+            " step's output and continue plan execution."
+        ),
+    )
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any | LocalDataValue:  # noqa: ANN401

@@ -1013,3 +1013,73 @@ async def test_portia_plan_v2_tool_error_in_invoke_tool_step() -> None:
 
     # Verify plan failed due to tool error
     assert plan_run.state == PlanRunState.FAILED
+
+
+def test_on_error_handler_returns_value() -> None:
+    """Step-specific on_error handler should override error and continue."""
+    config = Config.from_default(openai_api_key=SecretStr("123"))
+    portia = Portia(config=config)
+
+    def fail() -> str:  # pragma: no cover - executed during test
+        raise ValueError("boom")
+
+    plan = (
+        PlanBuilderV2("on error handler")
+        .function_step(function=fail, step_name="fail_step")
+        .on_error(lambda e: "recovered")
+        .function_step(function=lambda: "next", step_name="next_step")
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+    fail_output_name = plan.step_output_name("fail_step")
+    assert (
+        plan_run.outputs.step_outputs[fail_output_name].get_value() == "recovered"
+    )
+    assert plan_run.outputs.final_output.get_value() == "next"
+
+
+def test_ignore_errors_continues_plan() -> None:
+    """ignore_errors should swallow errors and use None as output."""
+    config = Config.from_default(openai_api_key=SecretStr("123"))
+    portia = Portia(config=config)
+
+    def fail() -> str:  # pragma: no cover - executed during test
+        raise RuntimeError("fail")
+
+    plan = (
+        PlanBuilderV2("ignore errors")
+        .function_step(function=fail, step_name="fail_step")
+        .ignore_errors()
+        .function_step(function=lambda: "ok")
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+    fail_output_name = plan.step_output_name("fail_step")
+    assert plan_run.outputs.step_outputs[fail_output_name].get_value() is None
+    assert plan_run.outputs.final_output.get_value() == "ok"
+
+
+def test_on_error_reraises() -> None:
+    """If handler re-raises, plan should fail."""
+    config = Config.from_default(openai_api_key=SecretStr("123"))
+    portia = Portia(config=config)
+
+    def fail() -> str:  # pragma: no cover - executed during test
+        raise RuntimeError("fail")
+
+    def handler(err: Exception) -> None:  # pragma: no cover - executed during test
+        raise err
+
+    plan = (
+        PlanBuilderV2("on error re-raise")
+        .function_step(function=fail)
+        .on_error(handler)
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.FAILED
