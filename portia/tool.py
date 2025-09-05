@@ -34,7 +34,6 @@ from pydantic import (
     HttpUrl,
     ValidationError,
     field_serializer,
-    field_validator,
     model_validator,
 )
 

@@ -282,7 +282,7 @@ class BrowserTool(Tool[str | BaseModel]):
                     logger().warning(
                         f"Wildcard in TLD '{domain}' may not be allowed. "
                         "Browser-use docs warn: 'Wildcards in TLD (e.g., example.*) are not allowed for security'. "
-                        "See: https://docs.browser-use.com/customize/browser-settings#allowed-domains"
+                        "See: https://docs.browser-use.com/customize/browser/all-parameters#allowed-domains"
                     )
                 elif domain.startswith("*."):
                     logger().info(
@@ -292,7 +292,14 @@ class BrowserTool(Tool[str | BaseModel]):
                 elif domain == "*":
                     logger().warning(
                         f"Universal wildcard '{domain}' allows access to ANY domain. "
-                        "This can be dangerous. Use specific domain patterns instead."
+                        "This is extremely dangerous. Use specific domain patterns instead."
+                    )
+                else:
+                    # Other wildcard patterns
+                    logger().warning(
+                        f"Wildcard pattern '{domain}' may match unintended domains. "
+                        "Per browser-use docs, be very cautious with wildcards. "
+                        "Consider using full URLs with schemes (https://example.com) for security."
                     )
 
             validated_domains.append(domain.strip())
@@ -435,9 +442,13 @@ class BrowserToolForUrl(BrowserTool):
     `infrastructure_option` argument.
 
     Args:
-        id (str, optional): Custom identifier for the tool. Defaults to "browser_tool".
-        name (str, optional): Display name for the tool. Defaults to "Browser Tool".
-        description (str, optional): Custom description of the tool's purpose.
+        url (str): The URL that this browser tool will navigate to for all tasks.
+        id (str, optional): Custom identifier for the tool. If not provided, will be generated
+            based on the URL's domain.
+        name (str, optional): Display name for the tool. If not provided, will be generated
+            based on the URL's domain.
+        description (str, optional): Custom description of the tool's purpose. If not provided,
+            will be generated with the URL.
         infrastructure_option (BrowserInfrastructureOption, optional): The infrastructure
             provider to use. Can be either `BrowserInfrastructureOption.LOCAL` or
             `BrowserInfrastructureOption.REMOTE`. Defaults to
@@ -477,14 +488,14 @@ class BrowserToolForUrl(BrowserTool):
                 if not isinstance(domain, str) or not domain.strip():
                     raise ValueError(f"Invalid domain in allowed_domains: {domain}")
 
+        domain_parts = str(HttpUrl(url).host).split(".")
+        formatted_domain = "_".join(domain_parts)
         super().__init__(
-            id=id or f"browser_tool_for_url_{url.replace('https://', '').replace('http://', '').replace('/', '_').replace('.', '_')}",
-            name=name or f"Browser Tool for {url.replace('https://', '').replace('http://', '')}",
-            description=description
-            or (
-                f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
-                "This tool handles a full end to end task. It is capable of doing multiple things "
-                "across different URLs within the same root domain as part of the end to end task."
+            id=id or f"browser_tool_for_url_{formatted_domain}",
+            name=name or f"Browser Tool for {formatted_domain}",
+            description=description or (
+                f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
+                "tasks."
             ),
             args_schema=BrowserToolForUrlSchema,
             model=model,
