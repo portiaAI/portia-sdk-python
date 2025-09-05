@@ -191,8 +191,13 @@ class StepOutput(Reference):
         """
         # Get the base step output value
         base_value = None
+        step_num = None
+        if isinstance(self.step, int):
+            step_num = self.step
+            if step_num < 0:
+                step_num += len(run_data.step_output_values)
         for step_output in run_data.step_output_values[::-1]:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
+            if step_num is not None and step_output.step_num == step_num:
                 base_value = step_output.value
                 break
             if isinstance(self.step, str) and step_output.step_name == self.step:
@@ -208,8 +213,13 @@ class StepOutput(Reference):
 
     def get_description(self, run_data: RunContext) -> str:
         """Get the description of the step output."""
+        step_num = None
+        if isinstance(self.step, int):
+            step_num = self.step
+            if step_num < 0:
+                step_num += len(run_data.step_output_values)
         for step_output in run_data.step_output_values:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
+            if step_num is not None and step_output.step_num == step_num:
                 return step_output.description
             if isinstance(self.step, str) and step_output.step_name == self.step:
                 return step_output.description

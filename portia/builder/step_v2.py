@@ -198,8 +198,8 @@ class StepV2(BaseModel, ABC):
         """
         paren_content = paren_content.strip()
 
-        if paren_content.isdigit() and ref_cls == StepOutput:
-            # Reference with a step index - e.g. StepOutput(0)
+        if paren_content.lstrip("-").isdigit() and ref_cls == StepOutput:
+            # Reference with a step index - e.g. StepOutput(0) or StepOutput(-1)
             return StepOutput(int(paren_content))
 
         if ", path=" in paren_content:
@@ -242,7 +242,7 @@ class StepV2(BaseModel, ABC):
         # Split by comma and take the first part
         first_param = paren_content.split(",")[0].strip()
 
-        if first_param.isdigit():
+        if first_param.lstrip("-").isdigit():
             step_param = int(first_param)
         elif (first_param.startswith('"') and first_param.endswith('"')) or (
             first_param.startswith("'") and first_param.endswith("'")
