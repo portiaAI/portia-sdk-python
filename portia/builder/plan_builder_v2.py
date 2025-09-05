@@ -55,6 +55,9 @@ class PlanBuilderV2:
         """
         self.plan = PlanV2(steps=[], label=label)
         self._block_stack: list[ConditionalBlock | LoopBlock] = []
+        self._current_parallel_group = 0
+        self._in_parallel = False
+        self._current_max_parallelism: int | None = 1
 
     def input(
         self,
@@ -100,6 +103,36 @@ class PlanBuilderV2:
             return None
         last_block = self._block_stack[-1]
         return last_block if isinstance(last_block, LoopBlock) else None
+
+    def parallel(self, *, max_parallelism: int | None = None) -> PlanBuilderV2:
+        """Switch subsequent steps to execute in parallel.
+
+        Args:
+            max_parallelism: Optional limit on the number of concurrent steps within the
+                parallel group. If None, concurrency is unbounded for that group.
+
+        Raises:
+            PlanBuilderError: If called when already in parallel mode with a
+                different ``max_parallelism`` value.
+        """
+        if self._in_parallel:
+            if max_parallelism != self._current_max_parallelism:
+                raise PlanBuilderError(
+                    "max_parallelism must match the current parallel group's max_parallelism"
+                )
+            return self
+        self._in_parallel = True
+        self._current_max_parallelism = max_parallelism
+        return self
+
+    def series(self) -> PlanBuilderV2:
+        """Switch subsequent steps back to sequential execution."""
+        if not self._in_parallel:
+            return self
+        self._in_parallel = False
+        self._current_parallel_group += 1
+        self._current_max_parallelism = 1
+        return self
 
     def loop(
         self,
@@ -170,7 +203,7 @@ class PlanBuilderV2:
             end_step_index=None,
         )
         self._block_stack.append(loop_block)
-        self.plan.steps.append(
+        self.add_step(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 over=over,
@@ -217,7 +250,7 @@ class PlanBuilderV2:
         if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
         start_loop_step.end_index = len(self.plan.steps)
-        self.plan.steps.append(
+        self.add_step(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 condition=start_loop_step.condition,
@@ -268,7 +301,7 @@ class PlanBuilderV2:
             parent_conditional_block=parent_block,
         )
         self._block_stack.append(conditional_block)
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=condition,
                 args=args or {},
@@ -322,7 +355,7 @@ class PlanBuilderV2:
                 "else_if_ must be called from a conditional block. Please add an if_ first."
             )
         self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=condition,
                 args=args or {},
@@ -359,7 +392,7 @@ class PlanBuilderV2:
                 "else_ must be called from a conditional block. Please add an if_ first."
             )
         self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=lambda: True,
                 args={},
@@ -398,7 +431,7 @@ class PlanBuilderV2:
                 "endif must be called from a conditional block. Please add an if_ first."
             )
         self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=lambda: True,
                 args={},
@@ -439,7 +472,7 @@ class PlanBuilderV2:
               prompt.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             LLMStep(
                 task=task,
                 inputs=inputs or [],
@@ -476,7 +509,7 @@ class PlanBuilderV2:
               via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             InvokeToolStep(
                 tool=tool,
                 args=args or {},
@@ -554,7 +587,7 @@ class PlanBuilderV2:
                 referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             SingleToolAgentStep(
                 tool=tool,
                 task=task,
@@ -593,7 +626,7 @@ class PlanBuilderV2:
             tool_call_limit: Maximum number of tool calls the agent can make.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             ReActAgentStep(
                 task=task,
                 tools=tools or [],
@@ -629,7 +662,7 @@ class PlanBuilderV2:
                 referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             UserVerifyStep(
                 message=message,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
@@ -670,7 +703,7 @@ class PlanBuilderV2:
                 referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             UserInputStep(
                 message=message,
                 options=options,
@@ -691,7 +724,11 @@ class PlanBuilderV2:
             step: A pre-built step instance that inherits from StepV2.
 
         """
+        step.parallel_group = self._current_parallel_group
+        step.max_parallelism = self._current_max_parallelism
         self.plan.steps.append(step)
+        if not self._in_parallel:
+            self._current_parallel_group += 1
         return self
 
     def add_steps(
@@ -737,9 +774,11 @@ class PlanBuilderV2:
                 if _input.name in existing_input_names:
                     raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
             self.plan.plan_inputs.extend(plan.plan_inputs)
-            self.plan.steps.extend(plan.steps)
+            for step in plan.steps:
+                self.add_step(step)
         else:
-            self.plan.steps.extend(plan)
+            for step in plan:
+                self.add_step(step)
 
         if input_values and isinstance(plan, PlanV2):
             allowed_input_names = {p.name for p in plan.plan_inputs}

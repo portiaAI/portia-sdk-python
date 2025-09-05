@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from langsmith import get_current_run_tree, traceable
@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.loops import LoopStepResult, LoopStepType
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.step_v2 import StepV2
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -2735,110 +2736,130 @@ class Portia:
         output_value = self._get_last_executed_step_output(run_data.legacy_plan, run_data.plan_run)
         branch_stack: list[ConditionalStepResult] = []
         while run_data.plan_run.current_step_index < len(plan.steps):
-            index = run_data.plan_run.current_step_index
-            step = plan.steps[index]
+            start_index = run_data.plan_run.current_step_index
+            start_step = plan.steps[start_index]
+            group_id = start_step.parallel_group
+            group_steps: list[tuple[int, StepV2]] = []
+            i = start_index
+            while i < len(plan.steps) and plan.steps[i].parallel_group == group_id:
+                group_steps.append((i, plan.steps[i]))
+                i += 1
+            max_parallel = group_steps[0][1].max_parallelism or len(group_steps)
+            sem = asyncio.Semaphore(max_parallel)
 
-            legacy_step = step.to_legacy_step(plan)
+            async def run_step(idx: int, stp: StepV2) -> tuple[str, Any, int, StepV2, Step]:
+                legacy = stp.to_legacy_step(plan)
+                run_data.plan_run.current_step_index = idx
+                try:
+                    self._handle_before_step_execution_hook(
+                        run_data.legacy_plan,
+                        run_data.plan_run,
+                        legacy,
+                    )
+                except SkipExecutionError as e:
+                    logger().info(f"Skipping step {idx}: {e}")
+                    return ("skip", e, idx, stp, legacy)
+                try:
+                    async with sem:
+                        res = await stp.run(run_data)
+                    return ("ok", res, idx, stp, legacy)
+                except Exception as e:  # noqa: BLE001
+                    return ("error", e, idx, stp, legacy)
 
-            try:
-                self._handle_before_step_execution_hook(
-                    run_data.legacy_plan,
-                    run_data.plan_run,
-                    legacy_step,
+            tasks = [asyncio.create_task(run_step(i, s)) for i, s in group_steps]
+            results = await asyncio.gather(*tasks)
+            for status, result, index, step, legacy_step in results:
+                if status == "skip":
+                    run_data.plan_run.current_step_index = index + 1
+                    continue
+                if status == "error":
+                    self.telemetry.capture(
+                        PlanV2StepExecutionTelemetryEvent(
+                            step_type=step.__class__.__name__,
+                            success=False,
+                            tool_id=legacy_step.tool_id,
+                        )
+                    )
+                    return self._handle_execution_error(
+                        run_data.plan_run, run_data.legacy_plan, index, legacy_step, result
+                    )
+                else:
+                    self.telemetry.capture(
+                        PlanV2StepExecutionTelemetryEvent(
+                            step_type=step.__class__.__name__,
+                            success=True,
+                            tool_id=legacy_step.tool_id,
+                        )
+                    )
+
+                match result:
+                    case ConditionalStepResult():
+                        jump_to_step_index = self._handle_conditional_step(result, branch_stack)
+                    case LoopStepResult():
+                        jump_to_step_index = self._handle_loop_step(result)
+                        result = result.value
+                    case _:
+                        jump_to_step_index = None
+
+                if not isinstance(result, LocalDataValue):
+                    local_output_value = LocalDataValue(value=result)
+                else:
+                    local_output_value = result
+                output_value = self._set_step_output(
+                    local_output_value, run_data.plan_run, legacy_step
                 )
-            except SkipExecutionError as e:
-                logger().info(f"Skipping step {index}: {e}")
+                if not is_clarification(result):
+                    run_data.step_output_values.append(
+                        StepOutputValue(
+                            step_name=step.step_name,
+                            step_num=index,
+                            value=local_output_value.value,
+                            description=(
+                                f"Output from step '{step.step_name}' (Description: {step})"
+                            ),
+                        )
+                    )
+
+                try:
+                    if clarified_plan_run := self._handle_post_step_execution(
+                        run_data.legacy_plan,
+                        run_data.plan_run,
+                        index,
+                        legacy_step,
+                        output_value,
+                    ):
+                        return clarified_plan_run
+                except Exception as e:  # noqa: BLE001
+                    logger().error(
+                        "Error in post-step stage for step {index}: {error}",
+                        index=index,
+                        error=e,
+                        plan=str(plan.id),
+                        plan_run=str(run_data.plan_run.id),
+                    )
+                    error_value = LocalDataValue(value=str(e))
+                    self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
+                    run_data.step_output_values.append(
+                        StepOutputValue(
+                            step_name=step.step_name,
+                            step_num=index,
+                            value=str(e),
+                            description=f"Error from step '{step.step_name}' (Description: {step})",
+                        )
+                    )
+                    return self._handle_plan_run_execution_error(
+                        run_data.plan_run, run_data.legacy_plan, error_value
+                    )
+
+                if jump_to_step_index is not None:
+                    logger().debug(f"Jumping to step {jump_to_step_index} from {index}")
+                    run_data.plan_run.current_step_index = jump_to_step_index
+                    logger().info(f"Completed step {index}, result: {result}")
+                    break
                 run_data.plan_run.current_step_index = index + 1
-                continue
+                logger().info(f"Completed step {index}, result: {result}")
 
-            try:
-                result = await step.run(run_data)
-            except Exception as e:  # noqa: BLE001
-                self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
-                        step_type=step.__class__.__name__,
-                        success=False,
-                        tool_id=step.to_legacy_step(plan).tool_id,
-                    )
-                )
-                return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, index, legacy_step, e
-                )
-            else:
-                self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
-                        step_type=step.__class__.__name__,
-                        success=True,
-                        tool_id=step.to_legacy_step(plan).tool_id,
-                    )
-                )
-            match result:
-                case ConditionalStepResult():
-                    jump_to_step_index = self._handle_conditional_step(result, branch_stack)
-                case LoopStepResult():
-                    jump_to_step_index = self._handle_loop_step(result)
-                    result = result.value
-                case _:
-                    jump_to_step_index = None
-
-            # Some steps output a LocalDataValue so they can attach a summary to the output, but
-            # we don't enforce that all steps do this so we need to handle both cases.
-            if not isinstance(result, LocalDataValue):
-                local_output_value = LocalDataValue(value=result)
-            else:
-                local_output_value = result
-            # This may persist the output to memory - store the memory value if it does
-            output_value = self._set_step_output(local_output_value, run_data.plan_run, legacy_step)
-            if not is_clarification(result):
-                run_data.step_output_values.append(
-                    StepOutputValue(
-                        step_name=step.step_name,
-                        step_num=index,
-                        value=local_output_value.value,
-                        description=(f"Output from step '{step.step_name}' (Description: {step})"),
-                    )
-                )
-
-            try:
-                if clarified_plan_run := self._handle_post_step_execution(
-                    run_data.legacy_plan,
-                    run_data.plan_run,
-                    index,
-                    legacy_step,
-                    output_value,
-                ):
-                    # No after_plan_run call here as the plan run will be resumed later
-                    return clarified_plan_run
-            except Exception as e:  # noqa: BLE001 - We want to capture all exceptions from the hook here
-                logger().error(
-                    "Error in post-step stage for step {index}: {error}",
-                    index=index,
-                    error=e,
-                    plan=str(plan.id),
-                    plan_run=str(run_data.plan_run.id),
-                )
-                error_value = LocalDataValue(value=str(e))
-                self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
-                run_data.step_output_values.append(
-                    StepOutputValue(
-                        step_name=step.step_name,
-                        step_num=index,
-                        value=str(e),
-                        description=f"Error from step '{step.step_name}' (Description: {step})",
-                    )
-                )
-                # Skip the after_step_execution hook as we have already run it
-                return self._handle_plan_run_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, error_value
-                )
-
-            if jump_to_step_index is not None:
-                logger().debug(f"Jumping to step {jump_to_step_index} from {index}")
-                run_data.plan_run.current_step_index = jump_to_step_index
-            else:
-                run_data.plan_run.current_step_index = index + 1
-            logger().info(f"Completed step {index}, result: {result}")
-
+            continue
         return self._post_plan_run_execution(
             run_data.legacy_plan,
             run_data.plan_run,
