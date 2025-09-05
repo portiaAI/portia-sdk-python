@@ -83,6 +83,7 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "mistral": ["mistralai", "langchain_mistralai"],
     "mistralai": ["mistralai", "langchain_mistralai"],  # in process of refactoring
     "groq": ["groq"],
+    "meta": [],
     "ollama": ["langchain_ollama"],
     "tools-browser-local": ["browser_use"],
     "tools-browser-browserbase": ["browser_use", "browserbase"],
