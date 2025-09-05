@@ -113,6 +113,21 @@ def test_get_value_with_int_step_success() -> None:
     assert result == "test result"
 
 
+def test_get_value_with_negative_index() -> None:
+    """Test get_value method with negative integer step."""
+    step_output = StepOutput(-1)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="first", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+
+    assert result == "second"
+
+
 def test_get_value_with_string_step_success() -> None:
     """Test get_value method with string step - successful case."""
     step_output = StepOutput("my_step")

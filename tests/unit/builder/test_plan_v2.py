@@ -143,6 +143,16 @@ def test_step_output_name_with_step_instance() -> None:
     assert plan.step_output_name(step2) == "$step_1_output"
 
 
+def test_step_output_name_with_negative_step_index() -> None:
+    """Test step_output_name() with negative step index."""
+    step1 = MockStepV2("first_step")
+    step2 = MockStepV2("second_step")
+    plan = PlanV2(steps=[step1, step2])
+
+    assert plan.step_output_name(-1) == "$step_1_output"
+    assert plan.step_output_name(-2) == "$step_0_output"
+
+
 def test_step_output_name_invalid_step_index() -> None:
     """Test step_output_name() method with invalid step index."""
     plan = PlanV2(steps=[MockStepV2("test_step")])

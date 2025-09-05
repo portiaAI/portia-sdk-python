@@ -136,6 +136,10 @@ class PlanV2(BaseModel):
                 step_num = self.idx_by_name(step)
             else:
                 step_num = step
+            if step_num < 0:
+                step_num += len(self.steps)
+            if step_num < 0 or step_num >= len(self.steps):
+                raise ValueError
         except ValueError:
             logger().warning(
                 f"Attempted to retrieve name of step {step} but step not found in plan"
