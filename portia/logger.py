@@ -328,3 +328,11 @@ def logger() -> LoggerInterface:
 
     """
     return logger_manager.logger
+
+
+def truncate_message(msg: Any, max_chars: int = 1000) -> str:  # noqa: ANN401
+    """Truncate a message for logging."""
+    msg_str = str(msg)
+    if len(msg_str) > max_chars:
+        return msg_str[:max_chars] + "...[truncated - only first 1000 characters shown]"
+    return msg_str
