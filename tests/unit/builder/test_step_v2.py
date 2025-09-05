@@ -229,6 +229,106 @@ def test_resolve_input_reference_with_regular_value() -> None:
     assert result == "regular_value"
 
 
+def test_string_templating_with_path_comprehensive() -> None:
+    """Test comprehensive string templating with path syntax for various scenarios."""
+    step = LLMStep(task="Test", step_name="test_step")
+
+    # Set up mock run data with complex nested structures
+    mock_run_data = Mock()
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.plan_inputs = [
+        PlanInput(name="user_profile", description="User profile data"),
+        PlanInput(name="preferences", description="User preferences"),
+    ]
+    mock_run_data.plan_run = Mock()
+    mock_run_data.plan_run.plan_run_inputs = {
+        "user_profile": LocalDataValue(
+            value={
+                "profile": {"name": "Alice", "email": "alice@example.com"},
+                "settings": {"theme": "dark", "notifications": True},
+            }
+        ),
+        "preferences": LocalDataValue(
+            value=[{"category": "tech", "priority": 1}, {"category": "sports", "priority": 2}]
+        ),
+    }
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=0,
+            step_name="search",
+            value={"results": [{"title": "AI Research", "score": 0.95}]},
+            description="Search results",
+        ),
+        StepOutputValue(
+            step_num=1,
+            step_name="analysis",
+            value={"data": {"items": {"complex-key": {"value": "nested_data"}}}},
+            description="Analysis results",
+        ),
+    ]
+
+    # Test 1: StepOutput with simple path
+    result = step._template_references(
+        "Found: {{ StepOutput('search', path='results.0.title') }}", mock_run_data
+    )
+    assert result == "Found: AI Research"
+
+    # Test 2: StepOutput with complex path (special characters in key)
+    result = step._template_references(
+        "Data: {{ StepOutput('analysis', path='data.items.complex-key.value') }}", mock_run_data
+    )
+    assert result == "Data: nested_data"
+
+    # Test 3: Input with path accessing nested object
+    result = step._template_references(
+        "User: {{ Input('user_profile', path='profile.name') }}", mock_run_data
+    )
+    assert result == "User: Alice"
+
+    # Test 4: Input with path accessing array element
+    result = step._template_references(
+        "Top preference: {{ Input('preferences', path='0.category') }}", mock_run_data
+    )
+    assert result == "Top preference: tech"
+
+    # Test 5: Mixed StepOutput and Input references with paths
+    result = step._template_references(
+        "{{ Input('user_profile', path='profile.name') }} searched for "
+        "{{ StepOutput('search', path='results.0.title') }} with score "
+        "{{ StepOutput('search', path='results.0.score') }}",
+        mock_run_data,
+    )
+    assert result == "Alice searched for AI Research with score 0.95"
+
+    # Test 6: Mixed quote styles (single and double quotes)
+    result = step._template_references(
+        'Email: {{ Input("user_profile", path="profile.email") }}', mock_run_data
+    )
+    assert result == "Email: alice@example.com"
+
+    # Test 7: References without paths mixed with path references
+    mock_run_data.step_output_values.append(
+        StepOutputValue(
+            step_num=2,
+            step_name="simple",
+            value="simple_result",
+            description="Simple result",
+        )
+    )
+    result = step._template_references(
+        "Simple: {{ StepOutput('simple') }} vs Complex: "
+        "{{ StepOutput('analysis', path='data.items.complex-key.value') }}",
+        mock_run_data,
+    )
+    assert result == "Simple: simple_result vs Complex: nested_data"
+
+    # Test 8: Numeric step references with paths
+    result = step._template_references(
+        "Result from step 0: {{ StepOutput(0, path='results.0.title') }}", mock_run_data
+    )
+    assert result == "Result from step 0: AI Research"
+
+
 def test_resolve_input_names_for_printing_with_reference() -> None:
     """Test _resolve_input_names_for_printing with Reference."""
     step = ConcreteStepV2()

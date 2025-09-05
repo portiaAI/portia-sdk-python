@@ -14,10 +14,12 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 import instructor
 import litellm
 from anthropic import Anthropic, AsyncAnthropic
+from google import genai
 from langchain.globals import set_llm_cache
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import Generation
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langsmith import wrappers
 from openai import AsyncAzureOpenAI, AsyncOpenAI, AzureOpenAI, OpenAI
@@ -25,6 +27,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from redis import RedisError
 
 from portia.common import validate_extras_dependencies
+from portia.gemini_langsmith_wrapper import wrap_gemini
 from portia.logger import logger
 from portia.token_check import estimate_tokens
 
@@ -1324,58 +1327,52 @@ if validate_extras_dependencies("amazon", raise_error=False):
             self._instructor_client = instructor.from_bedrock(bedrock_client)
 
 
-if validate_extras_dependencies("google", raise_error=False):
-    from google import genai
-    from langchain_google_genai import ChatGoogleGenerativeAI
+class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
+    """Google Generative AI (Gemini) model implementation."""
 
-    from portia.gemini_langsmith_wrapper import wrap_gemini
+    provider: LLMProvider = LLMProvider.GOOGLE
 
-    class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
-        """Google Generative AI (Gemini)model implementation."""
+    def __init__(
+        self,
+        *,
+        model_name: str = "gemini-2.0-flash",
+        api_key: SecretStr,
+        max_retries: int = 3,
+        temperature: float | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Google Generative AI client.
 
-        provider: LLMProvider = LLMProvider.GOOGLE
+        Args:
+            model_name: Name of the Google Generative AI model
+            api_key: API key for Google Generative AI
+            max_retries: Maximum number of retries
+            temperature: Temperature parameter for model sampling
+            **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
-        def __init__(
-            self,
-            *,
-            model_name: str = "gemini-2.0-flash",
-            api_key: SecretStr,
-            max_retries: int = 3,
-            temperature: float | None = None,
-            **kwargs: Any,
-        ) -> None:
-            """Initialize with Google Generative AI client.
+        """
+        # Configure genai with the api key
+        genai_client = genai.Client(api_key=api_key.get_secret_value())
 
-            Args:
-                model_name: Name of the Google Generative AI model
-                api_key: API key for Google Generative AI
-                max_retries: Maximum number of retries
-                temperature: Temperature parameter for model sampling
-                **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
+        client = ChatGoogleGenerativeAI(
+            model=model_name,
+            api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature or 0,
+            **kwargs,
+        )
+        super().__init__(client, model_name)
+        wrapped_gemini_client = wrap_gemini(genai_client)
 
-            """
-            # Configure genai with the api key
-            genai_client = genai.Client(api_key=api_key.get_secret_value())
-
-            client = ChatGoogleGenerativeAI(
-                model=model_name,
-                api_key=api_key,
-                max_retries=max_retries,
-                temperature=temperature or 0,
-                **kwargs,
-            )
-            super().__init__(client, model_name)
-            wrapped_gemini_client = wrap_gemini(genai_client)
-
-            self._instructor_client = instructor.from_genai(
-                client=wrapped_gemini_client,
-                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
-            )
-            self._instructor_client_async = instructor.from_genai(
-                client=wrapped_gemini_client,
-                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
-                use_async=True,
-            )
+        self._instructor_client = instructor.from_genai(
+            client=wrapped_gemini_client,
+            mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+        )
+        self._instructor_client_async = instructor.from_genai(
+            client=wrapped_gemini_client,
+            mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+            use_async=True,
+        )
 
 
 if validate_extras_dependencies("ollama", raise_error=False):
