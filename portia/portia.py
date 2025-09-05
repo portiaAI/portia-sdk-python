@@ -2751,7 +2751,7 @@ class Portia:
                 continue
 
             try:
-                result = await step.run(run_data)
+                result = await step.run_step(run_data)
             except Exception as e:  # noqa: BLE001
                 self.telemetry.capture(
                     PlanV2StepExecutionTelemetryEvent(

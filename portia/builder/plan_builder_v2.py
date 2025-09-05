@@ -272,6 +272,7 @@ class PlanBuilderV2:
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
         system_prompt: str | None = None,
+        cache: bool = False,
     ) -> PlanBuilderV2:
         """Add a step that sends a task to an LLM.
 
@@ -300,6 +301,7 @@ class PlanBuilderV2:
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
                 system_prompt=system_prompt,
+                cache=cache,
             )
         )
         return self
@@ -311,6 +313,7 @@ class PlanBuilderV2:
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
+        cache: bool = False,
     ) -> PlanBuilderV2:
         """Add a step that invokes a tool directly.
 
@@ -336,6 +339,7 @@ class PlanBuilderV2:
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
+                cache=cache,
             )
         )
         return self
@@ -347,6 +351,7 @@ class PlanBuilderV2:
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
+        cache: bool = False,
     ) -> PlanBuilderV2:
         """Add a step that calls a Python function.
 
@@ -372,6 +377,7 @@ class PlanBuilderV2:
             args=args,
             output_schema=output_schema,
             step_name=step_name,
+            cache=cache,
         )
 
     def single_tool_agent_step(
@@ -382,6 +388,7 @@ class PlanBuilderV2:
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
+        cache: bool = False,
     ) -> PlanBuilderV2:
         """Add a step where an agent uses a single tool to complete a task.
 
@@ -415,6 +422,7 @@ class PlanBuilderV2:
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
+                cache=cache,
             )
         )
         return self
@@ -429,6 +437,7 @@ class PlanBuilderV2:
         step_name: str | None = None,
         allow_agent_clarifications: bool = False,
         tool_call_limit: int = 25,
+        cache: bool = False,
     ) -> PlanBuilderV2:
         """Add a step that uses a ReAct agent with multiple tools.
 
@@ -456,6 +465,7 @@ class PlanBuilderV2:
                 tool_call_limit=tool_call_limit,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
+                cache=cache,
             )
         )
         return self

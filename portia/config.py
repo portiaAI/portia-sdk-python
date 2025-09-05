@@ -490,8 +490,15 @@ class Config(BaseModel):
 
     llm_redis_cache_url: str | None = Field(
         default_factory=lambda: os.getenv("LLM_REDIS_CACHE_URL"),
-        description="Optional Redis URL used for caching LLM responses. This URl should include "
+        description="Optional Redis URL used for caching LLM responses. This URL should include "
         "the auth details if required for access to the cache.",
+    )
+
+    step_redis_cache_url: str | None = Field(
+        default_factory=lambda: os.getenv("STEP_REDIS_CACHE_URL"),
+        description="Optional Redis URL used for caching step results. If not provided, "
+        "an in-memory cache will be used instead. This URL should include the auth details "
+        "if required for access to the cache.",
     )
 
     llm_provider: LLMProvider | None = Field(

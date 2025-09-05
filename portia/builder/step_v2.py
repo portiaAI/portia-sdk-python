@@ -17,6 +17,7 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.reference import Input, Reference, StepOutput
+from portia.builder.step_cache import StepCache
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -60,6 +61,29 @@ class StepV2(BaseModel, ABC):
         default=None,
         description="The conditional block containing this step, if part of conditional logic.",
     )
+    cache: bool = Field(
+        default=False,
+        description="Whether to cache the output of this step. This cached value will only be used "
+        "if the same value are passed into the step again (i.e. if the step runs with different, "
+        "inputs, the step will be re-run fully).",
+    )
+
+    async def run_step(self, run_data: RunContext) -> Any | LocalDataValue:  # noqa: ANN401
+        """Execute the step with optional caching.
+
+        This method handles caching logic and calls the actual run() method if needed.
+        """
+        if not self.cache:
+            return await self.run(run_data)
+
+        cached_result = await StepCache.get(self, run_data)
+        if cached_result is not None:
+            return cached_result
+
+        result = await self.run(run_data)
+        await StepCache.set(self, result, run_data)
+
+        return result
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any | LocalDataValue:  # noqa: ANN401
