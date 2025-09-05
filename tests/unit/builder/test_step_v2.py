@@ -770,6 +770,55 @@ def test_llm_step_to_legacy_step() -> None:
         mock_plan.step_output_name.assert_called_once_with(step)
 
 
+def test_llm_step_to_legacy_step_with_all_step_outputs() -> None:
+    """Test LLMStep to_legacy_step method with AllStepOutputs input."""
+    all_outputs_ref = AllStepOutputs()
+    step = LLMStep(
+        task="Analyze all previous outputs",
+        step_name="analysis",
+        inputs=[all_outputs_ref, "Additional context"],
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$analysis_output"
+
+    # Mock the plan to have some previous steps
+    mock_step1 = Mock()
+    mock_step1.step_name = "step1"
+    mock_step2 = Mock()
+    mock_step2.step_name = "step2"
+    mock_step3 = Mock()
+    mock_step3.step_name = "step3"
+
+    mock_plan.steps = [mock_step1, mock_step2, mock_step3, step]  # Include current step
+
+    # Mock the get_legacy_name method on AllStepOutputs
+    with patch.object(all_outputs_ref, "get_legacy_name") as mock_all_outputs_name:
+        # AllStepOutputs should return comma-separated names for all previous step outputs
+        mock_all_outputs_name.return_value = "step1_output,step2_output,step3_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        # Verify the PlanStep has the correct attributes
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "Analyze all previous outputs"
+        assert legacy_step.tool_id == "llm_tool"  # LLMTool.LLM_TOOL_ID
+        assert legacy_step.output == "$analysis_output"
+
+        # Verify inputs are converted to Variables
+        # Should have 3 Variables (one for each previous step output)
+        # The "Additional context" string input doesn't create a Variable
+        assert len(legacy_step.inputs) == 3
+        assert all(isinstance(inp, Variable) for inp in legacy_step.inputs)
+        assert legacy_step.inputs[0].name == "step1_output"
+        assert legacy_step.inputs[1].name == "step2_output"
+        assert legacy_step.inputs[2].name == "step3_output"
+
+        # Verify mocks were called
+        mock_all_outputs_name.assert_called_once_with(mock_plan)
+        mock_plan.step_output_name.assert_called_once_with(step)
+
+
 @pytest.mark.asyncio
 async def test_llm_step_run_linked_inputs() -> None:
     """Test LLMStep run with 2 inputs, one that refers to a Step Output."""
