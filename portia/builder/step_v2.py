@@ -443,13 +443,8 @@ class InvokeToolStep(StepV2):
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"InvokeToolStep(tool='{self._tool_name()}', args={self.args}{output_info})"
-
-    def _tool_name(self) -> str:
-        """Get the name of the tool."""
-        if isinstance(self.tool, str):
-            return self.tool
-        return self.tool.id
+        tool_name = self.tool if isinstance(self.tool, str) else self.tool.id
+        return f"InvokeToolStep(tool='{tool_name}', args={self.args}{output_info})"
 
     @override
     @traceable(name="Invoke Tool Step - Run")
@@ -506,10 +501,11 @@ class InvokeToolStep(StepV2):
         args_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]
         )
+        tool_name = self.tool if isinstance(self.tool, str) else self.tool.id
         return Step(
-            task=f"Use tool {self._tool_name()} with args: {args_desc}",
+            task=f"Use tool {tool_name} with args: {args_desc}",
             inputs=self._inputs_to_legacy_plan_variables(list(self.args.values()), plan),
-            tool_id=self._tool_name(),
+            tool_id=tool_name,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
@@ -525,7 +521,11 @@ class SingleToolAgentStep(StepV2):
     """
 
     task: str = Field(description="Natural language description of the task to accomplish.")
-    tool: str = Field(description="ID of the tool the agent should use to complete the task.")
+    tool: str | Tool = Field(
+        description=(
+            "ID of the tool the agent should use to complete the task or the Tool instance itself."
+        )
+    )
     inputs: list[Any] = Field(
         default_factory=list,
         description=(
@@ -545,7 +545,8 @@ class SingleToolAgentStep(StepV2):
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"SingleToolAgentStep(task='{self.task}', tool='{self.tool}'{output_info})"
+        tool_name = self.tool if isinstance(self.tool, str) else self.tool.id
+        return f"SingleToolAgentStep(task='{self.task}', tool='{tool_name}'{output_info})"
 
     @override
     @traceable(name="Single Tool Agent Step - Run")
@@ -559,12 +560,21 @@ class SingleToolAgentStep(StepV2):
         run_data: RunContext,
     ) -> BaseExecutionAgent:
         """Get the appropriate agent for executing the step."""
-        tool = ToolCallWrapper.from_tool_id(
-            self.tool,
-            run_data.tool_registry,
-            run_data.storage,
-            run_data.plan_run,
-        )
+        if isinstance(self.tool, str):
+            tool = ToolCallWrapper.from_tool_id(
+                self.tool,
+                run_data.tool_registry,
+                run_data.storage,
+                run_data.plan_run,
+            )
+        else:
+            if self.tool.id not in run_data.tool_registry:
+                run_data.tool_registry.with_tool(self.tool)
+            tool = ToolCallWrapper(
+                child_tool=self.tool,
+                storage=run_data.storage,
+                plan_run=run_data.plan_run,
+            )
         cls: type[BaseExecutionAgent]
         match run_data.config.execution_agent_type:
             case ExecutionAgentType.ONE_SHOT:
@@ -593,7 +603,7 @@ class SingleToolAgentStep(StepV2):
         return Step(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
-            tool_id=self.tool,
+            tool_id=self.tool if isinstance(self.tool, str) else self.tool.id,
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),
@@ -610,7 +620,11 @@ class ReActAgentStep(StepV2):
     """
 
     task: str = Field(description="Natural language description of the task to accomplish.")
-    tools: list[str] = Field(description="IDs of the tools the agent can use to complete the task.")
+    tools: Sequence[str | Tool] = Field(
+        description=(
+            "IDs of the tools the agent can use to complete the task or Tool instances themselves."
+        )
+    )
     inputs: list[Any] = Field(
         default_factory=list,
         description=(
@@ -643,7 +657,8 @@ class ReActAgentStep(StepV2):
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
         output_info = f" -> {self.output_schema.__name__}" if self.output_schema else ""
-        return f"ReActAgentStep(task='{self.task}', tools='{self.tools}', {output_info})"
+        tools_list = [t if isinstance(t, str) else t.id for t in self.tools]
+        return f"ReActAgentStep(task='{self.task}', tools='{tools_list}', {output_info})"
 
     @override
     @traceable(name="ReAct Agent Step - Run")
@@ -657,16 +672,22 @@ class ReActAgentStep(StepV2):
         run_data: RunContext,
     ) -> ReActAgent:
         """Get the appropriate agent for executing the step."""
-        tools = [
-            tool_wrapper
-            for tool in self.tools
-            if (
-                tool_wrapper := ToolCallWrapper.from_tool_id(
+        tools = []
+        for tool in self.tools:
+            if isinstance(tool, str):
+                tool_wrapper = ToolCallWrapper.from_tool_id(
                     tool, run_data.tool_registry, run_data.storage, run_data.plan_run
                 )
-            )
-            is not None
-        ]
+            else:
+                if tool.id not in run_data.tool_registry:
+                    run_data.tool_registry.with_tool(tool)
+                tool_wrapper = ToolCallWrapper(
+                    child_tool=tool,
+                    storage=run_data.storage,
+                    plan_run=run_data.plan_run,
+                )
+            if tool_wrapper is not None:
+                tools.append(tool_wrapper)
         task = self._template_references(self.task, run_data)
         task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
 
@@ -686,7 +707,7 @@ class ReActAgentStep(StepV2):
         return Step(
             task=self.task,
             inputs=self._inputs_to_legacy_plan_variables(self.inputs, plan),
-            tool_id=",".join(self.tools),
+            tool_id=",".join(tool if isinstance(tool, str) else tool.id for tool in self.tools),
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
             condition=self._get_legacy_condition(plan),

@@ -359,6 +359,18 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
     assert step.step_name == "agent_step"
 
 
+def test_single_tool_agent_step_accepts_tool_object() -> None:
+    """Test single_tool_agent_step accepts a Tool instance."""
+    builder = PlanBuilderV2()
+    mock_tool = MockTool()
+
+    builder.single_tool_agent_step(tool=mock_tool, task="Use the tool")
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, SingleToolAgentStep)
+    assert step.tool is mock_tool
+
+
 def test_react_agent_step_method_basic() -> None:
     """Test the react_agent_step() method with basic parameters."""
     builder = PlanBuilderV2()
@@ -376,6 +388,18 @@ def test_react_agent_step_method_basic() -> None:
     assert builder.plan.steps[0].step_name == "step_0"
     assert builder.plan.steps[0].tool_call_limit == 25
     assert builder.plan.steps[0].allow_agent_clarifications is False
+
+
+def test_react_agent_step_accepts_tool_objects() -> None:
+    """Test react_agent_step accepts Tool instances."""
+    builder = PlanBuilderV2()
+    tools = [MockTool()]
+
+    builder.react_agent_step(task="Research", tools=tools)
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.tools == tools
 
 
 def test_react_agent_step_method_with_all_parameters() -> None:
