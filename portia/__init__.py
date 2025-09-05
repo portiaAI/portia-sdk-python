@@ -78,6 +78,7 @@ from portia.open_source_tools.registry import (
     example_tool_registry,
     open_source_tool_registry,
 )
+from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
@@ -159,6 +160,7 @@ __all__ = [
     "Portia",
     "PortiaBaseError",
     "PortiaToolRegistry",
+    "OpenAISearchTool",
     "SearchTool",
     "SingleToolAgentStep",
     "SseMcpClientConfig",
