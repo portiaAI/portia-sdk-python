@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Input, StepOutput
+from portia.builder.reference import AllStepOutputs, Input, StepOutput
 from portia.builder.step_v2 import InvokeToolStep, LLMStep, SingleToolAgentStep
 
 # Clarification related classes
@@ -105,6 +105,7 @@ __all__ = [
     "SUPPORTED_MISTRALAI_MODELS",
     "SUPPORTED_OPENAI_MODELS",
     "ActionClarification",
+    "AllStepOutputs",
     "Clarification",
     "ClarificationCategory",
     "ClarificationHandler",

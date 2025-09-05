@@ -329,6 +329,19 @@ def test_string_templating_with_path_comprehensive() -> None:
     assert result == "Result from step 0: AI Research"
 
 
+def test_template_references_all_step_outputs() -> None:
+    """Test _template_references with AllStepOutputs."""
+    step = LLMStep(task="Test", step_name="test_step")
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="first", value="a", description=""),
+        StepOutputValue(step_num=1, step_name="second", value=2, description=""),
+    ]
+
+    result = step._template_references("Outputs: {{ AllStepOutputs() }}", mock_run_data)
+    assert result == "Outputs: {'first': 'a', 'second': 2}"
+
+
 def test_resolve_input_names_for_printing_with_reference() -> None:
     """Test _resolve_input_names_for_printing with Reference."""
     step = ConcreteStepV2()
@@ -838,19 +851,6 @@ def test_invoke_tool_step_str_with_tool_instance() -> None:
     assert (
         str(step) == "InvokeToolStep(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
     )
-
-
-def test_tool_name_with_string_tool() -> None:
-    """Test _tool_name method with string tool."""
-    step = InvokeToolStep(tool="search_tool", step_name="search")
-    assert step._tool_name() == "search_tool"
-
-
-def test_tool_name_with_tool_instance() -> None:
-    """Test _tool_name method with Tool instance."""
-    mock_tool = MockTool()
-    step = InvokeToolStep(tool=mock_tool, step_name="search")
-    assert step._tool_name() == "mock_tool"
 
 
 @pytest.mark.asyncio

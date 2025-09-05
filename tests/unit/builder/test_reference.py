@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Input, StepOutput, default_step_name
+from portia.builder.reference import AllStepOutputs, Input, StepOutput, default_step_name
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
@@ -391,6 +391,51 @@ def test_get_description_with_invalid_step() -> None:
     assert result == ""
 
 
+# Test cases for the AllStepOutputs class
+
+
+def test_all_step_outputs_str_representation() -> None:
+    """Test AllStepOutputs string representation."""
+    ref = AllStepOutputs()
+    assert str(ref) == "{{ AllStepOutputs() }}"
+
+
+def test_all_step_outputs_get_value() -> None:
+    """Test AllStepOutputs get_value method."""
+    ref = AllStepOutputs()
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="foo", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value=42, description=""),
+    ]
+
+    result = ref.get_value(mock_run_data)
+    assert result == {"step_0": "foo", "step_1": 42}
+
+
+def test_all_step_outputs_get_legacy_name() -> None:
+    """Test AllStepOutputs get_legacy_name method."""
+    ref = AllStepOutputs()
+
+    # Create a mock plan with 2 steps
+    mock_plan = Mock(spec=PlanV2)
+    mock_plan.steps = [Mock(), Mock()]  # 2 mock steps
+    mock_plan.step_output_name.side_effect = lambda i: f"$step_{i}_output"
+
+    result = ref.get_legacy_name(mock_plan)
+    assert result == "$step_0_output,$step_1_output"
+
+
+def test_all_step_outputs_get_description() -> None:
+    """Test AllStepOutputs get_description method."""
+    ref = AllStepOutputs()
+    mock_run_data = Mock()
+
+    result = ref.get_description(mock_run_data)
+    assert result == "All previous step outputs"
+
+
 # Test cases for the Input class
 
 
@@ -693,6 +738,56 @@ def test_input_get_value_with_path_pydantic_model() -> None:
 
     result = input_ref.get_value(mock_run_data)
     assert result == "New York"
+
+
+def test_input_get_description_mainline() -> None:
+    """Test Input get_description method - mainline case with description."""
+    input_ref = Input("user_name")
+
+    # Create mock plan input with description
+    mock_plan_input = PlanInput(name="user_name", description="The user's name")
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+
+    result = input_ref.get_description(mock_run_data)
+    assert result == "The user's name"
+
+
+def test_input_get_description_reference_case() -> None:
+    """Test Input get_description method - reference case where value is StepOutput."""
+    input_ref = Input("api_key")
+
+    # Create mock plan input with a reference to a step output as value
+    mock_step_output = Mock(spec=StepOutput)
+    mock_step_output.get_description.return_value = "Output from step 0"
+    mock_plan_input = PlanInput(name="api_key", value=mock_step_output)
+
+    # Create mock run data
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+
+    result = input_ref.get_description(mock_run_data)
+
+    assert result == "Output from step 0"
+    mock_step_output.get_description.assert_called_once_with(mock_run_data)
+
+
+def test_input_get_description_not_found() -> None:
+    """Test Input get_description method - input not found case."""
+    input_ref = Input("missing_input")
+
+    # Create mock run data with different input
+    mock_plan_input = PlanInput(name="other_input", description="Other input")
+    mock_run_data = Mock()
+    mock_run_data.plan.plan_inputs = [mock_plan_input]
+
+    with patch("portia.builder.reference.logger") as mock_logger:
+        result = input_ref.get_description(mock_run_data)
+
+        assert result == "Unknown plan input"
+        mock_logger().warning.assert_called_once_with("Input missing_input not found in plan")
 
 
 # Integration tests for reference classes
