@@ -570,7 +570,7 @@ class PlanBuilderV2:
         self,
         *,
         task: str,
-        tools: list[str | Tool] | None = None,
+        tools: Sequence[str | Tool] | None = None,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,

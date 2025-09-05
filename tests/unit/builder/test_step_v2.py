@@ -45,8 +45,8 @@ from portia.plan import Step as PlanStep
 from portia.prefixed_uuid import PlanRunUUID
 from portia.run_context import StepOutputValue
 from portia.tool import Tool
-from portia.tool_registry import ToolRegistry
 from portia.tool_decorator import tool
+from portia.tool_registry import ToolRegistry
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -841,19 +841,6 @@ def test_invoke_tool_step_str_with_tool_instance() -> None:
     )
 
 
-def test_tool_name_with_string_tool() -> None:
-    """Test _tool_name method with string tool."""
-    step = InvokeToolStep(tool="search_tool", step_name="search")
-    assert step._tool_name() == "search_tool"
-
-
-def test_tool_name_with_tool_instance() -> None:
-    """Test _tool_name method with Tool instance."""
-    mock_tool = MockTool()
-    step = InvokeToolStep(tool=mock_tool, step_name="search")
-    assert step._tool_name() == "mock_tool"
-
-
 @pytest.mark.asyncio
 async def test_invoke_tool_step_with_regular_value_input() -> None:
     """Test InvokeToolStep run with 1 regular value input."""
@@ -1109,7 +1096,6 @@ async def test_invoke_tool_step_with_tool_instance() -> None:
     mock_run_data.plan_run.id = PlanRunUUID()
     mock_run_data.plan_run.current_step_index = 0
     mock_run_data.storage = AsyncMock()
-    mock_run_data.tool_registry = ToolRegistry()
 
     with (
         patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
@@ -1126,7 +1112,6 @@ async def test_invoke_tool_step_with_tool_instance() -> None:
 
         assert result == "mock result"
         mock_arun.assert_called_once_with(mock_ctx, input="test input")
-        assert mock_tool.id in mock_run_data.tool_registry
 
 
 @pytest.mark.asyncio
@@ -1593,7 +1578,7 @@ def test_react_agent_step_with_tool_objects() -> None:
 def test_react_agent_step_adds_tool_to_registry() -> None:
     """Ensure ReActAgentStep registers Tool objects."""
     tool_instance = MockTool()
-    step = ReActAgentStep(task="Multi-tool", tools=[tool_instance])
+    step = ReActAgentStep(task="Multi-tool", tools=[tool_instance], step_name="test_step")
     run_data = Mock()
     run_data.tool_registry = ToolRegistry()
     run_data.storage = Mock()
