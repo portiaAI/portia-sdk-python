@@ -2106,6 +2106,7 @@ dependencies = [
     { name = "langchain", marker = "python_full_version < '4.0'" },
     { name = "langchain-anthropic", marker = "python_full_version < '4.0'" },
     { name = "langchain-core", marker = "python_full_version < '4.0'" },
+    { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
     { name = "langchain-openai", marker = "python_full_version < '4.0'" },
     { name = "langgraph", marker = "python_full_version < '4.0'" },
     { name = "langsmith", marker = "python_full_version < '4.0'" },
@@ -2113,6 +2114,7 @@ dependencies = [
     { name = "loguru", marker = "python_full_version < '4.0'" },
     { name = "mcp" },
     { name = "openai" },
+    { name = "google-genai" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "posthog" },
@@ -2128,10 +2130,8 @@ all = [
     { name = "boto3", marker = "python_full_version < '4.0'" },
     { name = "browser-use", marker = "python_full_version < '4.0'" },
     { name = "browserbase" },
-    { name = "google-genai" },
     { name = "groq" },
     { name = "langchain-aws", marker = "python_full_version < '4.0'" },
-    { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
     { name = "langchain-mistralai", marker = "python_full_version < '4.0'" },
     { name = "langchain-ollama", marker = "python_full_version < '4.0'" },
     { name = "langchain-redis", marker = "python_full_version < '3.14'" },
@@ -2146,10 +2146,6 @@ amazon = [
 cache = [
     { name = "langchain-redis" },
     { name = "redis" },
-]
-google = [
-    { name = "google-genai" },
-    { name = "langchain-google-genai", marker = "python_full_version < '4.0'" },
 ]
 groq = [
     { name = "groq" },
@@ -2206,8 +2202,7 @@ requires-dist = [
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
     { name = "click", specifier = ">=8.1.7,<9" },
-    { name = "google-genai", marker = "extra == 'all'", specifier = ">=1.18.0" },
-    { name = "google-genai", marker = "extra == 'google'", specifier = ">=1.18.0" },
+    { name = "google-genai", specifier = ">=1.18.0" },
     { name = "groq", marker = "extra == 'all'", specifier = ">=0.12.0,<1.0" },
     { name = "groq", marker = "extra == 'groq'", specifier = ">=0.12.0,<1.0" },
     { name = "instructor", marker = "python_full_version >= '3.9' and python_full_version < '4.0'", specifier = ">=1.9.0" },
@@ -2219,8 +2214,7 @@ requires-dist = [
     { name = "langchain-aws", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.2.28" },
     { name = "langchain-aws", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'amazon'", specifier = ">=0.2.28" },
     { name = "langchain-core", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=0.3.25,<0.4" },
-    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=2.1.8,<3" },
-    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'google'", specifier = ">=2.1.8,<3" },
+    { name = "langchain-google-genai", marker = "python_full_version >= '3.11' and python_full_version < '4.0'", specifier = ">=2.1.8,<3" },
     { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'all'", specifier = ">=0.2.3,<0.3" },
     { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'mistral'", specifier = ">=0.2.3,<0.3" },
     { name = "langchain-mistralai", marker = "python_full_version >= '3.11' and python_full_version < '4.0' and extra == 'mistralai'", specifier = ">=0.2.3,<0.3" },
@@ -2253,7 +2247,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'cache'", specifier = ">=5.2.1,<6" },
     { name = "testcontainers", extras = ["redis"], marker = "python_full_version >= '3.9' and python_full_version < '4.0'", specifier = ">=4.10.0" },
 ]
-provides-extras = ["mistral", "mistralai", "google", "amazon", "ollama", "groq", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
+provides-extras = ["mistral", "mistralai", "amazon", "ollama", "groq", "tools-browser-local", "tools-browser-browserbase", "tools-pdf-reader", "cache", "all"]
 
 [package.metadata.requires-dev]
 dev = [
