@@ -36,6 +36,7 @@ import pydash
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.logger import logger
+from portia.plan_run import PlanRun, PlanRunUUID
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -245,6 +246,152 @@ class AllStepOutputs(Reference):
     def get_description(self, run_data: RunContext) -> str:  # noqa: ARG002
         """Get a description of the reference."""
         return "All previous step outputs"
+
+
+class StepOutputFrom(Reference):
+    """Reference the output of a step from another plan run."""
+
+    step: str | int = Field(description="The step to reference the output of.")
+    plan_run: PlanRunUUID = Field(description="ID of the plan run to reference.")
+    path: str | None = Field(default=None, description="Optional path within the output.")
+
+    def __init__(
+        self,
+        step: str | int,
+        plan_run: PlanRun | PlanRunUUID | str,
+        path: str | None = None,
+    ) -> None:
+        plan_run_id = (
+            plan_run.id
+            if isinstance(plan_run, PlanRun)
+            else PlanRunUUID.from_string(plan_run)
+            if isinstance(plan_run, str)
+            else plan_run
+        )
+        super().__init__(step=step, plan_run=plan_run_id, path=path)  # type: ignore[call-arg]
+
+    @override
+    def get_legacy_name(self, plan: PlanV2) -> str:
+        return plan.step_output_name(self.step)
+
+    def __str__(self) -> str:
+        step_repr = f"'{self.step}'" if isinstance(self.step, str) else str(self.step)
+        if self.path:
+            return (
+                f"{{{{ StepOutputFrom({step_repr}, plan_run='{self.plan_run}', "
+                f"path='{self.path}') }}}}"
+            )
+        return f"{{{{ StepOutputFrom({step_repr}, plan_run='{self.plan_run}') }}}}"
+
+    @override
+    def get_value(self, run_data: RunContext) -> Any | None:  # noqa: ANN401
+        plan_run = run_data.storage.get_plan_run(self.plan_run)
+        plan = run_data.storage.get_plan(plan_run.plan_id)
+        output_name = plan.step_output_name(self.step)
+        output = plan_run.outputs.step_outputs.get(output_name)
+        if output is None:
+            logger().warning(
+                f"Output value for step {self.step} not found in plan run {self.plan_run}"
+            )
+            return None
+        value = output.get_value()
+        return pydash.get(value, self.path) if self.path else value
+
+    def get_description(self, run_data: RunContext) -> str:
+        plan_run = run_data.storage.get_plan_run(self.plan_run)
+        plan = run_data.storage.get_plan(plan_run.plan_id)
+        output_name = plan.step_output_name(self.step)
+        output = plan_run.outputs.step_outputs.get(output_name)
+        if output and (summary := output.get_summary()):
+            return summary
+        return ""
+
+
+class AllOutputsFrom(Reference):
+    """Reference all outputs from another plan run."""
+
+    plan_run: PlanRunUUID = Field(description="ID of the plan run to reference.")
+
+    def __init__(self, plan_run: PlanRun | PlanRunUUID | str) -> None:
+        plan_run_id = (
+            plan_run.id
+            if isinstance(plan_run, PlanRun)
+            else PlanRunUUID.from_string(plan_run)
+            if isinstance(plan_run, str)
+            else plan_run
+        )
+        super().__init__(plan_run=plan_run_id)  # type: ignore[call-arg]
+
+    @override
+    def get_legacy_name(self, plan: PlanV2) -> str:  # noqa: ARG002
+        return ""
+
+    def __str__(self) -> str:
+        return f"{{{{ AllOutputsFrom(plan_run='{self.plan_run}') }}}}"
+
+    @override
+    def get_value(self, run_data: RunContext) -> dict[str, Any]:
+        plan_run = run_data.storage.get_plan_run(self.plan_run)
+        plan = run_data.storage.get_plan(plan_run.plan_id)
+        outputs: dict[str, Any] = {}
+        for step in plan.steps:
+            output_name = plan.step_output_name(step)
+            output = plan_run.outputs.step_outputs.get(output_name)
+            if output is not None:
+                outputs[step.step_name] = output.get_value()
+        return outputs
+
+    def get_description(self, run_data: RunContext) -> str:  # noqa: ARG002
+        return f"All outputs from plan run {self.plan_run}"
+
+
+class OutputFromPlanRun(Reference):
+    """Reference the final output from another plan run."""
+
+    plan_run: PlanRunUUID = Field(description="ID of the plan run to reference.")
+    path: str | None = Field(default=None, description="Optional path within the output.")
+
+    def __init__(
+        self, plan_run: PlanRun | PlanRunUUID | str, path: str | None = None
+    ) -> None:
+        plan_run_id = (
+            plan_run.id
+            if isinstance(plan_run, PlanRun)
+            else PlanRunUUID.from_string(plan_run)
+            if isinstance(plan_run, str)
+            else plan_run
+        )
+        super().__init__(plan_run=plan_run_id, path=path)  # type: ignore[call-arg]
+
+    @override
+    def get_legacy_name(self, plan: PlanV2) -> str:  # noqa: ARG002
+        return ""
+
+    def __str__(self) -> str:
+        if self.path:
+            return (
+                f"{{{{ OutputFromPlanRun(plan_run='{self.plan_run}', path='{self.path}') }}}}"
+            )
+        return f"{{{{ OutputFromPlanRun(plan_run='{self.plan_run}') }}}}"
+
+    @override
+    def get_value(self, run_data: RunContext) -> Any | None:  # noqa: ANN401
+        plan_run = run_data.storage.get_plan_run(self.plan_run)
+        output = plan_run.outputs.final_output
+        if output is None:
+            logger().warning(
+                f"Final output not found for plan run {self.plan_run}"
+            )
+            return None
+        value = output.get_value()
+        return pydash.get(value, self.path) if self.path else value
+
+    def get_description(self, run_data: RunContext) -> str:
+        plan_run = run_data.storage.get_plan_run(self.plan_run)
+        output = plan_run.outputs.final_output
+        if output and (summary := output.get_summary()):
+            return summary
+        return ""
 
 
 class Input(Reference):

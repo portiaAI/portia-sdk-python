@@ -42,7 +42,8 @@ from portia.execution_agents.output import LocalDataValue
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import PlanInput, Variable
 from portia.plan import Step as PlanStep
-from portia.prefixed_uuid import PlanRunUUID
+from portia.plan_run import PlanRun, PlanRunOutputs
+from portia.prefixed_uuid import PlanRunUUID, PlanUUID
 from portia.run_context import StepOutputValue
 from portia.tool import Tool
 from portia.tool_decorator import tool
@@ -327,6 +328,28 @@ def test_string_templating_with_path_comprehensive() -> None:
         "Result from step 0: {{ StepOutput(0, path='results.0.title') }}", mock_run_data
     )
     assert result == "Result from step 0: AI Research"
+
+
+def test_template_references_step_output_from_and_output_from_plan_run() -> None:
+    """Test templating of cross-run references."""
+    step = ConcreteStepV2()
+    external_run = PlanRun(plan_id=PlanUUID(), end_user_id="user")
+    external_run.outputs = PlanRunOutputs(
+        step_outputs={"$step_0_output": LocalDataValue(value="ext")},
+        final_output=LocalDataValue(value="fin"),
+    )
+    storage = Mock()
+    storage.get_plan_run.return_value = external_run
+    storage.get_plan.return_value = PlanV2(steps=[])
+    run_data = Mock(storage=storage)
+    result = step._template_references(
+        (
+            f"Prev: {{ StepOutputFrom(0, plan_run='{external_run.id}') }} and final "
+            f"{{ OutputFromPlanRun(plan_run='{external_run.id}') }}"
+        ),
+        run_data,
+    )
+    assert result == "Prev: ext and final fin"
 
 
 @pytest.mark.asyncio
