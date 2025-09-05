@@ -64,6 +64,20 @@ class StepV2(BaseModel, ABC):
     loop_block: LoopBlock | None = Field(
         default=None, description="The loop block this step is part of, if any."
     )
+    parallel_group: int = Field(
+        default=0,
+        description=(
+            "Group identifier for parallel execution. Steps with the same value will be "
+            "executed in parallel while groups themselves run sequentially."
+        ),
+    )
+    max_parallelism: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of steps within this parallel group that may execute "
+            "concurrently. None means no explicit bound."
+        ),
+    )
 
     @abstractmethod
     async def run(self, run_data: RunContext) -> Any | LocalDataValue:  # noqa: ANN401

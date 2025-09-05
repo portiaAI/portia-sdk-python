@@ -1770,3 +1770,35 @@ def test_end_loop_non_loop_step_error() -> None:
         PlanBuilderError, match="The step at the start of the loop is not a LoopStep"
     ):
         builder.end_loop()
+
+
+def test_parallel_and_series_groups() -> None:
+    """Verify parallel and series mode grouping and max parallelism."""
+    plan = (
+        PlanBuilderV2()
+        .llm_step(task="s1")
+        .parallel(max_parallelism=2)
+        .llm_step(task="p1")
+        .llm_step(task="p2")
+        .parallel(max_parallelism=2)  # no effect
+        .llm_step(task="p3")
+        .series()
+        .series()
+        .llm_step(task="s2")
+        .parallel(max_parallelism=2)
+        .llm_step(task="p4")
+        .series()
+        .llm_step(task="s3")
+        .build()
+    )
+    groups = [step.parallel_group for step in plan.steps]
+    max_par = [step.max_parallelism for step in plan.steps]
+    assert groups == [0, 1, 1, 1, 2, 3, 4]
+    assert max_par == [1, 2, 2, 2, 1, 2, 1]
+
+
+def test_parallel_different_max_raises() -> None:
+    """Calling parallel twice with different max_parallelism should error."""
+    builder = PlanBuilderV2().parallel(max_parallelism=2).llm_step(task="p1")
+    with pytest.raises(PlanBuilderError):
+        builder.parallel(max_parallelism=3)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest import mock
@@ -191,6 +192,37 @@ async def test_portia_run_plan_v2_async_mainline(storage_type: str) -> None:
             run_files = list(Path(tmp_dir).glob("prun-*.json"))
             assert len(plan_files) == 1
             assert len(run_files) == 1
+
+
+@pytest.mark.asyncio
+async def test_parallel_steps_execute_concurrently() -> None:
+    """Steps within a parallel block should start at roughly the same time."""
+    start_times: list[float] = []
+
+    async def step_a() -> str:
+        start_times.append(time.perf_counter())
+        await asyncio.sleep(0.2)
+        return "A"
+
+    async def step_b() -> str:
+        start_times.append(time.perf_counter())
+        await asyncio.sleep(0.2)
+        return "B"
+
+    plan = (
+        PlanBuilderV2("Parallel plan")
+        .parallel(max_parallelism=2)
+        .function_step(function=step_a)
+        .function_step(function=step_b)
+        .build()
+    )
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        portia = _create_portia_with_storage("local", tmp_dir)
+        end_user = await portia.ainitialize_end_user()
+        await portia.arun_plan(plan, end_user)
+
+    assert len(start_times) == 2
+    assert abs(start_times[0] - start_times[1]) < 0.15
 
 
 @pytest.mark.asyncio
