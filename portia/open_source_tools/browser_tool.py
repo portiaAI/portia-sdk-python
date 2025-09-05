@@ -490,9 +490,10 @@ class BrowserToolForUrl(BrowserTool):
 
         domain_parts = str(HttpUrl(url).host).split(".")
         formatted_domain = "_".join(domain_parts)
+        domain_host = str(HttpUrl(url).host)
         super().__init__(
             id=id or f"browser_tool_for_url_{formatted_domain}",
-            name=name or f"Browser Tool for {formatted_domain}",
+            name=name or f"Browser Tool for {domain_host}",
             description=description or (
                 f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
                 "tasks."
