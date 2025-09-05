@@ -17,7 +17,15 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.loops import LoopBlock, LoopStepResult, LoopStepType, LoopType
-from portia.builder.reference import AllStepOutputs, Input, Reference, StepOutput
+from portia.builder.reference import (
+    AllOutputsFrom,
+    AllStepOutputs,
+    Input,
+    OutputFromPlanRun,
+    Reference,
+    StepOutput,
+    StepOutputFrom,
+)
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -137,11 +145,18 @@ class StepV2(BaseModel, ABC):
         Supports the following reference types:
         - {{ StepOutput(step_name) }}
         - {{ StepOutput('step_name', path='field.name') }}
+        - {{ StepOutputFrom(step_name, plan_run='id') }}
+        - {{ StepOutputFrom(step_name, plan_run='id', path='field.name') }}
         - {{ AllStepOutputs() }}
+        - {{ AllOutputsFrom(plan_run='id') }}
+        - {{ OutputFromPlanRun(plan_run='id') }}
         - {{ Input(input_name) }}
         """
-        # Find all {{ ... }} blocks that contain StepOutput, AllStepOutputs or Input
-        pattern = r"\{\{\s*(StepOutput|Input|AllStepOutputs)\s*\([^}]*\)\s*\}\}"
+        # Find all {{ ... }} blocks containing supported reference types
+        pattern = (
+            r"\{\{\s*(StepOutput|Input|AllStepOutputs|StepOutputFrom|"
+            r"AllOutputsFrom|OutputFromPlanRun)\s*\([^}]*\)\s*\}\}"
+        )
 
         def replace_reference(match: re.Match[str]) -> str:
             full_match = match.group(0)
@@ -155,6 +170,18 @@ class StepV2(BaseModel, ABC):
             try:
                 if ref_type_str == "AllStepOutputs":
                     ref_obj = AllStepOutputs()
+                elif ref_type_str == "AllOutputsFrom":
+                    ref_obj = self._parse_reference_expression(
+                        AllOutputsFrom, paren_content
+                    )
+                elif ref_type_str == "StepOutputFrom":
+                    ref_obj = self._parse_reference_expression(
+                        StepOutputFrom, paren_content
+                    )
+                elif ref_type_str == "OutputFromPlanRun":
+                    ref_obj = self._parse_reference_expression(
+                        OutputFromPlanRun, paren_content
+                    )
                 else:
                     ref_cls = StepOutput if ref_type_str == "StepOutput" else Input
                     ref_obj = self._parse_reference_expression(ref_cls, paren_content)
@@ -172,34 +199,71 @@ class StepV2(BaseModel, ABC):
         """Parse the content inside StepOutput(...) or Input(...) to create the reference object.
 
         Args:
-            ref_cls: The Reference class to instantiate (StepOutput or Input)
+            ref_cls: The Reference class to instantiate
             paren_content: The content inside the parentheses
 
         Supports the following reference types:
         - StepOutput(step_name)
         - StepOutput(step_name, path='field.name')
+        - StepOutputFrom(step_name, plan_run='id')
+        - StepOutputFrom(step_name, plan_run='id', path='field.name')
+        - AllOutputsFrom(plan_run='id')
+        - OutputFromPlanRun(plan_run='id')
         - Input(input_name)
 
         """
         paren_content = paren_content.strip()
 
-        if paren_content.isdigit() and ref_cls == StepOutput:
-            # Reference with a step index - e.g. StepOutput(0)
-            return StepOutput(int(paren_content))
+        if ref_cls == StepOutput:
+            if paren_content.isdigit():
+                return StepOutput(int(paren_content))
+            if ", path=" in paren_content:
+                return self._parse_reference_with_path(StepOutput, paren_content)
+            if (paren_content.startswith('"') and paren_content.endswith('"')) or (
+                paren_content.startswith("'") and paren_content.endswith("'")
+            ):
+                return StepOutput(paren_content[1:-1])
+            raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
 
-        if ", path=" in paren_content:
-            return self._parse_reference_with_path(ref_cls, paren_content)
+        if ref_cls == Input:
+            if ", path=" in paren_content:
+                return self._parse_reference_with_path(Input, paren_content)
+            if (paren_content.startswith('"') and paren_content.endswith('"')) or (
+                paren_content.startswith("'") and paren_content.endswith("'")
+            ):
+                return Input(paren_content[1:-1])
+            raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
 
-        # Simple reference with no path - e.g. StepOutput("step_name") or Input("input_name")
-        if (paren_content.startswith('"') and paren_content.endswith('"')) or (
-            paren_content.startswith("'") and paren_content.endswith("'")
-        ):
-            name = paren_content[1:-1]  # Remove quotes
-            if ref_cls == StepOutput:
-                return StepOutput(name)
-            return Input(name)
+        if ref_cls == StepOutputFrom:
+            pattern = (
+                r"([^,]+),\s*plan_run=['\"]([^'\"]+)['\"]"
+                r"(?:,\s*path=['\"]([^'\"]+)['\"])?"
+            )
+            match = re.fullmatch(pattern, paren_content)
+            if not match:
+                raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
+            step_part, plan_run_id, path = match.groups()
+            step_part = step_part.strip()
+            step_param = int(step_part) if step_part.isdigit() else step_part.strip("'\"")
+            return StepOutputFrom(step_param, plan_run_id, path=path)
 
-        raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
+        if ref_cls == AllOutputsFrom:
+            match = re.fullmatch(r"plan_run=['\"]([^'\"]+)['\"]", paren_content)
+            if not match:
+                raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
+            return AllOutputsFrom(plan_run=match.group(1))
+
+        if ref_cls == OutputFromPlanRun:
+            match = re.fullmatch(
+                r"plan_run=['\"]([^'\"]+)['\"](?:,\s*path=['\"]([^'\"]+)['\"])?",
+                paren_content,
+            )
+            if not match:
+                raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
+            plan_run_id, path = match.groups()
+            return OutputFromPlanRun(plan_run=plan_run_id, path=path)
+
+        raise ValueError(f"Invalid reference type: {ref_cls}")  # pragma: no cover
 
     def _parse_reference_with_path(self, ref_cls: type[Reference], paren_content: str) -> Reference:
         """Parse reference expressions that include path parameters.

@@ -7,10 +7,20 @@ from unittest.mock import Mock, patch
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import AllStepOutputs, Input, StepOutput, default_step_name
+from portia.builder.reference import (
+    AllOutputsFrom,
+    AllStepOutputs,
+    Input,
+    OutputFromPlanRun,
+    StepOutput,
+    StepOutputFrom,
+    default_step_name,
+)
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
+from portia.plan_run import PlanRun, PlanRunOutputs
+from portia.prefixed_uuid import PlanUUID
 from portia.run_context import StepOutputValue
 
 # Test cases for the default_step_name function
@@ -838,3 +848,45 @@ def test_multiple_inputs_and_outputs() -> None:
     # Test Input references
     assert Input("input1").get_legacy_name(plan) == "input1"
     assert Input("input2").get_legacy_name(plan) == "input2"
+
+
+def test_step_output_from_and_output_from_plan_run() -> None:
+    """Test references that pull data from another plan run."""
+    external_run = PlanRun(plan_id=PlanUUID(), end_user_id="user")
+    external_run.outputs = PlanRunOutputs(
+        step_outputs={"$step_0_output": LocalDataValue(value="ext")},
+        final_output=LocalDataValue(value="fin"),
+    )
+    plan = PlanV2(steps=[])
+    storage = Mock()
+    storage.get_plan_run.return_value = external_run
+    storage.get_plan.return_value = plan
+    run_data = Mock(storage=storage)
+
+    step_ref = StepOutputFrom(0, external_run.id)
+    assert (
+        str(step_ref)
+        == f"{{{{ StepOutputFrom(0, plan_run='{external_run.id}') }}}}"
+    )
+    assert step_ref.get_value(run_data) == "ext"
+
+    final_ref = OutputFromPlanRun(external_run.id)
+    assert (
+        str(final_ref)
+        == f"{{{{ OutputFromPlanRun(plan_run='{external_run.id}') }}}}"
+    )
+    assert final_ref.get_value(run_data) == "fin"
+
+
+def test_all_outputs_from_get_value() -> None:
+    """Test retrieving all outputs from another plan run."""
+    external_run = PlanRun(plan_id=PlanUUID(), end_user_id="user")
+    external_run.outputs.step_outputs["$step_0_output"] = LocalDataValue(value=1)
+    plan = PlanV2(steps=[LLMStep(task="t", step_name="first")])
+    storage = Mock()
+    storage.get_plan_run.return_value = external_run
+    storage.get_plan.return_value = plan
+    run_data = Mock(storage=storage)
+
+    ref = AllOutputsFrom(external_run.id)
+    assert ref.get_value(run_data) == {"first": 1}
