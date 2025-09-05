@@ -45,6 +45,7 @@ from portia.plan import Step as PlanStep
 from portia.prefixed_uuid import PlanRunUUID
 from portia.run_context import StepOutputValue
 from portia.tool import Tool
+from portia.tool_registry import ToolRegistry
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
@@ -1108,6 +1109,7 @@ async def test_invoke_tool_step_with_tool_instance() -> None:
     mock_run_data.plan_run.id = PlanRunUUID()
     mock_run_data.plan_run.current_step_index = 0
     mock_run_data.storage = AsyncMock()
+    mock_run_data.tool_registry = ToolRegistry()
 
     with (
         patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
@@ -1124,6 +1126,7 @@ async def test_invoke_tool_step_with_tool_instance() -> None:
 
         assert result == "mock result"
         mock_arun.assert_called_once_with(mock_ctx, input="test input")
+        assert mock_tool.id in mock_run_data.tool_registry
 
 
 @pytest.mark.asyncio
@@ -1306,6 +1309,43 @@ def test_single_tool_agent_str_with_output_schema() -> None:
         "SingleToolAgentStep(task='Search for info', tool='search_tool' -> MockOutputSchema)"
     )
     assert str(step) == expected_str
+
+
+def test_single_tool_agent_with_tool_object() -> None:
+    """Test SingleToolAgentStep with a Tool instance."""
+    tool_instance = MockTool()
+    step = SingleToolAgentStep(task="Use tool", tool=tool_instance, step_name="use")
+
+    assert str(step) == "SingleToolAgentStep(task='Use tool', tool='mock_tool')"
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$use_output"
+    legacy_step = step.to_legacy_step(mock_plan)
+    assert legacy_step.tool_id == "mock_tool"
+
+
+def test_single_tool_agent_step_adds_tool_to_registry() -> None:
+    """Ensure SingleToolAgentStep registers Tool objects."""
+    tool_instance = MockTool()
+    step = SingleToolAgentStep(task="Use tool", tool=tool_instance, step_name="use")
+    run_data = Mock()
+    run_data.config.execution_agent_type = ExecutionAgentType.DEFAULT
+    run_data.tool_registry = ToolRegistry()
+    run_data.storage = Mock()
+    run_data.plan_run = Mock()
+    run_data.legacy_plan = Mock()
+    run_data.end_user = Mock()
+    run_data.execution_hooks = Mock()
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_wrapper,
+        patch("portia.builder.step_v2.DefaultExecutionAgent") as mock_agent,
+    ):
+        mock_wrapper.return_value = Mock()
+        mock_agent.return_value = Mock()
+        step._get_agent_for_step(run_data)
+
+    assert tool_instance.id in run_data.tool_registry
 
 
 @pytest.mark.asyncio
@@ -1534,6 +1574,40 @@ def test_react_agent_step_str_with_output_schema() -> None:
 
     expected_str = f"ReActAgentStep(task='Task with schema', tools='{tools}',  -> MockOutputSchema)"
     assert str(step) == expected_str
+
+
+def test_react_agent_step_with_tool_objects() -> None:
+    """Test ReActAgentStep accepts Tool instances."""
+    tools = [MockTool(), "calculator_tool"]
+    step = ReActAgentStep(task="Multi-tool task", tools=tools, step_name="react")
+
+    tools_str = "['mock_tool', 'calculator_tool']"
+    assert str(step) == f"ReActAgentStep(task='Multi-tool task', tools='{tools_str}', )"
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$react_output"
+    legacy_step = step.to_legacy_step(mock_plan)
+    assert legacy_step.tool_id == "mock_tool,calculator_tool"
+
+
+def test_react_agent_step_adds_tool_to_registry() -> None:
+    """Ensure ReActAgentStep registers Tool objects."""
+    tool_instance = MockTool()
+    step = ReActAgentStep(task="Multi-tool", tools=[tool_instance])
+    run_data = Mock()
+    run_data.tool_registry = ToolRegistry()
+    run_data.storage = Mock()
+    run_data.plan_run = Mock()
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_wrapper,
+        patch("portia.builder.step_v2.ReActAgent") as mock_agent,
+    ):
+        mock_wrapper.return_value = Mock()
+        mock_agent.return_value = Mock()
+        step._get_agent_for_step(run_data)
+
+    assert tool_instance.id in run_data.tool_registry
 
 
 def test_react_agent_step_to_legacy_step() -> None:
