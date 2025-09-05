@@ -956,26 +956,10 @@ class LoopStep(StepV2):
         default_factory=dict, description="The args to check the condition with."
     )
     loop_step_type: LoopStepType
-    start_index: int = Field(description="The start index of the loop.")
-    end_index: int | None = Field(default=None, description="The end index of the loop.")
-
-    @property
-    def start_index_value(self) -> int:
-        """Get the start index value."""
-        if self.start_index is None:
-            raise ValueError("Start index is None")
-        return self.start_index
-
-    @property
-    def end_index_value(self) -> int:
-        """Get the end index value."""
-        if self.end_index is None:
-            raise ValueError("End index is None")
-        return self.end_index
 
     @model_validator(mode="after")
     def validate_model(self) -> Self:
-        """Validate the start and end indexes."""
+        """Validate the loop."""
         if self.condition is None and self.over is None:
             raise ValueError("Condition and over cannot both be None")
         if self.condition is not None and self.loop_type == LoopType.FOR_EACH:
@@ -1014,23 +998,9 @@ class LoopStep(StepV2):
                     raise ValueError("Over is required for for-each loop")
                 value = self._current_loop_variable(run_data)
                 self.index += 1
-                return LoopStepResult(
-                    step_type=self.loop_step_type,
-                    loop_result=value is not None,
-                    value=value,
-                    start_index=self.start_index_value,
-                    end_index=self.end_index_value,
-                )
+                return LoopStepResult(loop_result=value is not None, value=value)
             case _:
-                # conditional loops are evaluated at end of loop execution
-                # for-each loops are evaluated at end of loop execution
-                return LoopStepResult(
-                    step_type=self.loop_step_type,
-                    loop_result=True,
-                    value=True,
-                    start_index=self.start_index_value,
-                    end_index=self.end_index_value,
-                )
+                return LoopStepResult(loop_result=True, value=True)
 
     async def _handle_conditional_loop(
         self, run_data: RunContext, args: dict[str, Any]
@@ -1045,13 +1015,7 @@ class LoopStep(StepV2):
             )
         else:
             conditional_result = self.condition(**args)
-        return LoopStepResult(
-            step_type=self.loop_step_type,
-            loop_result=conditional_result,
-            value=conditional_result,
-            start_index=self.start_index_value,
-            end_index=self.end_index_value,
-        )
+        return LoopStepResult(loop_result=conditional_result, value=conditional_result)
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:

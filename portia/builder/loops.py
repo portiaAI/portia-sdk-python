@@ -40,18 +40,7 @@ class LoopType(StrEnum):
 
 
 class LoopStepResult(BaseModel):
-    """Output of a loop step.
+    """Output of a loop step."""
 
-    Args:
-        type: The type of loop block that was executed.
-        loop_result: The result of the loop predicate evaluation.
-        start_loop_block_step_index: The step index of the start loop block (loop).
-        end_loop_block_step_index: The step index of the end loop block (endloop).
-
-    """
-
-    step_type: LoopStepType
     value: Any = Field(description="The value of the loop step.")
-    loop_result: bool
-    start_index: int
-    end_index: int
+    loop_result: bool = Field(description="The result of the loop predicate evaluation.")
