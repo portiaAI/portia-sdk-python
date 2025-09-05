@@ -495,8 +495,9 @@ class BrowserToolForUrl(BrowserTool):
             id=id or f"browser_tool_for_url_{formatted_domain}",
             name=name or f"Browser Tool for {domain_host}",
             description=description or (
-                f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete "
-                "tasks."
+                f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
+                "This tool handles a full end to end task. It is capable of doing multiple things "
+                "across different URLs within the same root domain as part of the end to end task."
             ),
             args_schema=BrowserToolForUrlSchema,
             model=model,
