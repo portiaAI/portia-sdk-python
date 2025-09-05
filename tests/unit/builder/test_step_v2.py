@@ -15,7 +15,7 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.loops import LoopStepType, LoopType
-from portia.builder.reference import Input, StepOutput
+from portia.builder.reference import AllStepOutputs, Input, StepOutput
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
@@ -329,17 +329,47 @@ def test_string_templating_with_path_comprehensive() -> None:
     assert result == "Result from step 0: AI Research"
 
 
-def test_template_references_all_step_outputs() -> None:
-    """Test _template_references with AllStepOutputs."""
-    step = LLMStep(task="Test", step_name="test_step")
+@pytest.mark.asyncio
+async def test_llm_step_run_with_all_step_outputs_inputs() -> None:
+    """Test LLMStep run with AllStepOutputs reference and string template."""
+    all_outputs_ref = AllStepOutputs()
+    step = LLMStep(
+        task="Analyze outputs",
+        step_name="analysis",
+        inputs=[all_outputs_ref, f"Summary: {AllStepOutputs()}"],
+    )
     mock_run_data = Mock()
+    mock_run_data.storage = Mock()
     mock_run_data.step_output_values = [
-        StepOutputValue(step_num=0, step_name="first", value="a", description=""),
-        StepOutputValue(step_num=1, step_name="second", value=2, description=""),
+        StepOutputValue(step_num=0, step_name="first", value="result1", description="First step"),
+        StepOutputValue(step_num=1, step_name="second", value="result2", description="Second step"),
     ]
 
-    result = step._template_references("Outputs: {{ AllStepOutputs() }}", mock_run_data)
-    assert result == "Outputs: {'first': 'a', 'second': 2}"
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+        patch.object(all_outputs_ref, "get_value") as mock_get_value,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        mock_get_value.return_value = {"first": "result1", "second": "result2"}
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Analysis complete"
+        mock_wrapper_instance.arun.assert_called_once()
+        call_args = mock_wrapper_instance.arun.call_args
+        assert call_args[1]["task"] == "Analyze outputs"
+
+        expected_task_data = [
+            LocalDataValue(
+                value={"first": "result1", "second": "result2"}, summary="All previous step outputs"
+            ),
+            "Summary: {'first': 'result1', 'second': 'result2'}",  # String template resolved
+        ]
+        assert call_args[1]["task_data"] == expected_task_data
 
 
 def test_resolve_input_names_for_printing_with_reference() -> None:
@@ -851,6 +881,19 @@ def test_invoke_tool_step_str_with_tool_instance() -> None:
     assert (
         str(step) == "InvokeToolStep(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
     )
+
+
+def test_tool_name_with_string_tool() -> None:
+    """Test _tool_name method with string tool."""
+    step = InvokeToolStep(tool="search_tool", step_name="search")
+    assert step._tool_name() == "search_tool"
+
+
+def test_tool_name_with_tool_instance() -> None:
+    """Test _tool_name method with Tool instance."""
+    mock_tool = MockTool()
+    step = InvokeToolStep(tool=mock_tool, step_name="search")
+    assert step._tool_name() == "mock_tool"
 
 
 @pytest.mark.asyncio

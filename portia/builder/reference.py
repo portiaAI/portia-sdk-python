@@ -343,8 +343,7 @@ class Input(Reference):
             return plan_input.description
         if plan_input and isinstance(plan_input.value, Reference):
             return plan_input.value.get_description(run_data)
-        logger().warning(f"Input {self.name} not found in plan")
-        return "Unknown plan input"
+        return ""
 
     def _get_plan_input(self, run_data: RunContext) -> PlanInput | None:
         return next(

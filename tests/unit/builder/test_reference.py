@@ -783,11 +783,8 @@ def test_input_get_description_not_found() -> None:
     mock_run_data = Mock()
     mock_run_data.plan.plan_inputs = [mock_plan_input]
 
-    with patch("portia.builder.reference.logger") as mock_logger:
-        result = input_ref.get_description(mock_run_data)
-
-        assert result == "Unknown plan input"
-        mock_logger().warning.assert_called_once_with("Input missing_input not found in plan")
+    result = input_ref.get_description(mock_run_data)
+    assert result == ""
 
 
 # Integration tests for reference classes
