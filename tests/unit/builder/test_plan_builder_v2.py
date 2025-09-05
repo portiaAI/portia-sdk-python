@@ -797,6 +797,35 @@ def test_add_step_and_add_steps_integration() -> None:
     assert builder.plan.steps[4].step_name == "final"
 
 
+def test_add_steps_converts_stepoutput_indices() -> None:
+    """StepOutput indices in sub-plans should be remapped when merged."""
+
+    sub_plan = (
+        PlanBuilderV2()
+        .function_step(function=lambda: "alpha", step_name="alpha")
+        .function_step(
+            function=lambda x: x,
+            args={"x": StepOutput(0)},
+            step_name="beta",
+        )
+        .build()
+    )
+
+    plan = (
+        PlanBuilderV2()
+        .function_step(function=lambda: "top", step_name="top")
+        .add_steps(sub_plan)
+        .build()
+    )
+
+    # After merging, the StepOutput reference should point to the first step of
+    # the sub-plan ("alpha") rather than the first step of the top-level plan.
+    assert plan.steps[1].step_name == "alpha"
+    beta_step = plan.steps[2]
+    assert isinstance(beta_step.args["x"], StepOutput)
+    assert beta_step.args["x"].step == "alpha"
+
+
 def test_basic_if_endif_block() -> None:
     """Test basic if-endif conditional block."""
     builder = PlanBuilderV2()
