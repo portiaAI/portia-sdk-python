@@ -2728,7 +2728,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
@@ -2752,7 +2752,8 @@ class Portia:
                 run_data.plan_run.current_step_index = index + 1
                 continue
 
-            success = True
+            error = None
+            result = None
             try:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
@@ -2763,14 +2764,10 @@ class Portia:
                             handler_result = await handler_result
                         result = handler_result
                     except Exception as handler_error:  # noqa: BLE001
-                        success = False
                         error = handler_error
-                    else:
-                        success = True
                 else:
-                    success = False
                     error = e
-            if not success:
+            if error:
                 self.telemetry.capture(
                     PlanV2StepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
@@ -2781,14 +2778,13 @@ class Portia:
                 return self._handle_execution_error(
                     run_data.plan_run, run_data.legacy_plan, index, legacy_step, error
                 )
-            else:
-                self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
-                        step_type=step.__class__.__name__,
-                        success=True,
-                        tool_id=step.to_legacy_step(plan).tool_id,
-                    )
+            self.telemetry.capture(
+                PlanV2StepExecutionTelemetryEvent(
+                    step_type=step.__class__.__name__,
+                    success=True,
+                    tool_id=step.to_legacy_step(plan).tool_id,
                 )
+            )
             match result:
                 case ConditionalStepResult():
                     jump_to_step_index = self._handle_conditional_step(result, branch_stack)

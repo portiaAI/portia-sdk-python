@@ -1770,3 +1770,130 @@ def test_end_loop_non_loop_step_error() -> None:
         PlanBuilderError, match="The step at the start of the loop is not a LoopStep"
     ):
         builder.end_loop()
+
+
+# Error handling tests
+
+
+def test_on_error_method_basic() -> None:
+    """Test the on_error() method with basic functionality."""
+    builder = PlanBuilderV2()
+
+    def error_handler(e: Exception) -> str:
+        return f"Handled: {e}"
+
+    result = builder.llm_step(task="Test step").on_error(error_handler)
+
+    assert result is builder  # Should return self for chaining
+    assert len(builder.plan.steps) == 1
+    step = builder.plan.steps[0]
+    assert isinstance(step, LLMStep)
+    assert step.on_error is error_handler
+
+
+def test_on_error_method_with_no_steps_error() -> None:
+    """Test that on_error raises error when called before any step has been added."""
+    builder = PlanBuilderV2()
+
+    def error_handler(_: Exception) -> str:
+        return "handled"
+
+    with pytest.raises(PlanBuilderError, match="No step to attach error handler to."):
+        builder.on_error(error_handler)
+
+
+def test_on_error_method_attaches_to_last_step() -> None:
+    """Test that on_error attaches to the most recently added step."""
+    builder = PlanBuilderV2()
+
+    def first_handler(_: Exception) -> str:
+        return "first"
+
+    def second_handler(_: Exception) -> str:
+        return "second"
+
+    # Add multiple steps
+    builder.llm_step(task="First step")
+    builder.llm_step(task="Second step")
+    builder.llm_step(task="Third step").on_error(first_handler)
+    builder.llm_step(task="Fourth step").on_error(second_handler)
+
+    plan = builder.build()
+    assert len(plan.steps) == 4
+
+    # Only the steps we explicitly added handlers to should have them
+    assert plan.steps[0].on_error is None
+    assert plan.steps[1].on_error is None
+    assert plan.steps[2].on_error is first_handler
+    assert plan.steps[3].on_error is second_handler
+
+
+def test_ignore_errors_method_basic() -> None:
+    """Test the ignore_errors() method with basic functionality."""
+    builder = PlanBuilderV2()
+
+    result = builder.llm_step(task="Test step").ignore_errors()
+
+    assert result is builder  # Should return self for chaining
+    assert len(builder.plan.steps) == 1
+    step = builder.plan.steps[0]
+    assert isinstance(step, LLMStep)
+    assert step.on_error is not None
+
+    # Test that the error handler returns None (ignores the error)
+    test_exception = ValueError("Test exception")
+    assert step.on_error(test_exception) is None
+
+
+def test_ignore_errors_method_with_no_steps_error() -> None:
+    """Test that ignore_errors raises error when called before any step has been added."""
+    builder = PlanBuilderV2()
+
+    with pytest.raises(PlanBuilderError, match="No step to attach error handler to."):
+        builder.ignore_errors()
+
+
+def test_error_handling_method_chaining() -> None:
+    """Test that error handling methods work properly in method chains."""
+    builder = PlanBuilderV2()
+
+    def custom_error_handler(e: Exception) -> str:
+        return f"Custom handled: {e}"
+
+    result = (
+        builder.input(name="user_input", description="User input")
+        .llm_step(task="First step", inputs=[Input("user_input")])
+        .on_error(custom_error_handler)
+        .invoke_tool_step(tool="search_tool", args={"query": StepOutput(0)})
+        .ignore_errors()
+        .function_step(function=example_function_for_testing, args={"x": 42, "y": "test"})
+        .on_error(lambda _: "Function error handled")
+        .single_tool_agent_step(tool="final_tool", task="Final processing")
+        .ignore_errors()
+        .final_output(summarize=True)
+    )
+
+    assert result is builder
+    plan = builder.build()
+
+    assert len(plan.steps) == 4
+    assert len(plan.plan_inputs) == 1
+
+    # Check error handlers are properly attached
+    assert plan.steps[0].on_error is custom_error_handler
+    assert plan.steps[1].on_error is not None  # ignore_errors handler
+    assert plan.steps[2].on_error is not None  # custom lambda handler
+    assert plan.steps[3].on_error is not None  # ignore_errors handler
+
+    # Test that ignore_errors handlers return None
+    test_exception = Exception("Test")
+    assert plan.steps[1].on_error is not None
+    assert plan.steps[1].on_error(test_exception) is None
+    assert plan.steps[3].on_error is not None
+    assert plan.steps[3].on_error(test_exception) is None
+
+    # Test that custom handlers work as expected
+    assert plan.steps[0].on_error is not None
+    assert plan.steps[0].on_error(test_exception) == f"Custom handled: {test_exception}"
+    assert plan.steps[2].on_error is not None
+    assert plan.steps[2].on_error(test_exception) == "Function error handled"

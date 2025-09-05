@@ -1026,7 +1026,7 @@ def test_on_error_handler_returns_value() -> None:
     plan = (
         PlanBuilderV2("on error handler")
         .function_step(function=fail, step_name="fail_step")
-        .on_error(lambda e: "recovered")
+        .on_error(lambda _: "recovered")
         .function_step(function=lambda: "next", step_name="next_step")
         .build()
     )
@@ -1034,9 +1034,8 @@ def test_on_error_handler_returns_value() -> None:
     plan_run = portia.run_plan(plan)
     assert plan_run.state == PlanRunState.COMPLETE
     fail_output_name = plan.step_output_name("fail_step")
-    assert (
-        plan_run.outputs.step_outputs[fail_output_name].get_value() == "recovered"
-    )
+    assert plan_run.outputs.step_outputs[fail_output_name].get_value() == "recovered"
+    assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.get_value() == "next"
 
 
@@ -1060,6 +1059,7 @@ def test_ignore_errors_continues_plan() -> None:
     assert plan_run.state == PlanRunState.COMPLETE
     fail_output_name = plan.step_output_name("fail_step")
     assert plan_run.outputs.step_outputs[fail_output_name].get_value() is None
+    assert plan_run.outputs.final_output is not None
     assert plan_run.outputs.final_output.get_value() == "ok"
 
 
@@ -1074,12 +1074,7 @@ def test_on_error_reraises() -> None:
     def handler(err: Exception) -> None:  # pragma: no cover - executed during test
         raise err
 
-    plan = (
-        PlanBuilderV2("on error re-raise")
-        .function_step(function=fail)
-        .on_error(handler)
-        .build()
-    )
+    plan = PlanBuilderV2("on error re-raise").function_step(function=fail).on_error(handler).build()
 
     plan_run = portia.run_plan(plan)
     assert plan_run.state == PlanRunState.FAILED
