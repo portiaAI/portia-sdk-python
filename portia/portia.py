@@ -2801,8 +2801,6 @@ class Portia:
                 branch_stack.pop()
             elif isinstance(result, ExitStepResult):
                 logger().info(f"Exit step executed: {result.message}")
-                if result.error:
-                    logger().warning("Plan exiting due to error condition")
 
                 # Store the exit result and terminate execution
                 output_value = LocalDataValue(value=result)
@@ -2815,14 +2813,9 @@ class Portia:
                 )
                 run_data.step_output_values.append(output)
 
-                # Mark plan as complete and return
+                # Mark plan as complete and break out of loop
                 run_data.plan_run.current_step_index = len(plan.steps)
-                return self._post_plan_run_execution(
-                    run_data.legacy_plan,
-                    run_data.plan_run,
-                    output_value,
-                    skip_summarization=not plan.summarize and plan.final_output_schema is None,
-                )
+                break
 
             output_value = LocalDataValue(value=result)
             # This may persist the output to memory - store the memory value if it does
@@ -2864,6 +2857,9 @@ class Portia:
                 return self._handle_plan_run_execution_error(
                     run_data.plan_run, run_data.legacy_plan, error_value
                 )
+
+            if isinstance(result, ExitStepResult) and result.error:
+                logger().warning("Plan exiting due to error condition")
 
             # Don't increment current step beyond the last step
             if jump_to_step_index is None and i < len(plan.steps) - 1:

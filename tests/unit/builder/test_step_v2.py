@@ -29,8 +29,6 @@ from portia.model import Message
 from portia.plan import Step as PlanStep
 from portia.plan import Variable
 from portia.tool import Tool
-from portia.builder.reference import ReferenceValue
-from portia.execution_agents.output import LocalDataValue
 
 
 class MockOutputSchema(BaseModel):
@@ -1279,16 +1277,16 @@ class TestExitStep:
     async def test_exit_step_run_with_non_string_resolved_message(self) -> None:
         """Test ExitStep run method when resolved message is not a string."""
         step = ExitStep(step_name="exit_step", message="Processing {{ StepOutput(0) }}")
-        
+
         # Create a proper RunContext with step_output_values populated
         mock_storage = Mock()
         mock_portia = Mock()
         mock_portia.storage = mock_storage
-        
+
         # Create a ReferenceValue with a LocalDataValue containing a non-string value
         mock_output_value = LocalDataValue(value=42, summary="Step completed")
         mock_reference_value = ReferenceValue(value=mock_output_value, description="Step 0 output")
-        
+
         mock_run_data = Mock()
         mock_run_data.step_output_values = [mock_reference_value]
         mock_run_data.portia = mock_portia
@@ -1303,16 +1301,16 @@ class TestExitStep:
     async def test_exit_step_run_with_none_resolved_message(self) -> None:
         """Test ExitStep run method when resolved message is None."""
         step = ExitStep(step_name="exit_step", message="Processing {{ StepOutput(0) }}")
-        
+
         # Create a proper RunContext with step_output_values populated
         mock_storage = Mock()
         mock_portia = Mock()
         mock_portia.storage = mock_storage
-        
+
         # Create a ReferenceValue with a LocalDataValue containing None value
         mock_output_value = LocalDataValue(value=None, summary="Step completed")
         mock_reference_value = ReferenceValue(value=mock_output_value, description="Step 0 output")
-        
+
         mock_run_data = Mock()
         mock_run_data.step_output_values = [mock_reference_value]
         mock_run_data.portia = mock_portia
