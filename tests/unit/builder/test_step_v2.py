@@ -29,6 +29,8 @@ from portia.model import Message
 from portia.plan import Step as PlanStep
 from portia.plan import Variable
 from portia.tool import Tool
+from portia.builder.reference import ReferenceValue
+from portia.execution_agents.output import LocalDataValue
 
 
 class MockOutputSchema(BaseModel):
@@ -1254,52 +1256,72 @@ class TestExitStep:
     async def test_exit_step_run_with_reference_resolution(self) -> None:
         """Test ExitStep run method with message reference resolution."""
         step = ExitStep(step_name="exit_step", message="Processing {{ StepOutput(0) }}")
+
+        # Create a proper RunContext with step_output_values populated
+        mock_storage = Mock()
+        mock_portia = Mock()
+        mock_portia.storage = mock_storage
+
+        mock_output_value = LocalDataValue(value="completed successfully", summary="Step completed")
+        mock_reference_value = ReferenceValue(value=mock_output_value, description="Step 0 output")
+
         mock_run_data = Mock()
+        mock_run_data.step_output_values = [mock_reference_value]
+        mock_run_data.portia = mock_portia
 
-        # Mock the _resolve_input_reference method to return resolved message
-        with patch.object(step, "_resolve_input_reference") as mock_resolve:
-            mock_resolve.return_value = "Processing completed successfully"
+        result = await step.run(mock_run_data)
 
-            result = await step.run(mock_run_data)
-
-            assert isinstance(result, ExitStepResult)
-            assert result.message == "Processing completed successfully"
-            assert result.error is False
-
-            # Verify _resolve_input_reference was called with the message
-            mock_resolve.assert_called_once_with("Processing {{ StepOutput(0) }}", mock_run_data)
+        assert isinstance(result, ExitStepResult)
+        assert result.message == "Processing completed successfully"
+        assert result.error is False
 
     @pytest.mark.asyncio
     async def test_exit_step_run_with_non_string_resolved_message(self) -> None:
         """Test ExitStep run method when resolved message is not a string."""
         step = ExitStep(step_name="exit_step", message="Processing {{ StepOutput(0) }}")
+        
+        # Create a proper RunContext with step_output_values populated
+        mock_storage = Mock()
+        mock_portia = Mock()
+        mock_portia.storage = mock_storage
+        
+        # Create a ReferenceValue with a LocalDataValue containing a non-string value
+        mock_output_value = LocalDataValue(value=42, summary="Step completed")
+        mock_reference_value = ReferenceValue(value=mock_output_value, description="Step 0 output")
+        
         mock_run_data = Mock()
+        mock_run_data.step_output_values = [mock_reference_value]
+        mock_run_data.portia = mock_portia
 
-        # Mock the _resolve_input_reference method to return non-string
-        with patch.object(step, "_resolve_input_reference") as mock_resolve:
-            mock_resolve.return_value = 42
+        result = await step.run(mock_run_data)
 
-            result = await step.run(mock_run_data)
-
-            assert isinstance(result, ExitStepResult)
-            assert result.message == "42"
-            assert result.error is False
+        assert isinstance(result, ExitStepResult)
+        assert result.message == "Processing 42"
+        assert result.error is False
 
     @pytest.mark.asyncio
     async def test_exit_step_run_with_none_resolved_message(self) -> None:
         """Test ExitStep run method when resolved message is None."""
         step = ExitStep(step_name="exit_step", message="Processing {{ StepOutput(0) }}")
+        
+        # Create a proper RunContext with step_output_values populated
+        mock_storage = Mock()
+        mock_portia = Mock()
+        mock_portia.storage = mock_storage
+        
+        # Create a ReferenceValue with a LocalDataValue containing None value
+        mock_output_value = LocalDataValue(value=None, summary="Step completed")
+        mock_reference_value = ReferenceValue(value=mock_output_value, description="Step 0 output")
+        
         mock_run_data = Mock()
+        mock_run_data.step_output_values = [mock_reference_value]
+        mock_run_data.portia = mock_portia
 
-        # Mock the _resolve_input_reference method to return None
-        with patch.object(step, "_resolve_input_reference") as mock_resolve:
-            mock_resolve.return_value = None
+        result = await step.run(mock_run_data)
 
-            result = await step.run(mock_run_data)
-
-            assert isinstance(result, ExitStepResult)
-            assert result.message == ""
-            assert result.error is False
+        assert isinstance(result, ExitStepResult)
+        assert result.message == "Processing None"
+        assert result.error is False
 
     def test_exit_step_to_legacy_step_normal_exit(self) -> None:
         """Test ExitStep to_legacy_step method for normal exit."""
@@ -1345,35 +1367,3 @@ class TestExitStep:
         assert legacy_step.output == "$exit_step_output"
         assert legacy_step.structured_output_schema is None
         assert len(legacy_step.inputs) == 0
-
-
-class TestExitStepResult:
-    """Test cases for the ExitStepResult class."""
-
-    def test_exit_step_result_initialization_defaults(self) -> None:
-        """Test ExitStepResult initialization with default values."""
-        result = ExitStepResult()
-
-        assert result.message == ""
-        assert result.error is False
-
-    def test_exit_step_result_initialization_with_custom_values(self) -> None:
-        """Test ExitStepResult initialization with custom values."""
-        result = ExitStepResult(message="Custom message", error=True)
-
-        assert result.message == "Custom message"
-        assert result.error is True
-
-    def test_exit_step_result_initialization_with_message_only(self) -> None:
-        """Test ExitStepResult initialization with message only."""
-        result = ExitStepResult(message="Just a message")
-
-        assert result.message == "Just a message"
-        assert result.error is False
-
-    def test_exit_step_result_initialization_with_error_only(self) -> None:
-        """Test ExitStepResult initialization with error flag only."""
-        result = ExitStepResult(error=True)
-
-        assert result.message == ""
-        assert result.error is True

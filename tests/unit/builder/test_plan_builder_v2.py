@@ -810,9 +810,7 @@ class TestPlanBuilderV2Exit:
             .exit(message="Normal completion")
         )
 
-        assert (
-            len(result.plan.steps) == 8
-        )  # 8 steps total
+        assert len(result.plan.steps) == 8  # 8 steps total
         # Check that the exit step is properly placed within the conditional
         exit_step = result.plan.steps[3]
         assert isinstance(exit_step, ExitStep)
