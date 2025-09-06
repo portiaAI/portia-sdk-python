@@ -505,7 +505,7 @@ class ExitStep(StepV2):
         return Step(
             task=task,
             inputs=[],
-            tool_id="exit_step",
+            tool_id=None,
             output=plan.step_output_name(self),
             structured_output_schema=None,
             condition=self._get_legacy_condition(plan),

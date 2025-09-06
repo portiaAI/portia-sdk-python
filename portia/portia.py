@@ -2860,6 +2860,7 @@ class Portia:
 
             if isinstance(result, ExitStepResult) and result.error:
                 logger().warning("Plan exiting due to error condition")
+                self._set_plan_run_state(run_data.plan_run, PlanRunState.FAILED)
 
             # Don't increment current step beyond the last step
             if jump_to_step_index is None and i < len(plan.steps) - 1:
@@ -2873,7 +2874,9 @@ class Portia:
             run_data.legacy_plan,
             run_data.plan_run,
             output_value,
-            skip_summarization=not plan.summarize and plan.final_output_schema is None,
+            skip_summarization=(not plan.summarize
+            and plan.final_output_schema is None)
+            or run_data.plan_run.state == PlanRunState.FAILED,
         )
 
     @staticmethod
