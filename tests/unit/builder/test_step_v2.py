@@ -1331,7 +1331,7 @@ class TestExitStep:
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Exit plan: Normal completion"
-        assert legacy_step.tool_id == "exit_step"
+        assert legacy_step.tool_id == None
         assert legacy_step.output == "$exit_step_output"
         assert legacy_step.structured_output_schema is None
         assert len(legacy_step.inputs) == 0
@@ -1346,7 +1346,7 @@ class TestExitStep:
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Exit plan with error: Error occurred"
-        assert legacy_step.tool_id == "exit_step"
+        assert legacy_step.tool_id == None
         assert legacy_step.output == "$exit_step_output"
         assert legacy_step.structured_output_schema is None
         assert len(legacy_step.inputs) == 0
@@ -1361,7 +1361,7 @@ class TestExitStep:
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Exit plan"
-        assert legacy_step.tool_id == "exit_step"
+        assert legacy_step.tool_id == None
         assert legacy_step.output == "$exit_step_output"
         assert legacy_step.structured_output_schema is None
         assert len(legacy_step.inputs) == 0
