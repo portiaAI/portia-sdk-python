@@ -484,7 +484,6 @@ class ExitStep(StepV2):
     @traceable(name="Exit Step - Run")
     async def run(self, run_data: RunContext) -> ExitStepResult:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
         """Execute the exit step, causing the plan to terminate gracefully."""
-        # Resolve any references in the message
         resolved_message = self._resolve_input_reference(self.message, run_data)
         if isinstance(resolved_message, str):
             message = resolved_message
