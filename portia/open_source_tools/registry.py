@@ -37,7 +37,6 @@ open_source_tool_registry = ToolRegistry(
         ImageUnderstandingTool(),
         LLMTool(),
         MapTool(),
-        SearchTool(),
         WeatherTool(),
     ],
 )
@@ -51,6 +50,16 @@ if validate_extras_dependencies("tools-pdf-reader", raise_error=False) and os.ge
     from .pdf_reader_tool import PDFReaderTool
 
     open_source_tool_registry.with_tool(PDFReaderTool())
+
+# Add search tools based on available API keys
+if os.getenv("TAVILY_API_KEY"):
+    # Use Tavily search as primary search tool
+    open_source_tool_registry.with_tool(SearchTool())
+elif os.getenv("OPENAI_API_KEY"):
+    # Use OpenAI search as fallback when Tavily is not available
+    from .openai_search_tool import OpenAISearchTool
+
+    open_source_tool_registry.with_tool(OpenAISearchTool())
 
 # Always register SQL tools (uses stdlib sqlite3). Configure via env at runtime.
 open_source_tool_registry.with_tool(ListTablesTool())

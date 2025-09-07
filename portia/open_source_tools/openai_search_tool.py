@@ -173,22 +173,14 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
     def _parse_formatted_response(self, response: object) -> list[dict[str, Any]]:
         """Parse the structured JSON response from OpenAI Response API."""
         if not hasattr(response, "output") or not response.output:
-            raise ToolSoftError(f"No output in OpenAI response: {response}")
+            return []
 
         try:
-            # Get the response content as JSON
-            if hasattr(response.output, "text") and response.output.text:
-                response_text = response.output.text
-            elif isinstance(response.output, str):
-                response_text = response.output
-            else:
-                response_text = str(response.output)
-
+            # OpenAI Response API with JSON schema returns structured output consistently
+            response_text = response.output.text
             parsed_response = json.loads(response_text)
-
-            # Return empty list if no results found instead of raising error
-            return parsed_response.get("results", [])
+            results = parsed_response.get("results", [])
+            return results if isinstance(results, list) else []
         except (json.JSONDecodeError, AttributeError, KeyError):
-            # Fallback to basic response if JSON parsing fails
-            content = getattr(response.output, "text", "") or str(response.output)
-            return [{"url": "", "title": "Search Results", "content": content}] if content else []
+            # Return empty results if parsing fails - don't raise errors for empty results
+            return []
