@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel, Field
@@ -11,10 +11,12 @@ from pydantic import BaseModel, Field
 from portia import Config, LogLevel, Portia
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
+from portia.clarification import UserVerificationClarification
 from portia.clarification_handler import ClarificationHandler
 from portia.config import StorageClass
 from portia.execution_hooks import ExecutionHooks
-from portia.plan_run import PlanRunState
+from portia.model import LLMProvider
+from portia.plan_run import PlanRun, PlanRunState
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -24,8 +26,11 @@ if TYPE_CHECKING:
         Clarification,
         InputClarification,
         MultipleChoiceClarification,
-        UserVerificationClarification,
     )
+    from portia.plan import Step
+
+
+MODEL_PROVIDERS = [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
 
 
 class CommodityPrice(BaseModel):
@@ -87,6 +92,16 @@ class FinalOutput(BaseModel):
 
     poem: str
     example_similar_poem: str
+
+
+@pytest.fixture
+def local_portia() -> Portia:
+    """Create a local Portia instance."""
+    return Portia(
+        config=Config.from_default(
+            storage_class=StorageClass.MEMORY, default_log_level=LogLevel.DEBUG, portia_api_key=None
+        )
+    )
 
 
 @pytest.mark.parametrize("is_async", [False, True])
@@ -758,7 +773,7 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         on_error: Callable[[Clarification, object], None],  # noqa: ARG002
     ) -> None:
         """Handle multiple choice clarification by selecting 100."""
-        if "How many kilos of gold" in clarification.user_guidance:
+        if "How many ounces of gold" in clarification.user_guidance:
             on_resolution(clarification, 2)
             return
         raise RuntimeError("Received unexpected multiple choice clarification")
@@ -770,7 +785,7 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
         on_error: Callable[[Clarification, object], None],  # noqa: ARG002
     ) -> None:
         """Handle input clarification by returning '2' as string."""
-        if "How many kilos of gold" in clarification.user_guidance:
+        if "How many ounces of gold" in clarification.user_guidance:
             on_resolution(clarification, "2")
             return
         raise RuntimeError("Received unexpected input clarification")
@@ -790,27 +805,28 @@ class ExampleBuilderClarificationHandler(ClarificationHandler):
 
 # Rerun as occasionally Tavily doesn't give back the gold price
 @pytest.mark.flaky(reruns=3)
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     (
         "storage_class",
         "user_input_options",
-        "currency_override",
+        "country_override",
         "expected_currency",
         "expected_user_input",
     ),
     [
         # Test disk storage class with multi-choice clarification
-        (StorageClass.DISK, [1, 2, 5], "USD", "USD", 2),
+        (StorageClass.DISK, [1, 2, 5], "Spain", "EUR", 2),
         # Test input clarification
-        (StorageClass.CLOUD, None, "USD", "USD", "2"),
-        # Test with default currency (EUR)
-        (StorageClass.CLOUD, [1, 2, 5], None, "EUR", 2),
+        (StorageClass.CLOUD, None, "USA", "USD", "2"),
+        # Test with default country (UK)
+        (StorageClass.CLOUD, [1, 2, 5], None, "GBP", 2),
     ],
 )
-def test_example_builder_plan_scenarios(
+async def test_example_builder_plan_scenarios(
     storage_class: StorageClass,
     user_input_options: list[int] | None,
-    currency_override: str | None,
+    country_override: str | None,
     expected_currency: str,
     expected_user_input: int | str,
 ) -> None:
@@ -825,37 +841,40 @@ def test_example_builder_plan_scenarios(
         execution_hooks=ExecutionHooks(clarification_handler=ExampleBuilderClarificationHandler()),
     )
 
-    def calculate_total_price(
-        price_with_currency: CommodityPriceWithCurrency, purchase_quantity: str | int
-    ) -> float:
+    def calculate_total_price(price: float, purchase_quantity: str | int) -> float:
         """Calculate total price with string to int conversion."""
-        return price_with_currency.price * int(purchase_quantity)
+        return price * int(purchase_quantity)
 
     plan = (
         PlanBuilderV2("Buy some gold")
         .input(
-            name="currency",
-            description="The currency to purchase the gold in",
-            default_value="EUR",
+            name="country", description="The country to purchase the gold in", default_value="UK"
         )
         .invoke_tool_step(
-            step_name="Search gold price",
+            step_name="Search currency",
             tool="search_tool",
             args={
-                "search_query": f"What is the price of gold per kilo in {Input('currency')}?",
+                "search_query": f"What is the currency in {Input('country')}?",
             },
+        )
+        .react_agent_step(
+            step_name="Search gold price",
+            tools=["search_tool", "calculator_tool"],
+            task=f"What is the price of gold per ounce in {Input('country')}?",
+            inputs=[StepOutput(0)],
             output_schema=CommodityPriceWithCurrency,
         )
         .user_input(
-            message="How many kilos of gold do you want to purchase?",
+            step_name="Purchase quantity",
+            message="How many ounces of gold do you want to purchase?",
             options=user_input_options,
         )
         .function_step(
             step_name="Calculate total price",
             function=calculate_total_price,
             args={
-                "price_with_currency": StepOutput("Search gold price"),
-                "purchase_quantity": StepOutput(1),
+                "price": StepOutput("Search gold price", path="price"),
+                "purchase_quantity": StepOutput("Purchase quantity"),
             },
         )
         .user_verify(
@@ -874,7 +893,7 @@ def test_example_builder_plan_scenarios(
         .endif()
         .llm_step(
             task="Create a fake receipt for the purchase of gold.",
-            inputs=[StepOutput("Calculate total price"), Input("currency")],
+            inputs=[StepOutput("Calculate total price"), Input("country")],
             step_name="Generate receipt",
         )
         .final_output(
@@ -884,16 +903,20 @@ def test_example_builder_plan_scenarios(
     )
 
     plan_run_inputs = {}
-    if currency_override is not None:
-        plan_run_inputs["currency"] = currency_override
+    if country_override is not None:
+        plan_run_inputs["country"] = country_override
 
-    plan_run = portia.run_plan(plan, plan_run_inputs=plan_run_inputs)
+    plan_run = await portia.arun_plan(plan, plan_run_inputs=plan_run_inputs)
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
 
-    # Verify the gold price was found with correct currency
-    gold_price_output = plan_run.outputs.step_outputs["$step_0_output"]
+    # Verify the currency search was successful
+    currency_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert currency_output is not None
+
+    # Verify the gold price was found with correct currency (step 1 is now react_agent_step)
+    gold_price_output = plan_run.outputs.step_outputs["$step_1_output"]
     assert gold_price_output is not None
     gold_price_data = gold_price_output.get_value()
     assert isinstance(gold_price_data, CommodityPriceWithCurrency)
@@ -901,12 +924,12 @@ def test_example_builder_plan_scenarios(
     assert gold_price_data.currency == expected_currency
 
     # Verify user input was correct type and value
-    user_input_output = plan_run.outputs.step_outputs["$step_1_output"]
+    user_input_output = plan_run.outputs.step_outputs["$step_2_output"]
     assert user_input_output is not None
     assert user_input_output.get_value() == expected_user_input
 
     # Verify total price calculation
-    total_price_output = plan_run.outputs.step_outputs["$step_2_output"]
+    total_price_output = plan_run.outputs.step_outputs["$step_3_output"]
     assert total_price_output is not None
     total_price = total_price_output.get_value()
     assert total_price == gold_price_data.price * 2
@@ -1033,3 +1056,835 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
     assert all_inputs.get("sub_input_no_default_2", "") == "sub_value"
     assert all_inputs.get("sub_input_with_default_1", "") == 200
     assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"
+
+
+# Loop integration tests
+
+
+def test_plan_v2_while_loop_conditional_simple(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop - simple case that runs once."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def increment_and_check() -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"loop_iteration_{counter}")
+        return counter < 2  # Run once
+
+    plan = (
+        PlanBuilderV2(label="Test while loop")
+        .function_step(
+            function=lambda: record_func("before_loop"),
+        )
+        .loop(while_=increment_and_check)
+        .function_step(
+            function=lambda: record_func("inside_loop"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_loop"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Verify the loop executed correctly
+    assert "before_loop" in messages
+    assert "after_loop" in messages
+    assert counter == 2
+
+    # Check that the loop body executed multiple times
+    loop_executions = [msg for msg in messages if msg == "inside_loop"]
+    assert len(loop_executions) == 1
+
+    # Check that condition function was called
+    condition_calls = [msg for msg in messages if msg.startswith("loop_iteration_")]
+    assert len(condition_calls) == 2
+    assert "loop_iteration_1" in condition_calls
+    assert "loop_iteration_2" in condition_calls
+
+
+def test_plan_v2_while_loop_conditional_false(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop - condition is false."""
+    messages: list[str] = []
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def always_false() -> bool:
+        record_func("condition_evaluated")
+        return False
+
+    plan = (
+        PlanBuilderV2(label="Test while loop that is false")
+        .function_step(
+            function=lambda: record_func("before_loop"),
+        )
+        .loop(while_=always_false)
+        .function_step(
+            function=lambda: record_func("inside_loop"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_loop"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Should execute: before_loop, condition_evaluated, after_loop
+    # Note: conditional loops always run at least once to evaluate the condition
+    expected_messages = ["before_loop", "condition_evaluated", "after_loop"]
+    assert messages == expected_messages
+
+
+def test_plan_v2_loop_for_each_simple(local_portia: Portia) -> None:
+    """Test PlanV2 for-each loop with simple list."""
+    messages: list[str] = []
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def generate_list() -> list[str]:
+        return ["apple", "banana", "cherry"]
+
+    plan = (
+        PlanBuilderV2(label="Test for-each loop")
+        .function_step(
+            function=generate_list,
+            step_name="generate_items",
+        )
+        .function_step(
+            function=lambda: record_func("before_loop"),
+        )
+        .loop(over=StepOutput("generate_items"), step_name="Loop")
+        .function_step(
+            function=lambda item: record_func(f"processing_{item}"),
+            args={"item": StepOutput("Loop")},
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_loop"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "before_loop",
+        "processing_apple",
+        "processing_banana",
+        "processing_cherry",
+        "after_loop",
+    ]
+    assert messages == expected_messages
+
+
+def test_plan_v2_loop_for_each_empty_list(local_portia: Portia) -> None:
+    """Test PlanV2 for-each loop with empty list."""
+    messages: list[str] = []
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def generate_empty_list() -> list[str]:
+        return []
+
+    plan = (
+        PlanBuilderV2(label="Test for-each loop with empty list")
+        .function_step(
+            function=generate_empty_list,
+            step_name="generate_items",
+        )
+        .function_step(
+            function=lambda: record_func("before_loop"),
+        )
+        .loop(over=StepOutput("generate_items"), step_name="Loop")
+        .function_step(
+            function=lambda item: record_func(f"processing_{item}"),
+            args={"item": StepOutput("Loop")},
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_loop"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Should execute: before_loop, after_loop (no loop iterations)
+    expected_messages = ["before_loop", "after_loop"]
+    assert messages == expected_messages
+
+
+def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
+    """Test PlanV2 nested conditional loops."""
+    messages: list[str] = []
+    outer_counter = 0
+    inner_counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def outer_condition() -> bool:
+        nonlocal outer_counter
+        outer_counter += 1
+        record_func(f"outer_condition_{outer_counter}")
+        return outer_counter < 3  # Run twice
+
+    def inner_condition() -> bool:
+        nonlocal inner_counter
+        inner_counter += 1
+        record_func(f"inner_condition_{inner_counter}")
+        return inner_counter < 2  # Run once per outer iteration
+
+    plan = (
+        PlanBuilderV2(label="Test nested conditional loops")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=outer_condition)
+        .function_step(
+            function=lambda: record_func("outer_loop_start"),
+        )
+        .loop(while_=inner_condition)
+        .function_step(
+            function=lambda: record_func("inner_loop"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("outer_loop_end"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Verify the nested loops executed correctly
+    assert "start" in messages
+    assert "end" in messages
+
+    # Check that outer loop executed multiple times
+    outer_starts = [msg for msg in messages if msg == "outer_loop_start"]
+    assert len(outer_starts) == 2  # outer_counter < 3 means it runs 2 times (1, 2)
+
+    # Check that inner loop executed multiple times
+    inner_loops = [msg for msg in messages if msg == "inner_loop"]
+    assert (
+        len(inner_loops) == 1
+    )  # inner loop runs multiple times per outer iteration due to condition evaluation
+
+    # Check that condition functions were called
+    outer_conditions = [msg for msg in messages if msg.startswith("outer_condition_")]
+    assert len(outer_conditions) == 3
+    assert "outer_condition_1" in outer_conditions
+    assert "outer_condition_2" in outer_conditions
+
+    inner_conditions = [msg for msg in messages if msg.startswith("inner_condition_")]
+    assert len(inner_conditions) == 3
+    assert "inner_condition_1" in inner_conditions
+    assert "inner_condition_2" in inner_conditions
+
+    assert outer_counter == 3
+    assert inner_counter == 3
+
+
+def test_plan_v2_loop_inside_conditional(local_portia: Portia) -> None:
+    """Test PlanV2 loop inside conditional block."""
+    messages: list[str] = []
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    plan = (
+        PlanBuilderV2(label="Test loop inside conditional")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .if_(condition=lambda: True)
+        .function_step(
+            function=lambda: record_func("if_start"),
+        )
+        .function_step(
+            function=lambda: list(range(3)),
+            step_name="generate_items",
+        )
+        .loop(over=StepOutput("generate_items"), step_name="Loop")
+        .function_step(
+            function=lambda item: record_func(f"loop_item_{item}"),
+            args={"item": StepOutput("Loop")},
+            step_name="loop_item",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("if_end"),
+        )
+        .else_()
+        .function_step(
+            function=lambda: record_func("else_block"),
+        )
+        .endif()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Should execute: start, if_start, loop_item_1, loop_item_2, loop_item_3, if_end, end
+    expected_messages = [
+        "start",
+        "if_start",
+        "loop_item_0",
+        "loop_item_1",
+        "loop_item_2",
+        "if_end",
+        "end",
+    ]
+    assert messages == expected_messages
+
+
+def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop with arguments."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_eval_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test conditional loop with args")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=condition_with_args, args={"x": 42, "y": "test"})
+        .function_step(
+            function=lambda: record_func("inside_loop"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "condition_eval_1_x_42_y_test",
+        "inside_loop",
+        "condition_eval_2_x_42_y_test",
+        "inside_loop",
+        "condition_eval_3_x_42_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+
+
+def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop with string condition."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def increment_counter(message: str) -> int:
+        nonlocal counter
+        counter += 1
+        record_func(message)
+        return counter
+
+    plan = (
+        PlanBuilderV2(label="Test conditional loop with string condition")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_="x < 3", args={"x": StepOutput("inside_loop")})
+        .function_step(
+            function=lambda: increment_counter("inside_loop"),
+            step_name="inside_loop",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    assert "start" in messages
+    assert "end" in messages
+    assert counter == 0
+
+
+def test_plan_v2_loop_complex_nested_structure(local_portia: Portia) -> None:
+    """Test PlanV2 complex nested structure with loops and conditionals."""
+    messages: list[str] = []
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def generate_numbers() -> list[int]:
+        return [1, 2, 3, 4, 5]
+
+    def is_even(num: int) -> bool:
+        return num % 2 == 0
+
+    def is_positive(num: int) -> bool:
+        return num > 0
+
+    plan = (
+        PlanBuilderV2(label="Test complex nested loops and conditionals")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .function_step(
+            function=generate_numbers,
+            step_name="numbers",
+        )
+        .loop(over=StepOutput("numbers"), step_name="Loop")
+        .if_(condition=lambda num: is_even(num), args={"num": StepOutput("Loop")})
+        .function_step(
+            function=lambda num: record_func(f"even_number_{num}"),
+            args={"num": StepOutput("Loop")},
+        )
+        .if_(condition=lambda num: is_positive(num), args={"num": StepOutput("Loop")})
+        .function_step(
+            function=lambda num: record_func(f"positive_even_{num}"),
+            args={"num": StepOutput("Loop")},
+        )
+        .endif()
+        .else_()
+        .function_step(
+            function=lambda num: record_func(f"odd_number_{num}"),
+            args={"num": StepOutput("Loop")},
+        )
+        .endif()
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Should execute: start, then for each number 1-5:
+    # - 1: odd_number_1
+    # - 2: even_number_2, positive_even_2
+    # - 3: odd_number_3
+    # - 4: even_number_4, positive_even_4
+    # - 5: odd_number_5
+    assert "start" in messages
+    assert "odd_number_1" in messages
+    assert "even_number_2" in messages
+    assert "positive_even_2" in messages
+    assert "odd_number_3" in messages
+    assert "even_number_4" in messages
+    assert "positive_even_4" in messages
+    assert "odd_number_5" in messages
+    assert "end" in messages
+
+
+# New tests demonstrating while vs do_while differences
+
+
+def test_plan_v2_while_loop_condition_checked_first(local_portia: Portia) -> None:
+    """Test that while loop checks condition before executing body."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def condition_false_initially() -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_check_{counter}")
+        return False  # Always false, so body should never execute
+
+    plan = (
+        PlanBuilderV2(label="Test while loop - condition checked first")
+        .function_step(
+            function=lambda: record_func("before_while"),
+        )
+        .loop(while_=condition_false_initially)
+        .function_step(
+            function=lambda: record_func("inside_while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_while"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # While loop: condition is checked first, body never executes if false
+    expected_messages = ["before_while", "condition_check_1", "after_while"]
+    assert messages == expected_messages
+    assert counter == 1
+
+
+def test_plan_v2_do_while_loop_condition_checked_after(local_portia: Portia) -> None:
+    """Test that do_while loop executes body first, then checks condition."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def condition_false_after_first_execution() -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_check_{counter}")
+        return False  # False after first check, but body should execute once
+
+    plan = (
+        PlanBuilderV2(label="Test do_while loop - body executes first")
+        .function_step(
+            function=lambda: record_func("before_do_while"),
+        )
+        .loop(do_while_=condition_false_after_first_execution)
+        .function_step(
+            function=lambda: record_func("inside_do_while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("after_do_while"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # Do-while loop: body executes first, then condition is checked
+    expected_messages = [
+        "before_do_while",
+        "inside_do_while_body",
+        "condition_check_1",
+        "after_do_while",
+    ]
+    assert messages == expected_messages
+    assert counter == 1
+
+
+def test_plan_v2_while_loop_with_args(local_portia: Portia) -> None:
+    """Test while loop with arguments passed to condition function."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def while_condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"while_condition_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test while loop with arguments")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=while_condition_with_args, args={"x": 100, "y": "test"})
+        .function_step(
+            function=lambda: record_func("while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "while_condition_1_x_100_y_test",
+        "while_body",
+        "while_condition_2_x_100_y_test",
+        "while_body",
+        "while_condition_3_x_100_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+
+
+def test_plan_v2_do_while_loop_with_args(local_portia: Portia) -> None:
+    """Test do_while loop with arguments passed to condition function."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def do_while_condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"do_while_condition_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test do_while loop with arguments")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(do_while_=do_while_condition_with_args, args={"x": 200, "y": "example"})
+        .function_step(
+            function=lambda: record_func("do_while_body"),
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "do_while_body",
+        "do_while_condition_1_x_200_y_example",
+        "do_while_body",
+        "do_while_condition_2_x_200_y_example",
+        "do_while_body",
+        "do_while_condition_3_x_200_y_example",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+
+
+def test_plan_v2_do_while_loop_string_condition(local_portia: Portia) -> None:
+    """Test do_while loop with string condition."""
+    messages: list[str] = []
+    counter = 0
+
+    def record_func(message: str) -> None:
+        messages.append(message)
+
+    def increment_counter() -> int:
+        nonlocal counter
+        counter += 1
+        record_func(f"counter_{counter}")
+        return counter
+
+    plan = (
+        PlanBuilderV2(label="Test do_while loop with string condition")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(do_while_="x < 3", args={"x": StepOutput("counter_step")})
+        .function_step(
+            function=increment_counter,
+            step_name="counter_step",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda: record_func("end"),
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    # String conditions are evaluated by the conditional evaluation agent
+    # The exact behavior depends on the agent, but it should run the loop
+    assert "start" in messages
+    assert "end" in messages
+    assert counter > 0
+
+
+@pytest.mark.flaky(reruns=3)
+@pytest.mark.parametrize("llm_provider", MODEL_PROVIDERS)
+@pytest.mark.asyncio
+async def test_react_agent_weather_research_and_poem(
+    llm_provider: LLMProvider,
+) -> None:
+    """Test react agent researching weather in European capitals and writing a poem."""
+    config = Config.from_default(
+        llm_provider=llm_provider,
+        default_log_level=LogLevel.DEBUG,
+    )
+
+    portia = Portia(config=config)
+
+    class CapitalWeatherInfo(BaseModel):
+        """Weather information for a capital city."""
+
+        uk_capital_weather: str
+        france_capital_weather: str
+        germany_capital_weather: str
+
+    plan = (
+        PlanBuilderV2("Research weather in European capitals and write a poem")
+        .react_agent_step(
+            task=(
+                "Find the current weather in the capitals of the United Kingdom, France, "
+                "and Germany. First use the search tool to find the capital city of each country, "
+                "then use the weather tool to get the current weather for each capital. "
+                "Provide a summary of the weather information for all three capitals."
+            ),
+            tools=["search_tool", "weather_tool"],
+            step_name="weather_research",
+            output_schema=CapitalWeatherInfo,
+        )
+        .llm_step(
+            task=(
+                "Write a beautiful poem about the weather in the capitals of UK, France, "
+                "and Germany based on the weather information provided. The poem should "
+                "capture the atmosphere and mood of each city's weather."
+            ),
+            inputs=[StepOutput("weather_research")],
+            step_name="weather_poem",
+        )
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert isinstance(plan_run.outputs.final_output.get_value(), str)
+    assert plan_run.outputs.final_output.get_value()
+
+    # Verify we got weather information
+    weather_step_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert weather_step_output is not None
+    weather_info_value = weather_step_output.get_value()
+    assert isinstance(weather_info_value, CapitalWeatherInfo)
+    assert weather_info_value.uk_capital_weather is not None
+    assert weather_info_value.france_capital_weather is not None
+    assert weather_info_value.germany_capital_weather is not None
+    assert weather_step_output.summary is not None
+
+    poem_step_output = plan_run.outputs.step_outputs["$step_1_output"]
+    assert poem_step_output is not None
+    poem_content = poem_step_output.get_value()
+    assert isinstance(poem_content, str)
+    # Check our poem is at least 10 characters long
+    assert len(poem_content) > 10
+
+
+class CountryClarificationHandler(ClarificationHandler):
+    """Test clarification handler that provides a country for react agent."""
+
+    def handle_input_clarification(
+        self,
+        clarification: InputClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle input clarification by returning 'United Kingdom'."""
+        on_resolution(clarification, "United Kingdom")
+
+    def handle_user_verification_clarification(
+        self,
+        clarification: UserVerificationClarification,
+        on_resolution: Callable[[Clarification, object], None],
+        on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    ) -> None:
+        """Handle user verification clarification by returning 'United Kingdom'."""
+        on_resolution(clarification, True)  # noqa: FBT003
+
+
+@pytest.mark.asyncio
+async def test_react_agent_weather_with_clarifications() -> None:
+    """Test react agent weather lookup with clarification for country input."""
+    config = Config.from_default(default_log_level=LogLevel.DEBUG)
+
+    before_step_already_called = False
+
+    def before_tool_call_execution_hook(
+        tool: Tool,  # noqa: ARG001
+        args: dict[str, Any],  # noqa: ARG001
+        plan_run: PlanRun,
+        _step: Step,
+    ) -> UserVerificationClarification | None:
+        nonlocal before_step_already_called
+        before_step_already_called = True
+        if not before_step_already_called:
+            return UserVerificationClarification(
+                plan_run_id=plan_run.id,
+                user_guidance="Are you happy to proceed with the search call?",
+                source="Test",
+            )
+        return None
+
+    portia = Portia(
+        config=config,
+        execution_hooks=ExecutionHooks(
+            before_tool_call=before_tool_call_execution_hook,
+            clarification_handler=CountryClarificationHandler(),
+        ),
+    )
+
+    plan = (
+        PlanBuilderV2("Get weather for capital city")
+        .react_agent_step(
+            task="Find the current weather in the capital of the provided country",
+            tools=["search_tool", "weather_tool"],
+            step_name="weather_lookup",
+            allow_agent_clarifications=True,
+        )
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify we got weather information from the step
+    weather_step_output = plan_run.outputs.step_outputs["$step_0_output"]
+    assert weather_step_output is not None
+    weather_content = weather_step_output.get_value()
+    assert isinstance(weather_content, str)
+    weather_lower = weather_content.lower()
+    assert "london" in weather_lower or "uk" in weather_lower or "united kingdom" in weather_lower
+
+    # Verify step has summary
+    assert weather_step_output.get_summary() is not None
