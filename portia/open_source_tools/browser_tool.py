@@ -523,7 +523,6 @@ class BrowserToolForUrl(BrowserTool):
 class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
-
     @abstractmethod
     def setup_browser(
         self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
@@ -545,7 +544,6 @@ class BrowserInfrastructureProvider(ABC):
     @abstractmethod
     def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g. release the session if needed."""
-
 
 
 class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
@@ -627,14 +625,15 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         if chrome_path_from_env:
             return chrome_path_from_env
 
-        if sys.platform == "darwin":  # macOS
-            return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        elif sys.platform == "win32":  # Windows
-            return r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-        elif sys.platform == "linux":  # Linux
-            return "/usr/bin/google-chrome"
-        else:
-            raise RuntimeError(f"Unsupported platform: {sys.platform}")
+        match sys.platform:
+            case "darwin":  # macOS
+                return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+            case "win32":  # Windows
+                return r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+            case "linux":  # Linux
+                return "/usr/bin/google-chrome"
+            case _:
+                raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
     def step_complete(self, ctx: ToolRunContext) -> None:
         """Call when the step is complete to e.g release the session."""
