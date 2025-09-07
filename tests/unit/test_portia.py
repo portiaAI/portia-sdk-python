@@ -108,15 +108,15 @@ def test_portia_local_default_config_with_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool and 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
-        # are in open_source_tool_registry but not in the default tool registry
-        # available to the Portia instance. PDF reader is in open_source_tool_registry if
-        # Mistral API key is set, and isn't in the default tool registry.
-        # Unfortunately this is determined when the registry file is imported, so we can't just mock
-        # the Mistral API key here.
-        expected_diff = 5  # browser_tool + 4 SQL tools
+        # Tools in open_source_tool_registry but not in default tool registry:
+        # - BrowserTool (if dependency available)
+        # - CrawlTool, ExtractTool, FileReaderTool, FileWriterTool, ImageUnderstandingTool, MapTool (6 tools)
+        # - 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
+        # - PDFReaderTool (if MISTRAL_API_KEY set)
+        # Note: Both registries have SearchTool when TAVILY_API_KEY is set
+        expected_diff = 11  # 1 browser + 6 base tools + 4 SQL tools
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 6  # + pdf_reader_tool
+            expected_diff = 12  # + pdf_reader_tool
 
         assert (
             len(portia.tool_registry.get_tools())
@@ -141,17 +141,16 @@ def test_portia_local_default_config_without_api_keys() -> None:
         portia = Portia()
         assert str(portia.config) == str(Config.from_default())
 
-        # BrowserTool, SearchTool, WeatherTool, CrawlTool, ExtractTool, MapTool,
-        # and 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
-        # are in open_source_tool_registry but not in the
-        # default tool registry available to the Portia instance. PDF reader is in
-        # open_source_tool_registry if Mistral API key is set, and isn't in the default tool
-        # registry Unfortunately this is determined when the registry file is imported, so we
-        # can't just mock the Mistral API key here.
-        # Note: OpenAI search tool is in both registries when OPENAI_API_KEY is set
-        expected_diff = 10  # 10 tools missing (BrowserTool, SearchTool, WeatherTool, CrawlTool, ExtractTool, MapTool, 4 SQL tools)
+        # Tools in open_source_tool_registry but not in default tool registry:
+        # - BrowserTool (if dependency available) 
+        # - CrawlTool, ExtractTool, FileReaderTool, FileWriterTool, ImageUnderstandingTool, MapTool (6 tools)
+        # - 4 SQL tools (list_tables, run_sql, get_table_schemas, check_sql)
+        # - PDFReaderTool (if MISTRAL_API_KEY set)
+        # - OpenAISearchTool (when OPENAI_API_KEY set but no TAVILY_API_KEY)
+        # Note: Default registry has WeatherTool, open_source has WeatherTool + OpenAISearchTool in this case
+        expected_diff = 12  # 1 browser + 6 base tools + 4 SQL tools + 1 OpenAI search
         if os.getenv("MISTRAL_API_KEY"):
-            expected_diff = 11  # PDF reader tool also missing
+            expected_diff = 13  # + pdf_reader_tool
 
 
         assert (

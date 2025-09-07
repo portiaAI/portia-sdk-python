@@ -251,7 +251,7 @@ def test_openai_search_tool_no_search_results() -> None:
     """Test that OpenAISearchTool handles invalid JSON gracefully."""
     mock_api_key = "sk-test-api-key"
 
-    # Mock response with invalid JSON that will fall back to basic response
+    # Mock response with invalid JSON that will return empty results
     mock_response = Mock()
     mock_response.output = Mock()
     mock_response.output.text = "Invalid JSON response"
@@ -266,10 +266,9 @@ def test_openai_search_tool_no_search_results() -> None:
             ctx = get_test_tool_context()
             result = tool.run(ctx, "What is the capital of France?")
 
-            # Should fall back to basic response
-            assert len(result) == 1
-            assert result[0]["title"] == "Search Results"
-            assert result[0]["content"] == "Invalid JSON response"
+            # Should return empty list for invalid JSON (don't raise errors)
+            assert len(result) == 0
+            assert result == []
 
 
 def test_openai_search_tool_different_query() -> None:
