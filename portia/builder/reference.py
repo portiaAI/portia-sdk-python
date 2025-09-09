@@ -234,16 +234,6 @@ class StepOutput(Reference):
         return ""
 
 
-class AllStepOutputs(StepOutput):
-    """A reference to all the step outputs of a step."""
-
-    full: bool = True
-
-    def __init__(self, step: str | int, path: str | None = None) -> None:
-        """Initialize a reference to all the step outputs of a step."""
-        super().__init__(step=step, path=path, full=True)
-
-
 class Input(Reference):
     """A reference to a user-provided plan input.
 
