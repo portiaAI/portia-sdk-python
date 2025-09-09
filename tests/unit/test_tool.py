@@ -746,16 +746,44 @@ def test_portia_mcp_tool_call() -> None:
             args=["test"],
         ),
     )
-    expected = (
-        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
-        '"structuredContent":null,"isError":false}'
-    )
 
     with patch(
         "portia.tool.get_mcp_session",
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
         tool_result = tool.run(get_test_tool_context(), a=1, b=2)
+        assert tool_result == "Hello, world!"
+
+
+def test_portia_mcp_tool_call_with_complex_response() -> None:
+    """Test invoking a tool via MCP with a complex response."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[mcp.types.AudioContent(type="audio", data="lalalala", mimeType="audio/wav")],
+        isError=False,
+    )
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        ),
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        tool_result = tool.run(get_test_tool_context())
+        expected = (
+            '{"meta":null,"content":[{"type":"audio","data":"lalalala","mimeType":"audio/wav","annotations":null,"meta":null}],'
+            '"structuredContent":null,"isError":false}'
+        )
         assert tool_result == expected
 
 
@@ -964,17 +992,13 @@ async def test_portia_mcp_tool_async_call() -> None:
             args=["test"],
         ),
     )
-    expected = (
-        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
-        '"structuredContent":null,"isError":false}'
-    )
 
     with patch(
         "portia.tool.get_mcp_session",
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
         tool_result = await tool.arun(get_test_tool_context(), a=1, b=2)
-        assert tool_result == expected
+        assert tool_result == "Hello, world!"
 
 
 @pytest.mark.asyncio

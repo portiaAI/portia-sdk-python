@@ -27,6 +27,7 @@ import httpx
 import mcp
 from jsonref import replace_refs
 from langchain_core.tools import StructuredTool
+from mcp.types import TextContent
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -931,6 +932,18 @@ class PortiaMcpTool(Tool[str]):
                     f"MCP tool {self.name}({self.id}) returned an error: "
                     f"{tool_result.model_dump_json()}"
                 )
+            # If the tool returned a single text content block, return the plain text
+            try:
+                content_blocks = tool_result.content  # mcp >= current spec
+            except AttributeError:
+                content_blocks = getattr(tool_result, "contents", None)  # safety for older variants
+
+            if isinstance(content_blocks, list) and len(content_blocks) == 1:
+                block = content_blocks[0]
+                if isinstance(block, TextContent):
+                    return block.text
+
+            # Fallback to returning the full JSON for non-text or multi-block results
             return tool_result.model_dump_json()
 
 
