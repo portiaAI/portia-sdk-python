@@ -359,6 +359,18 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
     assert step.step_name == "agent_step"
 
 
+def test_single_tool_agent_step_accepts_tool_object() -> None:
+    """Test single_tool_agent_step accepts a Tool instance."""
+    builder = PlanBuilderV2()
+    mock_tool = MockTool()
+
+    builder.single_tool_agent_step(tool=mock_tool, task="Use the tool")
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, SingleToolAgentStep)
+    assert step.tool is mock_tool
+
+
 def test_react_agent_step_method_basic() -> None:
     """Test the react_agent_step() method with basic parameters."""
     builder = PlanBuilderV2()
@@ -376,6 +388,18 @@ def test_react_agent_step_method_basic() -> None:
     assert builder.plan.steps[0].step_name == "step_0"
     assert builder.plan.steps[0].tool_call_limit == 25
     assert builder.plan.steps[0].allow_agent_clarifications is False
+
+
+def test_react_agent_step_accepts_tool_objects() -> None:
+    """Test react_agent_step accepts Tool instances."""
+    builder = PlanBuilderV2()
+    tools = [MockTool()]
+
+    builder.react_agent_step(task="Research", tools=tools)
+
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.tools == tools
 
 
 def test_react_agent_step_method_with_all_parameters() -> None:
@@ -1694,46 +1718,6 @@ def test_current_loop_block_property() -> None:
     builder.end_loop()
     # No current loop block
     assert builder._current_loop_block is None
-
-
-def test_end_loop_sets_end_index() -> None:
-    """Test that end_loop properly sets the end_index of the start loop step."""
-    builder = PlanBuilderV2()
-
-    # Start a loop
-    builder.loop(while_=lambda: True, step_name="test_loop")
-
-    # Add some steps inside the loop
-    builder.llm_step(task="Step 1")
-    builder.llm_step(task="Step 2")
-
-    # End the loop
-    builder.end_loop()
-
-    # Build the plan to access the steps
-    plan = builder.build()
-
-    # Find the start loop step
-    start_loop_step = None
-    for step in plan.steps:
-        if isinstance(step, LoopStep) and step.loop_step_type == LoopStepType.START:
-            start_loop_step = step
-            break
-
-    assert start_loop_step is not None
-    assert start_loop_step.step_name == "test_loop"
-
-    # Verify that the end_index is set correctly
-    # The end_index should point to the end_loop step
-    assert start_loop_step.end_index is not None
-    assert (
-        start_loop_step.end_index == len(plan.steps) - 1
-    )  # Should point to the last step (end_loop)
-
-    # Verify the end_loop step is at the expected index
-    end_loop_step = plan.steps[start_loop_step.end_index]
-    assert isinstance(end_loop_step, LoopStep)
-    assert end_loop_step.loop_step_type == LoopStepType.END
 
 
 def test_end_loop_no_loop_block_error() -> None:

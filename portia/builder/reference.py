@@ -48,7 +48,7 @@ def default_step_name(step_index: int) -> str:
         step_index: The zero-based index of the step in the plan.
 
     Returns:
-        A string in the format "step_{index}" (e.g., "step_0", "step_1").
+        A string in the format `"step_{index}" (e.g., "step_0", "step_1")`.
 
     """
     return f"step_{step_index}"
