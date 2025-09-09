@@ -933,11 +933,7 @@ class PortiaMcpTool(Tool[str]):
                     f"{tool_result.model_dump_json()}"
                 )
             # If the tool returned a single text content block, return the plain text
-            try:
-                content_blocks = tool_result.content  # mcp >= current spec
-            except AttributeError:
-                content_blocks = getattr(tool_result, "contents", None)  # safety for older variants
-
+            content_blocks = tool_result.content
             if isinstance(content_blocks, list) and len(content_blocks) == 1:
                 block = content_blocks[0]
                 if isinstance(block, TextContent):
