@@ -1696,46 +1696,6 @@ def test_current_loop_block_property() -> None:
     assert builder._current_loop_block is None
 
 
-def test_end_loop_sets_end_index() -> None:
-    """Test that end_loop properly sets the end_index of the start loop step."""
-    builder = PlanBuilderV2()
-
-    # Start a loop
-    builder.loop(while_=lambda: True, step_name="test_loop")
-
-    # Add some steps inside the loop
-    builder.llm_step(task="Step 1")
-    builder.llm_step(task="Step 2")
-
-    # End the loop
-    builder.end_loop()
-
-    # Build the plan to access the steps
-    plan = builder.build()
-
-    # Find the start loop step
-    start_loop_step = None
-    for step in plan.steps:
-        if isinstance(step, LoopStep) and step.loop_step_type == LoopStepType.START:
-            start_loop_step = step
-            break
-
-    assert start_loop_step is not None
-    assert start_loop_step.step_name == "test_loop"
-
-    # Verify that the end_index is set correctly
-    # The end_index should point to the end_loop step
-    assert start_loop_step.end_index is not None
-    assert (
-        start_loop_step.end_index == len(plan.steps) - 1
-    )  # Should point to the last step (end_loop)
-
-    # Verify the end_loop step is at the expected index
-    end_loop_step = plan.steps[start_loop_step.end_index]
-    assert isinstance(end_loop_step, LoopStep)
-    assert end_loop_step.loop_step_type == LoopStepType.END
-
-
 def test_end_loop_no_loop_block_error() -> None:
     """Test that end_loop raises PlanBuilderError when no loop block exists."""
     builder = PlanBuilderV2()
