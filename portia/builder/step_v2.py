@@ -396,7 +396,8 @@ class LLMStep(StepV2):
 
         tool_ctx = run_data.get_tool_run_ctx()
         task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
-        return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
+        task = self._template_references(self.task, run_data)
+        return await wrapped_tool.arun(tool_ctx, task=task, task_data=task_data)
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:

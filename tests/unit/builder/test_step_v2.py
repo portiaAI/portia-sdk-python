@@ -530,6 +530,49 @@ async def test_llm_step_run_one_reference_input() -> None:
 
 
 @pytest.mark.asyncio
+async def test_llm_step_run_interpolated_reference_in_task() -> None:
+    """Test LLMStep run where the task string contains an interpolated reference."""
+    reference_input = StepOutput(0)
+    step = LLMStep(
+        task=f"Summarize result: {StepOutput(0)}",
+        step_name="summarize",
+        inputs=[reference_input],
+    )
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value="previous step result",
+            description="Step 0",
+            step_name="summarize",
+            step_num=0,
+        )
+    ]
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+        patch.object(reference_input, "get_value") as mock_get_value,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        # Only the input reference is patched; the task interpolation resolves
+        # via StepOutput.get_value
+        mock_get_value.return_value = "Previous step result"
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="Summary: Previous step result")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Summary: Previous step result"
+        mock_wrapper_instance.arun.assert_called_once()
+        call_args = mock_wrapper_instance.arun.call_args
+        assert call_args[1]["task"] == "Summarize result: previous step result"
+        expected_task_data = LocalDataValue(value="Previous step result", summary="Step 0")
+        assert call_args[1]["task_data"] == [expected_task_data]
+
+
+@pytest.mark.asyncio
 async def test_llm_step_run_mixed_inputs() -> None:
     """Test LLMStep run with 2 regular value inputs and 2 reference inputs."""
     ref1 = Input("user_name")
