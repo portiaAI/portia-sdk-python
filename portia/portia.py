@@ -2838,7 +2838,7 @@ class Portia:
                 run_data.plan_run.current_step_index = jump_to_step_index
             else:
                 run_data.plan_run.current_step_index = index + 1
-            logger().info(f"Completed step {index}, result: {result}")
+            logger().info(f"Completed step {index}", result=result)
 
         return self._post_plan_run_execution(
             run_data.legacy_plan,
