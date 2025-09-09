@@ -38,7 +38,7 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.run_context import RunContext
+    from portia.run_context import RunContext, StepOutputValue
 
 
 def default_step_name(step_index: int) -> str:
@@ -155,10 +155,17 @@ class StepOutput(Reference):
             "These can be combined: 'results.0.user.address.street'."
         ),
     )
+    full: bool = Field(
+        default=False,
+        description=(
+            "Whether to return the full step output values as a list. "
+            "Used in the case of loop steps."
+        ),
+    )
 
-    def __init__(self, step: str | int, path: str | None = None) -> None:
+    def __init__(self, step: str | int, path: str | None = None, full: bool = False) -> None:
         """Initialize a reference to a step's output."""
-        super().__init__(step=step, path=path)  # type: ignore[call-arg]
+        super().__init__(step=step, path=path, full=full)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -190,21 +197,32 @@ class StepOutput(Reference):
 
         """
         # Get the base step output value
-        base_value = None
-        for step_output in run_data.step_output_values[::-1]:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
-                base_value = step_output.value
-                break
-            if isinstance(self.step, str) and step_output.step_name == self.step:
-                base_value = step_output.value
-                break
-
-        if base_value is None:
+        to_parse = None
+        if self.full:
+            to_parse = [
+                step_output.value
+                for step_output in run_data.step_output_values
+                if self._match_output(step_output)
+            ]
+        else:
+            for step_output in run_data.step_output_values[::-1]:
+                if self._match_output(step_output):
+                    to_parse = [step_output.value]
+                    break
+        if to_parse is None:
             logger().warning(f"Output value for step {self.step} not found")
             return None
+        if self.path:
+            parsed = [pydash.get(step_output, self.path) for step_output in to_parse]
+        else:
+            parsed = to_parse
+        return parsed if self.full else parsed[0]
 
-        # If there is a path, use pydash to traverse the object
-        return pydash.get(base_value, self.path) if self.path else base_value
+    def _match_output(self, step_output: StepOutputValue) -> bool:
+        """Match the step output to the step stored in the reference."""
+        return (isinstance(self.step, int) and step_output.step_num == self.step) or (
+            isinstance(self.step, str) and step_output.step_name == self.step
+        )
 
     def get_description(self, run_data: RunContext) -> str:
         """Get the description of the step output."""
@@ -214,6 +232,16 @@ class StepOutput(Reference):
             if isinstance(self.step, str) and step_output.step_name == self.step:
                 return step_output.description
         return ""
+
+
+class AllStepOutputs(StepOutput):
+    """A reference to all the step outputs of a step."""
+
+    full: bool = True
+
+    def __init__(self, step: str | int, path: str | None = None) -> None:
+        """Initialize a reference to all the step outputs of a step."""
+        super().__init__(step=step, path=path, full=True)
 
 
 class Input(Reference):

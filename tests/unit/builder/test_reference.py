@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Input, StepOutput, default_step_name
+from portia.builder.reference import AllStepOutputs, Input, StepOutput, default_step_name
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
@@ -746,3 +746,493 @@ def test_multiple_inputs_and_outputs() -> None:
     # Test Input references
     assert Input("input1").get_legacy_name(plan) == "input1"
     assert Input("input2").get_legacy_name(plan) == "input2"
+
+
+# Test cases for StepOutput with full=True parameter
+
+
+def test_step_output_full_initialization() -> None:
+    """Test StepOutput initialization with full=True."""
+    step_output = StepOutput("my_step", full=True)
+    assert step_output.step == "my_step"
+    assert step_output.full is True
+
+
+def test_step_output_full_with_path_initialization() -> None:
+    """Test StepOutput initialization with full=True and path."""
+    step_output = StepOutput("my_step", path="field.name", full=True)
+    assert step_output.step == "my_step"
+    assert step_output.path == "field.name"
+    assert step_output.full is True
+
+
+def test_step_output_full_str_representation() -> None:
+    """Test StepOutput string representation with full=True."""
+    step_output = StepOutput("custom_step", full=True)
+    result = str(step_output)
+    assert result == "{{ StepOutput('custom_step') }}"
+
+
+def test_step_output_full_with_path_str_representation() -> None:
+    """Test StepOutput string representation with full=True and path."""
+    step_output = StepOutput("my_step", path="field.name", full=True)
+    result = str(step_output)
+    assert result == "{{ StepOutput('my_step', path='field.name') }}"
+
+
+def test_step_output_full_get_value_single_output() -> None:
+    """Test StepOutput with full=True returns list even for single output."""
+    step_output = StepOutput("my_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="my_step", value="test result", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="test", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["test result"]
+
+
+def test_step_output_full_get_value_multiple_outputs() -> None:
+    """Test StepOutput with full=True returns all matching outputs as list."""
+    step_output = StepOutput("loop_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="loop_step", value="first iteration", description=""),
+        StepOutputValue(
+            step_num=2, step_name="loop_step", value="second iteration", description=""
+        ),
+        StepOutputValue(step_num=3, step_name="loop_step", value="third iteration", description=""),
+        StepOutputValue(step_num=4, step_name="step_4", value="final", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["first iteration", "second iteration", "third iteration"]
+
+
+def test_step_output_full_get_value_with_path() -> None:
+    """Test StepOutput with full=True and path extracts from all matching outputs."""
+    step_output = StepOutput("loop_step", path="result.value", full=True)
+
+    mock_data1 = {"result": {"value": "first_value"}}
+    mock_data2 = {"result": {"value": "second_value"}}
+    mock_data3 = {"result": {"value": "third_value"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="loop_step", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="loop_step", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="loop_step", value=mock_data3, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["first_value", "second_value", "third_value"]
+
+
+def test_step_output_full_get_value_with_path_mixed_data() -> None:
+    """Test StepOutput with full=True and path handles mixed data types."""
+    step_output = StepOutput("mixed_step", path="data", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(
+            step_num=1, step_name="mixed_step", value={"data": "string_value"}, description=""
+        ),
+        StepOutputValue(step_num=2, step_name="mixed_step", value={"data": 42}, description=""),
+        StepOutputValue(
+            step_num=3, step_name="mixed_step", value={"data": [1, 2, 3]}, description=""
+        ),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["string_value", 42, [1, 2, 3]]
+
+
+def test_step_output_full_get_value_no_matches() -> None:
+    """Test StepOutput with full=True returns empty list when no matches found."""
+    step_output = StepOutput("nonexistent_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == []
+
+
+def test_step_output_full_get_value_with_path_missing_field() -> None:
+    """Test StepOutput with full=True and path handles missing fields gracefully."""
+    step_output = StepOutput("loop_step", path="missing.field", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=1, step_name="loop_step", value={"data": "value1"}, description=""
+        ),
+        StepOutputValue(
+            step_num=2, step_name="loop_step", value={"data": "value2"}, description=""
+        ),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == [None, None]
+
+
+def test_step_output_full_get_value_with_int_step() -> None:
+    """Test StepOutput with full=True using integer step index."""
+    step_output = StepOutput(1, full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="first", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="final", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["first", "second"]
+
+
+# Test cases for AllStepOutputs wrapper class
+
+
+def test_all_step_outputs_initialization() -> None:
+    """Test AllStepOutputs initialization."""
+    all_outputs = AllStepOutputs("my_step")
+    assert all_outputs.step == "my_step"
+    assert all_outputs.full is True
+
+
+def test_all_step_outputs_with_path_initialization() -> None:
+    """Test AllStepOutputs initialization with path."""
+    all_outputs = AllStepOutputs("my_step", path="field.name")
+    assert all_outputs.step == "my_step"
+    assert all_outputs.path == "field.name"
+    assert all_outputs.full is True
+
+
+def test_all_step_outputs_str_representation() -> None:
+    """Test AllStepOutputs string representation."""
+    all_outputs = AllStepOutputs("custom_step")
+    result = str(all_outputs)
+    assert result == "{{ StepOutput('custom_step') }}"
+
+
+def test_all_step_outputs_with_path_str_representation() -> None:
+    """Test AllStepOutputs string representation with path."""
+    all_outputs = AllStepOutputs("my_step", path="field.name")
+    result = str(all_outputs)
+    assert result == "{{ StepOutput('my_step', path='field.name') }}"
+
+
+def test_all_step_outputs_get_legacy_name() -> None:
+    """Test AllStepOutputs get_legacy_name method."""
+    all_outputs = AllStepOutputs("named_step")
+
+    mock_plan = Mock(spec=PlanV2)
+    mock_plan.step_output_name.return_value = "$named_step_output"
+
+    result = all_outputs.get_legacy_name(mock_plan)
+    assert result == "$named_step_output"
+    mock_plan.step_output_name.assert_called_once_with("named_step")
+
+
+def test_all_step_outputs_get_value_single_output() -> None:
+    """Test AllStepOutputs returns list even for single output."""
+    all_outputs = AllStepOutputs("my_step")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="my_step", value="test result", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="test", description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["test result"]
+
+
+def test_all_step_outputs_get_value_multiple_outputs() -> None:
+    """Test AllStepOutputs returns all matching outputs as list."""
+    all_outputs = AllStepOutputs("loop_step")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="loop_step", value="first iteration", description=""),
+        StepOutputValue(
+            step_num=2, step_name="loop_step", value="second iteration", description=""
+        ),
+        StepOutputValue(step_num=3, step_name="loop_step", value="third iteration", description=""),
+        StepOutputValue(step_num=4, step_name="step_4", value="final", description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["first iteration", "second iteration", "third iteration"]
+
+
+def test_all_step_outputs_get_value_with_path() -> None:
+    """Test AllStepOutputs with path extracts from all matching outputs."""
+    all_outputs = AllStepOutputs("loop_step", path="result.value")
+
+    mock_data1 = {"result": {"value": "first_value"}}
+    mock_data2 = {"result": {"value": "second_value"}}
+    mock_data3 = {"result": {"value": "third_value"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="loop_step", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="loop_step", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="loop_step", value=mock_data3, description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["first_value", "second_value", "third_value"]
+
+
+def test_all_step_outputs_get_value_with_path_complex_nested() -> None:
+    """Test AllStepOutputs with complex nested path extraction."""
+    all_outputs = AllStepOutputs("data_step", path="items.0.name")
+
+    mock_data1 = {"items": [{"name": "item1"}, {"name": "item2"}]}
+    mock_data2 = {"items": [{"name": "item3"}, {"name": "item4"}]}
+    mock_data3 = {"items": [{"name": "item5"}]}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=1, step_name="data_step", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="data_step", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="data_step", value=mock_data3, description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["item1", "item3", "item5"]
+
+
+def test_all_step_outputs_get_value_with_int_step() -> None:
+    """Test AllStepOutputs using integer step index."""
+    all_outputs = AllStepOutputs(1)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="first", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="final", description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["first", "second"]
+
+
+def test_all_step_outputs_get_value_no_matches() -> None:
+    """Test AllStepOutputs returns empty list when no matches found."""
+    all_outputs = AllStepOutputs("nonexistent_step")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == []
+
+
+def test_all_step_outputs_get_value_with_path_missing_field() -> None:
+    """Test AllStepOutputs with path handles missing fields gracefully."""
+    all_outputs = AllStepOutputs("loop_step", path="missing.field")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=1, step_name="loop_step", value={"data": "value1"}, description=""
+        ),
+        StepOutputValue(
+            step_num=2, step_name="loop_step", value={"data": "value2"}, description=""
+        ),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == [None, None]
+
+
+def test_all_step_outputs_get_value_with_path_pydantic_model() -> None:
+    """Test AllStepOutputs with path and Pydantic models."""
+
+    class UserData(BaseModel):
+        name: str
+        age: int
+
+    all_outputs = AllStepOutputs("user_step", path="name")
+
+    user1 = UserData(name="Alice", age=25)
+    user2 = UserData(name="Bob", age=30)
+    user3 = UserData(name="Charlie", age=35)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=1, step_name="user_step", value=user1, description=""),
+        StepOutputValue(step_num=2, step_name="user_step", value=user2, description=""),
+        StepOutputValue(step_num=3, step_name="user_step", value=user3, description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["Alice", "Bob", "Charlie"]
+
+
+# Test cases for loop scenarios and complex use cases
+
+
+def test_step_output_full_loop_scenario() -> None:
+    """Test StepOutput with full=True in a typical loop scenario."""
+    # Simulate a loop that processes items and produces multiple outputs
+    step_output = StepOutput("process_item", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="get_items", value=[1, 2, 3], description=""),
+        StepOutputValue(step_num=1, step_name="process_item", value="processed_1", description=""),
+        StepOutputValue(step_num=2, step_name="process_item", value="processed_2", description=""),
+        StepOutputValue(step_num=3, step_name="process_item", value="processed_3", description=""),
+        StepOutputValue(step_num=4, step_name="finalize", value="done", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["processed_1", "processed_2", "processed_3"]
+
+
+def test_step_output_full_loop_with_path_scenario() -> None:
+    """Test StepOutput with full=True and path in a loop scenario."""
+    step_output = StepOutput("analyze_item", path="result.score", full=True)
+
+    mock_data1 = {"result": {"score": 85, "status": "good"}}
+    mock_data2 = {"result": {"score": 92, "status": "excellent"}}
+    mock_data3 = {"result": {"score": 78, "status": "fair"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="get_items", value=[1, 2, 3], description=""),
+        StepOutputValue(step_num=1, step_name="analyze_item", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="analyze_item", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="analyze_item", value=mock_data3, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == [85, 92, 78]
+
+
+def test_all_step_outputs_loop_scenario() -> None:
+    """Test AllStepOutputs in a typical loop scenario."""
+    all_outputs = AllStepOutputs("process_item")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="get_items", value=[1, 2, 3], description=""),
+        StepOutputValue(step_num=1, step_name="process_item", value="processed_1", description=""),
+        StepOutputValue(step_num=2, step_name="process_item", value="processed_2", description=""),
+        StepOutputValue(step_num=3, step_name="process_item", value="processed_3", description=""),
+        StepOutputValue(step_num=4, step_name="finalize", value="done", description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == ["processed_1", "processed_2", "processed_3"]
+
+
+def test_all_step_outputs_loop_with_path_scenario() -> None:
+    """Test AllStepOutputs with path in a loop scenario."""
+    all_outputs = AllStepOutputs("analyze_item", path="result.score")
+
+    mock_data1 = {"result": {"score": 85, "status": "good"}}
+    mock_data2 = {"result": {"score": 92, "status": "excellent"}}
+    mock_data3 = {"result": {"score": 78, "status": "fair"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="get_items", value=[1, 2, 3], description=""),
+        StepOutputValue(step_num=1, step_name="analyze_item", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="analyze_item", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="analyze_item", value=mock_data3, description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == [85, 92, 78]
+
+
+def test_step_output_full_vs_normal_behavior() -> None:
+    """Test that full=True returns list while full=False returns single value."""
+    step_output_full = StepOutput("my_step", full=True)
+    step_output_normal = StepOutput("my_step", full=False)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="my_step", value="first", description=""),
+        StepOutputValue(step_num=2, step_name="my_step", value="second", description=""),
+        StepOutputValue(step_num=3, step_name="step_3", value="final", description=""),
+    ]
+
+    result_full = step_output_full.get_value(mock_run_data)
+    result_normal = step_output_normal.get_value(mock_run_data)
+
+    assert result_full == ["first", "second"]
+    assert result_normal == "second"  # Returns the last matching output
+
+
+def test_all_step_outputs_equivalent_to_step_output_full() -> None:
+    """Test that AllStepOutputs behaves identically to StepOutput with full=True."""
+    all_outputs = AllStepOutputs("my_step", path="data.value")
+    step_output_full = StepOutput("my_step", path="data.value", full=True)
+
+    mock_data1 = {"data": {"value": "first"}}
+    mock_data2 = {"data": {"value": "second"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=1, step_name="my_step", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="my_step", value=mock_data2, description=""),
+    ]
+
+    result_all = all_outputs.get_value(mock_run_data)
+    result_full = step_output_full.get_value(mock_run_data)
+
+    assert result_all == result_full
+    assert result_all == ["first", "second"]
+
+
+def test_step_output_full_empty_list_when_no_outputs() -> None:
+    """Test StepOutput with full=True returns empty list when step has no outputs."""
+    step_output = StepOutput("empty_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == []
+
+
+def test_all_step_outputs_empty_list_when_no_outputs() -> None:
+    """Test AllStepOutputs returns empty list when step has no outputs."""
+    all_outputs = AllStepOutputs("empty_step")
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+    ]
+
+    result = all_outputs.get_value(mock_run_data)
+    assert result == []
