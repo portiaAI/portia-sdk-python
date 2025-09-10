@@ -155,6 +155,52 @@ def test_run_signature_validation_no_args() -> None:
         mock_logger.return_value.warning.assert_not_called()
 
 
+def test_tool_id_validation_no_comma() -> None:
+    """Test that tool IDs cannot contain commas."""
+
+    # Valid tool should initialize without error
+    class ValidTool(Tool):
+        def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+            return "valid"
+
+    # Test valid IDs with various allowed characters
+    for valid_id in [
+        "valid_tool_id",
+        "tool123",
+        "tool-name",
+        "tool.name",
+        "tool:name",
+        "mcp:server:tool",
+    ]:
+        valid_tool = ValidTool(
+            id=valid_id,
+            name="Valid Tool",
+            description="A tool with a valid ID",
+            output_schema=("str", "output"),
+        )
+        assert valid_tool.id == valid_id
+
+    # Invalid tool should raise ValidationError for commas
+    class InvalidTool(Tool):
+        def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+            return "invalid"
+
+    # Test various invalid cases with commas
+    for invalid_id in [
+        "invalid,tool",
+        "tool,with,many,commas",
+        ",leading_comma",
+        "trailing_comma,",
+    ]:
+        with pytest.raises(ValueError, match="Tool ID cannot contain commas"):
+            InvalidTool(
+                id=invalid_id,
+                name="Invalid Tool",
+                description="A tool with an invalid ID",
+                output_schema=("str", "output"),
+            )
+
+
 def test_tool_to_langchain() -> None:
     """Test langchain rep of a Tool."""
     tool = AdditionTool()
@@ -700,16 +746,44 @@ def test_portia_mcp_tool_call() -> None:
             args=["test"],
         ),
     )
-    expected = (
-        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
-        '"structuredContent":null,"isError":false}'
-    )
 
     with patch(
         "portia.tool.get_mcp_session",
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
         tool_result = tool.run(get_test_tool_context(), a=1, b=2)
+        assert tool_result == "Hello, world!"
+
+
+def test_portia_mcp_tool_call_with_complex_response() -> None:
+    """Test invoking a tool via MCP with a complex response."""
+    mock_session = MagicMock(spec=ClientSession)
+    mock_session.call_tool.return_value = mcp.types.CallToolResult(
+        content=[mcp.types.AudioContent(type="audio", data="lalalala", mimeType="audio/wav")],
+        isError=False,
+    )
+
+    tool = PortiaMcpTool(
+        id="mcp:mock_mcp:test_tool",
+        name="test_tool",
+        description="I am a tool",
+        output_schema=("str", "Tool output formatted as a JSON string"),
+        mcp_client_config=StdioMcpClientConfig(
+            server_name="mock_mcp",
+            command="test",
+            args=["test"],
+        ),
+    )
+
+    with patch(
+        "portia.tool.get_mcp_session",
+        new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
+    ):
+        tool_result = tool.run(get_test_tool_context())
+        expected = (
+            '{"meta":null,"content":[{"type":"audio","data":"lalalala","mimeType":"audio/wav","annotations":null,"meta":null}],'
+            '"structuredContent":null,"isError":false}'
+        )
         assert tool_result == expected
 
 
@@ -918,17 +992,13 @@ async def test_portia_mcp_tool_async_call() -> None:
             args=["test"],
         ),
     )
-    expected = (
-        '{"meta":null,"content":[{"type":"text","text":"Hello, world!","annotations":null,"meta":null}],'  # noqa: E501
-        '"structuredContent":null,"isError":false}'
-    )
 
     with patch(
         "portia.tool.get_mcp_session",
         new=MockMcpSessionWrapper(mock_session).mock_mcp_session,
     ):
         tool_result = await tool.arun(get_test_tool_context(), a=1, b=2)
-        assert tool_result == expected
+        assert tool_result == "Hello, world!"
 
 
 @pytest.mark.asyncio

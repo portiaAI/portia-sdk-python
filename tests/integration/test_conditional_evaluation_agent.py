@@ -18,8 +18,8 @@ async def test_conditional_evaluation_agent(llm_provider: LLMProvider) -> None:
     )
     agent = ConditionalEvaluationAgent(config)
 
-    true_result = await agent.execute("2 + 2 == 4", {})
-    false_result = await agent.execute("2 + 2 == 5", {})
+    true_result = await agent.execute(conditional="2 + 2 == 4", arguments={})
+    false_result = await agent.execute(conditional="2 + 2 == 5", arguments={})
 
     assert true_result is True
     assert false_result is False
@@ -37,12 +37,12 @@ async def test_conditional_evaluation_agent_with_arguments(llm_provider: LLMProv
     agent = ConditionalEvaluationAgent(config)
 
     true_result = await agent.execute(
-        "x + y == z",
-        {"x": 2, "y": 2, "z": 4},
+        conditional="x + y == z",
+        arguments={"x": 2, "y": 2, "z": 4},
     )
     false_result = await agent.execute(
-        "x + y == z",
-        {"x": 2, "y": 2, "z": 5},
+        conditional="x + y == z",
+        arguments={"x": 2, "y": 2, "z": 5},
     )
 
     assert true_result is True

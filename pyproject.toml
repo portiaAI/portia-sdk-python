@@ -1,6 +1,6 @@
 [project]
 name = "portia-sdk-python"
-version = "0.7.2"
+version = "0.8.0"
 description = "Portia Labs Python SDK for building agentic workflows."
 authors = [{ name = "Hello", email = "hello@portialabs.ai" }]
 requires-python = ">=3.11"
@@ -37,7 +37,10 @@ dependencies = [
     "testcontainers[redis]>=4.10.0 ; python_version >= '3.9' and python_version < '4.0'",
     "instructor>=1.9.0 ; python_version >= '3.9' and python_version < '4.0'",
     "litellm>=1.74.9.post1",
-    "openai<1.99"
+    "openai<1.99",
+    "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
+    "google-genai>=1.18.0",
+    "pydash>=8.0.0,<9",
 ]
 
 [project.optional-dependencies]
@@ -49,15 +52,12 @@ mistralai = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
 ]
-google = [
-    "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-genai>=1.18.0",
-]
 amazon = [
     "langchain-aws>=0.2.28 ; python_version >= '3.11' and python_version < '4.0'",
     "boto3>=1.39.9"
 ]
 ollama = ["langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'"]
+groq = ["groq>=0.12.0,<1.0"]
 tools-browser-local = [
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
@@ -72,9 +72,8 @@ cache = ["redis>=5.2.1,<6", "langchain-redis>=0.1.2" ]
 all = [
     "langchain-mistralai>=0.2.3,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
     "mistralai>=1.2.5,<2",
-    "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
-    "google-genai>=1.18.0",
     "langchain-ollama>=0.2.2,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
+    "groq>=0.12.0,<1.0",
     "playwright>=1.49.0,<2",
     "browser-use==0.1.40 ; python_version >= '3.11' and python_version < '4.0'",
     "browserbase>=1.2.0,<2",
@@ -103,6 +102,10 @@ dev = [
     "pytest-xdist[psutil]>=3.6.1,<4",
     "pytest-asyncio>=1.1.0",
     "pytest-httpx>=0.35.0",
+    "pydash>=8.0.5",
+    "glom>=24.11.0",
+    "box>=0.1.5",
+    "nested-property>=1.0.2",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -179,9 +182,6 @@ omit = [
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
     "portia/cli.py",  # Best effort test coverage
-    "portia/portia.py", # TODO: Remove this once testing has been added for new PlanV2
-    "portia/builder/step_v2.py", # TODO: Remove this once testing has been added for string templating
-    "portia/builder/plan_builder_v2.py", # TODO: Remove this once testing has been added for string templating
 ]
 
 [tool.coverage.report]

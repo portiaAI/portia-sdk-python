@@ -45,6 +45,7 @@ class AgentNode(str, Enum):
         ARGUMENT_VERIFIER (str): A node representing the argument verifier.
         ARGUMENT_PARSER (str): A node representing the argument parser.
         MEMORY_EXTRACTION (str): A node representing the memory extraction step.
+        REASONING (str): A node representing the reasoning step.
 
     """
 
@@ -54,6 +55,7 @@ class AgentNode(str, Enum):
     ARGUMENT_VERIFIER = "argument_verifier"
     ARGUMENT_PARSER = "argument_parser"
     MEMORY_EXTRACTION = "memory_extraction"
+    REASONING = "reasoning"
 
 
 MAX_RETRIES = 4
@@ -128,8 +130,7 @@ def _template_inputs_into_arg_value(arg_value: str, step_inputs: list[StepInput]
     if len(untemplated_var_matches) > 0:
         extra_vars = ", ".join(list(untemplated_var_matches))
         raise ToolSoftError(
-            "Templated variables found in input that are not valid "
-            f"inputs for step: {extra_vars}"
+            f"Templated variables found in input that are not valid inputs for step: {extra_vars}"
         )
 
     return Template(arg_value).render(**template_args)

@@ -27,6 +27,7 @@ import httpx
 import mcp
 from jsonref import replace_refs
 from langchain_core.tools import StructuredTool
+from mcp.types import TextContent
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -34,6 +35,7 @@ from pydantic import (
     HttpUrl,
     ValidationError,
     field_serializer,
+    field_validator,
     model_validator,
 )
 
@@ -142,6 +144,28 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         "enabled. If not provided, the output will be the default output schema of the tool.run() "
         "method.",
     )
+
+    @field_validator("id")
+    @classmethod
+    def validate_id_no_comma(cls, v: str) -> str:
+        """Ensure the tool ID does not contain commas.
+
+        Commas are used as delimiters in some contexts where multiple tool IDs
+        are concatenated, so individual tool IDs cannot contain commas.
+
+        Args:
+            v: The tool ID to validate.
+
+        Returns:
+            str: The validated tool ID.
+
+        Raises:
+            ValueError: If the tool ID contains a comma.
+
+        """
+        if "," in v:
+            raise ValueError("Tool ID cannot contain commas")
+        return v
 
     def ready(self, ctx: ToolRunContext) -> ReadyResponse:  # noqa: ARG002
         """Check whether the tool can be plan_run.
@@ -463,7 +487,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         return (
             StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 func=partial(self._run, ctx),
@@ -471,13 +495,17 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             )
             if sync
             else StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 coroutine=partial(self._arun, ctx),
                 return_direct=True,
             )
         )
+
+    def get_langchain_name(self) -> str:
+        """Get the name of the tool for LangChain."""
+        return self.name.replace(" ", "_")
 
     def to_langchain_with_artifact(self, ctx: ToolRunContext, sync: bool = True) -> StructuredTool:
         """Return a LangChain representation of this tool with content and artifact.
@@ -498,7 +526,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """
         return (
             StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 func=partial(self._run_with_artifacts, ctx),
@@ -507,7 +535,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
             )
             if sync
             else StructuredTool(
-                name=self.name.replace(" ", "_"),
+                name=self.get_langchain_name(),
                 description=self._generate_tool_description(),
                 args_schema=self.args_schema,
                 coroutine=partial(self._arun_with_artifacts, ctx),
@@ -564,8 +592,7 @@ class Tool(BaseModel, Generic[SERIALIZABLE_TYPE_VAR]):
         """Return a pretty string representation of the tool."""
         title = f"| {self.name} ({self.id}) |"
         return (
-            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}"
-            f"\n{self._generate_tool_description()}"
+            f"{'-' * len(title)}\n{title}\n{'-' * len(title)}\n{self._generate_tool_description()}"
         )
 
 
@@ -905,6 +932,14 @@ class PortiaMcpTool(Tool[str]):
                     f"MCP tool {self.name}({self.id}) returned an error: "
                     f"{tool_result.model_dump_json()}"
                 )
+            # If the tool returned a single text content block, return the plain text
+            content_blocks = tool_result.content
+            if isinstance(content_blocks, list) and len(content_blocks) == 1:
+                block = content_blocks[0]
+                if isinstance(block, TextContent):
+                    return block.text
+
+            # Fallback to returning the full JSON for non-text or multi-block results
             return tool_result.model_dump_json()
 
 

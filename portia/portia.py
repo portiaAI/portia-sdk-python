@@ -26,13 +26,13 @@ import time
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from langsmith import traceable
-from pydantic import BaseModel, ConfigDict, Field
+from langsmith import get_current_run_tree, traceable
+from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
+from portia.builder.loops import LoopStepResult, LoopStepType
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import ReferenceValue
-from portia.builder.step_v2 import ExitStepResult, FunctionStep
+from portia.builder.step_v2 import ExitStepResult, LoopStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -51,10 +51,10 @@ from portia.errors import (
     PlanError,
     PlanNotFoundError,
     SkipExecutionError,
-    ToolNotFoundError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
+from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
     LocalDataValue,
@@ -70,13 +70,13 @@ from portia.introspection_agents.introspection_agent import (
     PreStepIntrospection,
     PreStepIntrospectionOutcome,
 )
-from portia.logger import logger, logger_manager
+from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
+from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
-    MAX_OUTPUT_LOG_LENGTH,
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
@@ -88,6 +88,7 @@ from portia.telemetry.views import (
     PortiaFunctionCallTelemetryEvent,
 )
 from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
+from portia.tool_decorator import LOCAL_FUNCTION_PREFIX
 from portia.tool_registry import (
     DefaultToolRegistry,
     PortiaToolRegistry,
@@ -102,21 +103,6 @@ if TYPE_CHECKING:
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
-
-
-class RunContext(BaseModel):
-    """Data that is returned from a step."""
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    plan: PlanV2 = Field(description="The Portia plan being executed.")
-    legacy_plan: Plan = Field(description="The legacy plan representation.")
-    plan_run: PlanRun = Field(description="The current plan run instance.")
-    end_user: EndUser = Field(description="The end user executing the plan.")
-    step_output_values: list[ReferenceValue] = Field(
-        default_factory=list, description="Outputs set by the step."
-    )
-    portia: Portia = Field(description="The Portia client instance.")
 
 
 class Portia:
@@ -1091,7 +1077,7 @@ class Portia:
             )
         )
         if isinstance(plan, PlanV2):
-            if not plan_run:
+            if not plan_run:  # pragma: no cover
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PlanV2"
                 )
@@ -1139,7 +1125,7 @@ class Portia:
         )
 
         if isinstance(plan, PlanV2):
-            if not plan_run:
+            if not plan_run:  # pragma: no cover
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PlanV2"
                 )
@@ -1283,12 +1269,13 @@ class Portia:
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
 
-            for plan_input in plan.plan_inputs:
-                if plan_input.value is not None:
-                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
-                        value=plan_input.value
-                    )
-            return
+            # Pragma no cover as PlanV2 only uses async method
+            for plan_input in plan.plan_inputs:  # pragma: no cover
+                if plan_input.value is not None:  # pragma: no cover
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(  # pragma: no cover
+                        value=plan_input.value  # pragma: no cover
+                    )  # pragma: no cover
+            return  # pragma: no cover
 
         if plan_run_inputs and not plan.plan_inputs:
             logger().warning(
@@ -1312,8 +1299,9 @@ class Portia:
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
                     )
-                elif plan_input.value is not None:
-                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                # Pragma no cover as PlanV2 only uses async method
+                elif plan_input.value is not None:  # pragma: no cover
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(  # pragma: no cover
                         value=plan_input.value
                     )
 
@@ -1469,7 +1457,11 @@ class Portia:
             # we'll go through this immediately.
             # If they're handled asynchronously,
             # we'll wait for the plan run to be ready.
-            plan_run = self.wait_for_ready(plan_run)
+            try:
+                plan_run = self.wait_for_ready(plan_run)
+            except InvalidPlanRunStateError:
+                logger().error("Plan run is not ready to resume after clarification")
+                return plan_run
 
         return plan_run
 
@@ -2144,7 +2136,7 @@ class Portia:
         plan: Plan,
         index: int,
         step: Step,
-        error: Exception,
+        error: Exception | str,
     ) -> PlanRun:
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
@@ -2199,13 +2191,8 @@ class Portia:
             summary = plan_run.outputs.final_output.get_summary()
             if not summary:
                 summary = str(plan_run.outputs.final_output.get_value())
-            if len(summary) > MAX_OUTPUT_LOG_LENGTH:
-                summary = (
-                    summary[:MAX_OUTPUT_LOG_LENGTH]
-                    + "...[truncated - only first 1000 characters shown]"
-                )
             logger().info(
-                f"Final output: {summary!s}",
+                f"Final output: {truncate_message(summary)!s}",
             )
 
     def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
@@ -2460,8 +2447,8 @@ class Portia:
         for clarification in clarifications:
             clarification.step = plan_run.current_step_index
             logger().info(
-                f"Clarification requested - category: {clarification.category}, "
-                f"user_guidance: {clarification.user_guidance}.",
+                f"Clarification requested - category: {clarification.category}, ",
+                user_guidance=clarification.user_guidance,
                 plan=str(plan_run.plan_id),
                 plan_run=str(plan_run.id),
             )
@@ -2476,24 +2463,6 @@ class Portia:
         plan_run.outputs.clarifications = plan_run.outputs.clarifications + new_clarifications
         self._set_plan_run_state(plan_run, PlanRunState.NEED_CLARIFICATION)
         return plan_run
-
-    def get_tool(self, tool_id: str | None, plan_run: PlanRun) -> Tool | None:
-        """Get the tool for a step."""
-        if not tool_id:
-            return None
-        try:
-            child_tool = self.tool_registry.get_tool(tool_id)
-        except ToolNotFoundError:
-            # Special case LLMTool so it doesn't need to be in all tool registries
-            if tool_id == LLMTool.LLM_TOOL_ID:
-                child_tool = LLMTool()
-            else:
-                raise  # pragma: no cover
-        return ToolCallWrapper(
-            child_tool=child_tool,
-            storage=self.storage,
-            plan_run=plan_run,
-        )
 
     def get_agent_for_step(
         self,
@@ -2512,7 +2481,12 @@ class Portia:
             BaseAgent: The agent to execute the step.
 
         """
-        tool = self.get_tool(step.tool_id, plan_run)
+        tool = ToolCallWrapper.from_tool_id(
+            step.tool_id,
+            self.tool_registry,
+            self.storage,
+            plan_run,
+        )
         cls: type[BaseExecutionAgent]
         match self.config.execution_agent_type:
             case ExecutionAgentType.ONE_SHOT:
@@ -2627,16 +2601,28 @@ class Portia:
             if (
                 not step.tool_id
                 or step.tool_id in tools_remaining
-                or FunctionStep.tool_id_is_local_function(step.tool_id)
+                or step.tool_id.startswith(LOCAL_FUNCTION_PREFIX)
             ):
                 continue
-            tools_remaining.add(step.tool_id)
 
-            tool = self.get_tool(step.tool_id, plan_run)
+            if "," in step.tool_id:
+                # A comma can only appear in the tool ID with PlanV2 ReAct agent steps where they
+                # are using more than one tool in a single step.
+                tools_remaining.update(step.tool_id.split(","))
+            else:
+                tools_remaining.add(step.tool_id)
+
+        for tool_id in tools_remaining:
+            tool = ToolCallWrapper.from_tool_id(
+                tool_id,
+                self.tool_registry,
+                self.storage,
+                plan_run,
+            )
             if not tool:
                 continue  # pragma: no cover - Should not happen if tool_id is set - defensive check
             if tool.id.startswith("portia:"):
-                portia_cloud_tool_ids_remaining.add(step.tool_id)
+                portia_cloud_tool_ids_remaining.add(tool_id)
             else:
                 ready_response = tool.ready(tool_run_context)
                 if not ready_response.ready:
@@ -2667,12 +2653,6 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
     ) -> PlanRun:
         """Run a Portia plan."""
-        legacy_plan = plan.to_legacy_plan(
-            PlanContext(
-                query=plan.label,
-                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
-            ),
-        )
         if structured_output_schema:
             if plan.final_output_schema:
                 logger().warning(
@@ -2680,10 +2660,22 @@ class Portia:
                     "overwrites the final output schema set in the plan builder."
                 )
             plan.final_output_schema = structured_output_schema
-        plan_run = await self._aget_plan_run_from_plan(legacy_plan, end_user, plan_run_inputs)
-        return await self.resume_builder_plan(
+        legacy_plan = plan.to_legacy_plan(
+            PlanContext(
+                query=plan.label,
+                tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
+            ),
+        )
+        plan_run = await self._aget_plan_run_from_plan(
+            legacy_plan, end_user, plan_run_inputs, structured_output_schema
+        )
+        plan_run = await self.resume_builder_plan(
             plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
         )
+        rt = get_current_run_tree()
+        if rt:
+            rt.add_metadata({"plan_run_id": str(plan_run.id)})
+        return plan_run
 
     async def resume_builder_plan(
         self,
@@ -2712,7 +2704,11 @@ class Portia:
             legacy_plan=legacy_plan,
             plan_run=plan_run,
             end_user=end_user or await self.ainitialize_end_user(plan_run.end_user_id),
-            portia=self,
+            config=self.config,
+            tool_registry=self.tool_registry,
+            storage=self.storage,
+            execution_hooks=self.execution_hooks,
+            telemetry=self.telemetry,
         )
 
         try:
@@ -2739,12 +2735,22 @@ class Portia:
 
         output_value = self._get_last_executed_step_output(run_data.legacy_plan, run_data.plan_run)
         branch_stack: list[ConditionalStepResult] = []
-        for i, step in enumerate(plan.steps):
-            if i < run_data.plan_run.current_step_index:
-                logger().debug(f"Skipping step {i}: {step}")
-                continue
+        while run_data.plan_run.current_step_index < len(plan.steps):
+            index = run_data.plan_run.current_step_index
+            step = plan.steps[index]
 
-            logger().info(f"Starting step {i}: {step}")
+            legacy_step = step.to_legacy_step(plan)
+
+            try:
+                self._handle_before_step_execution_hook(
+                    run_data.legacy_plan,
+                    run_data.plan_run,
+                    legacy_step,
+                )
+            except SkipExecutionError as e:
+                logger().info(f"Skipping step {index}: {e}")
+                run_data.plan_run.current_step_index = index + 1
+                continue
 
             try:
                 result = await step.run(run_data)
@@ -2757,7 +2763,7 @@ class Portia:
                     )
                 )
                 return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, i, step.to_legacy_step(plan), e
+                    run_data.plan_run, run_data.legacy_plan, index, legacy_step, e
                 )
             else:
                 self.telemetry.capture(
@@ -2767,73 +2773,51 @@ class Portia:
                         tool_id=step.to_legacy_step(plan).tool_id,
                     )
                 )
-            jump_to_step_index: int | None = None
-            if (
-                isinstance(result, ConditionalStepResult)
-                and result.type == ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK
-            ):
-                logger().debug("Entering new conditional block")
-                branch_stack.append(result)
-                if not result.conditional_result:
-                    logger().debug("Conditional clause is false, jumping to next clause")
-                    jump_to_step_index = result.next_clause_step_index
-            elif (
-                isinstance(result, ConditionalStepResult)
-                and result.type == ConditionalBlockClauseType.ALTERNATE_CLAUSE
-            ):
-                stack_state = branch_stack[-1]
-                if stack_state.conditional_result:
-                    logger().debug("Previous conditional clause has already run, jumping to exit")
-                    # One of the branches has already run, so we jump to exit
-                    jump_to_step_index = stack_state.end_condition_block_step_index
-                elif result.conditional_result:
-                    logger().debug("Conditional clause is true, evaluating steps")
-                    # Overwrite the stack state with the new result
-                    branch_stack[-1] = result
-                elif not result.conditional_result:
-                    logger().debug("Conditional clause is false, jumping to next clause or exit")
-                    jump_to_step_index = result.next_clause_step_index
-            elif (
-                isinstance(result, ConditionalStepResult)
-                and result.type == ConditionalBlockClauseType.END_CONDITION_BLOCK
-            ):
-                logger().debug("Exiting conditional branch")
-                branch_stack.pop()
-            elif isinstance(result, ExitStepResult):
-                logger().info(f"Exit step executed: {result.message}")
 
-                # Store the exit result and terminate execution
-                output_value = LocalDataValue(value=result)
-                output_value = self._set_step_output(
-                    output_value, run_data.plan_run, step.to_legacy_step(plan)
-                )
-                output = ReferenceValue(
-                    value=output_value,
-                    description=(f"Exit from step '{step.step_name}' (Description: {step})"),
-                )
-                run_data.step_output_values.append(output)
+            jump_to_step_index = None
+            match result:
+                case ConditionalStepResult():
+                    jump_to_step_index = self._handle_conditional_step(result, branch_stack)
+                case LoopStepResult():
+                    if isinstance(step, LoopStep):
+                        jump_to_step_index = self._handle_loop_step(result, step)
+                        result = result.value
+                case ExitStepResult():
+                    logger().info(f"Exit step executed: {result.message}")
+                    if result.error:
+                        return self._handle_execution_error(
+                            run_data.plan_run,
+                            run_data.legacy_plan,
+                            index,
+                            legacy_step,
+                            result.message,
+                        )
+                    jump_to_step_index = len(plan.steps)
 
-                # Mark plan as complete and break out of loop
-                run_data.plan_run.current_step_index = len(plan.steps)
-                break
-
-            output_value = LocalDataValue(value=result)
+            # Some steps output a LocalDataValue so they can attach a summary to the output, but
+            # we don't enforce that all steps do this so we need to handle both cases.
+            if not isinstance(result, LocalDataValue):
+                local_output_value = LocalDataValue(value=result)
+            else:
+                local_output_value = result
             # This may persist the output to memory - store the memory value if it does
-            output_value = self._set_step_output(
-                output_value, run_data.plan_run, step.to_legacy_step(plan)
-            )
-            output = ReferenceValue(
-                value=output_value,
-                description=(f"Output from step '{step.step_name}' (Description: {step})"),
-            )
-            run_data.step_output_values.append(output)
+            output_value = self._set_step_output(local_output_value, run_data.plan_run, legacy_step)
+            if not is_clarification(result):
+                run_data.step_output_values.append(
+                    StepOutputValue(
+                        step_name=step.step_name,
+                        step_num=index,
+                        value=local_output_value.value,
+                        description=(f"Output from step '{step.step_name}' (Description: {step})"),
+                    )
+                )
 
             try:
                 if clarified_plan_run := self._handle_post_step_execution(
                     run_data.legacy_plan,
                     run_data.plan_run,
-                    i,
-                    step.to_legacy_step(plan),
+                    index,
+                    legacy_step,
                     output_value,
                 ):
                     # No after_plan_run call here as the plan run will be resumed later
@@ -2841,43 +2825,85 @@ class Portia:
             except Exception as e:  # noqa: BLE001 - We want to capture all exceptions from the hook here
                 logger().error(
                     "Error in post-step stage for step {index}: {error}",
-                    index=i,
+                    index=index,
                     error=e,
                     plan=str(plan.id),
                     plan_run=str(run_data.plan_run.id),
                 )
                 error_value = LocalDataValue(value=str(e))
                 self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
-                error_output = ReferenceValue(
-                    value=error_value,
-                    description=(f"Error from step '{step.step_name}' (Description: {step})"),
+                run_data.step_output_values.append(
+                    StepOutputValue(
+                        step_name=step.step_name,
+                        step_num=index,
+                        value=str(e),
+                        description=f"Error from step '{step.step_name}' (Description: {step})",
+                    )
                 )
-                run_data.step_output_values.append(error_output)
                 # Skip the after_step_execution hook as we have already run it
                 return self._handle_plan_run_execution_error(
                     run_data.plan_run, run_data.legacy_plan, error_value
                 )
 
-            if isinstance(result, ExitStepResult) and result.error:
-                logger().warning("Plan exiting due to error condition")
-                self._set_plan_run_state(run_data.plan_run, PlanRunState.FAILED)
-
-            # Don't increment current step beyond the last step
-            if jump_to_step_index is None and i < len(plan.steps) - 1:
-                run_data.plan_run.current_step_index += 1
             if jump_to_step_index is not None:
-                logger().debug(f"Jumping to step {jump_to_step_index} from {i}")
+                logger().debug(f"Jumping to step {jump_to_step_index} from {index}")
                 run_data.plan_run.current_step_index = jump_to_step_index
-            logger().info(f"Completed step {i}, result: {result}")
+            else:
+                run_data.plan_run.current_step_index = index + 1
+            logger().info(f"Completed step {index}", result=result)
 
         return self._post_plan_run_execution(
             run_data.legacy_plan,
             run_data.plan_run,
             output_value,
-            skip_summarization=(not plan.summarize
-            and plan.final_output_schema is None)
-            or run_data.plan_run.state == PlanRunState.FAILED,
+            skip_summarization=not plan.summarize and plan.final_output_schema is None,
         )
+
+    def _handle_loop_step(self, result: LoopStepResult, step: LoopStep) -> int | None:
+        """Handle a loop step."""
+        match step.loop_step_type, result.loop_result:
+            case LoopStepType.START, True:
+                logger().debug("Running loop")
+                return None  # just iterate the loop as usual
+            case LoopStepType.END, True:
+                logger().debug("Returning to loop start")
+                return step.loop_block.start_step_index if step.loop_block else None
+            case (_, False):
+                logger().debug("Loop condition is false, jumping to exit")
+                return (
+                    step.loop_block.end_step_index + 1
+                    if step.loop_block and step.loop_block.end_step_index
+                    else None
+                )
+
+    def _handle_conditional_step(
+        self, result: ConditionalStepResult, branch_stack: list[ConditionalStepResult]
+    ) -> int | None:
+        """Handle a conditional step."""
+        match result.type:
+            case ConditionalBlockClauseType.NEW_CONDITIONAL_BLOCK:
+                logger().debug("Entering new conditional block")
+                branch_stack.append(result)
+                if not result.conditional_result:
+                    logger().debug("Conditional clause is false, jumping to next clause")
+                    return result.next_clause_step_index
+            case ConditionalBlockClauseType.ALTERNATE_CLAUSE:
+                stack_state = branch_stack[-1]
+                if stack_state.conditional_result:
+                    logger().debug("Previous conditional clause has already run, jumping to exit")
+                    # One of the branches has already run, so we jump to exit
+                    return stack_state.end_condition_block_step_index
+                if result.conditional_result:
+                    logger().debug("Conditional clause is true, evaluating steps")
+                    # Overwrite the stack state with the new result
+                    branch_stack[-1] = result
+                elif not result.conditional_result:
+                    logger().debug("Conditional clause is false, jumping to next clause or exit")
+                    return result.next_clause_step_index
+            case ConditionalBlockClauseType.END_CONDITION_BLOCK:
+                logger().debug("Exiting conditional branch")
+                branch_stack.pop()
+        return None
 
     @staticmethod
     def _log_models(config: Config) -> None:

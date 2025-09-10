@@ -23,11 +23,13 @@ from __future__ import annotations
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from typing_extensions import deprecated
 
 from portia.common import Serializable
 from portia.prefixed_uuid import PlanUUID
 
 
+@deprecated("Use PlanBuilderV2 instead")
 class PlanBuilder:
     """A builder for creating plans.
 
@@ -40,6 +42,8 @@ class PlanBuilder:
                 .step("Step 2", "tool_id_2", "output_2") \
                 .input("input_1", "value_1") \
                 .build()
+
+    This class is now deprecated. Use PlanBuilderV2 instead.
 
     """
 

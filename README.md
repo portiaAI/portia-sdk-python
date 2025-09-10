@@ -122,7 +122,7 @@ The example below introduces **some** of the config options available with Porti
 - The `storage_class` is set using the `StorageClass.CLOUD` ENUM. So long as your `PORTIA_API_KEY` is set, runs and tool calls will be logged and appear automatically in your Portia dashboard at <a href="https://app.portialabs.ai" target="_blank">**app.portialabs.ai (↗)**</a>.
 - The `default_log_level` is set using the `LogLevel.DEBUG` ENUM to `DEBUG` so you can get some insight into the sausage factory in your terminal, including plan generation, run states, tool calls and outputs at every step 😅
   - To enable ultra-verbose tracing of LLM calls across agents and tools, set `default_log_level=LogLevel.TRACE` (or the string "TRACE"). TRACE includes all DEBUG logs plus additional "LLM call" entries showing the model and high-level purpose (planning, introspection, summarization, parsing/verification, tool-calling).
-- The `llm_provider` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider. In the example below we're using GPT 4o, but you can use Anthropic, Gemini and others!
+- The `llm_provider` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider. In the example below we're using GPT 4o, but you can use Anthropic, Gemini, Grok and others!
 
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
 
@@ -173,3 +173,100 @@ You can support our work best by leaving a star!
 ![star](https://github.com/user-attachments/assets/8df5e1d9-a0d4-40b4-9c51-945841744050)
 
 We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
+
+# ❤️ Contributors
+A heartfelt thank you to our growing list of contributors!
+<!-- readme: contributors,mounir-portia/-,robbie-portia/-,emmaportia/-,sam-portia/-,Nathanjp91/-,TomSPortia/-,OmarEl-Mohandes/-,portiaAI-bot/- -start -->
+<table>
+	<tbody>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/fanlinwang">
+                    <img src="https://avatars.githubusercontent.com/u/25503130?v=4" width="100;" alt="fanlinwang"/>
+                    <br />
+                    <sub><b>fanlinwang</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/hannah-portia">
+                    <img src="https://avatars.githubusercontent.com/u/187275200?v=4" width="100;" alt="hannah-portia"/>
+                    <br />
+                    <sub><b>hannah-portia</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/asquare14">
+                    <img src="https://avatars.githubusercontent.com/u/22938709?v=4" width="100;" alt="asquare14"/>
+                    <br />
+                    <sub><b>Atibhi Agrawal</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/judy2k">
+                    <img src="https://avatars.githubusercontent.com/u/359772?v=4" width="100;" alt="judy2k"/>
+                    <br />
+                    <sub><b>Mark Smith</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/md-abid-hussain">
+                    <img src="https://avatars.githubusercontent.com/u/101964499?v=4" width="100;" alt="md-abid-hussain"/>
+                    <br />
+                    <sub><b>Md Abid Hussain</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/saitama142">
+                    <img src="https://avatars.githubusercontent.com/u/53933154?v=4" width="100;" alt="saitama142"/>
+                    <br />
+                    <sub><b>0u55</b></sub>
+                </a>
+            </td>
+		</tr>
+		<tr>
+            <td align="center">
+                <a href="https://github.com/amorriscode">
+                    <img src="https://avatars.githubusercontent.com/u/16005567?v=4" width="100;" alt="amorriscode"/>
+                    <br />
+                    <sub><b>Anthony Morris</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/gaurava05">
+                    <img src="https://avatars.githubusercontent.com/u/45741026?v=4" width="100;" alt="gaurava05"/>
+                    <br />
+                    <sub><b>Gaurav Agarwal</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/jingkaihe">
+                    <img src="https://avatars.githubusercontent.com/u/1335938?v=4" width="100;" alt="jingkaihe"/>
+                    <br />
+                    <sub><b>Jingkai He</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/ksingh-08">
+                    <img src="https://avatars.githubusercontent.com/u/148441103?v=4" width="100;" alt="ksingh-08"/>
+                    <br />
+                    <sub><b>Karan Singh</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/hemanthkotaprolu">
+                    <img src="https://avatars.githubusercontent.com/u/92506047?v=4" width="100;" alt="hemanthkotaprolu"/>
+                    <br />
+                    <sub><b>Kotaprolu Hemanth</b></sub>
+                </a>
+            </td>
+            <td align="center">
+                <a href="https://github.com/sangwaboi">
+                    <img src="https://avatars.githubusercontent.com/u/182721678?v=4" width="100;" alt="sangwaboi"/>
+                    <br />
+                    <sub><b>Vishvendra Sangwan</b></sub>
+                </a>
+            </td>
+		</tr>
+	<tbody>
+</table>
+<!-- readme: contributors,mounir/-,robbie-portia/-,emmaportia/-,sam-portia/-,Nathanjp91/-,tomSportia/-,OmarEl-Mohandes/- -end -->

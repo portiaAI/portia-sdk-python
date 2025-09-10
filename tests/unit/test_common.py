@@ -55,104 +55,109 @@ def test_combine_args_kwargs() -> None:
     }
 
 
-class TestPrefixedUUID:
-    """Tests for PrefixedUUID."""
+# Tests for PrefixedUUID
 
-    def test_default_prefix(self) -> None:
-        """Test PrefixedUUID with default empty prefix."""
-        prefixed_uuid = PrefixedUUID()
-        assert prefixed_uuid.prefix == ""
-        assert isinstance(prefixed_uuid.uuid, UUID)
-        assert str(prefixed_uuid) == str(prefixed_uuid.uuid)
 
-    def test_custom_prefix(self) -> None:
-        """Test PrefixedUUID with custom prefix."""
+def test_default_prefix() -> None:
+    """Test PrefixedUUID with default empty prefix."""
+    prefixed_uuid = PrefixedUUID()
+    assert prefixed_uuid.prefix == ""
+    assert isinstance(prefixed_uuid.uuid, UUID)
+    assert str(prefixed_uuid) == str(prefixed_uuid.uuid)
 
-        class CustomPrefixUUID(PrefixedUUID):
-            prefix = "test"
 
-        prefixed_uuid = CustomPrefixUUID()
-        assert prefixed_uuid.prefix == "test"
-        assert str(prefixed_uuid).startswith("test-")
-        assert str(prefixed_uuid) == f"test-{prefixed_uuid.uuid}"
-        assert isinstance(prefixed_uuid.uuid, UUID)
-        assert str(prefixed_uuid)[5:] == str(prefixed_uuid.uuid)
+def test_custom_prefix() -> None:
+    """Test PrefixedUUID with custom prefix."""
 
-    def test_from_string(self) -> None:
-        """Test creating PrefixedUUID from string."""
-        # Test with default prefix
-        uuid_str = "123e4567-e89b-12d3-a456-426614174000"
-        prefixed_uuid = PrefixedUUID.from_string(uuid_str)
-        assert str(prefixed_uuid) == uuid_str
+    class CustomPrefixUUID(PrefixedUUID):
+        prefix = "test"
 
-        # Test with custom prefix
-        class CustomPrefixUUID(PrefixedUUID):
-            prefix = "test"
+    prefixed_uuid = CustomPrefixUUID()
+    assert prefixed_uuid.prefix == "test"
+    assert str(prefixed_uuid).startswith("test-")
+    assert str(prefixed_uuid) == f"test-{prefixed_uuid.uuid}"
+    assert isinstance(prefixed_uuid.uuid, UUID)
+    assert str(prefixed_uuid)[5:] == str(prefixed_uuid.uuid)
 
-        prefixed_str = f"test-{uuid_str}"
-        prefixed_uuid = CustomPrefixUUID.from_string(prefixed_str)
-        assert str(prefixed_uuid) == prefixed_str
-        assert str(prefixed_uuid)[5:] == str(prefixed_uuid.uuid)
 
-        with pytest.raises(ValueError, match="Prefix monkey does not match expected prefix test"):
-            CustomPrefixUUID.from_string("monkey-123e4567-e89b-12d3-a456-426614174000")
+def test_from_string() -> None:
+    """Test creating PrefixedUUID from string."""
+    # Test with default prefix
+    uuid_str = "123e4567-e89b-12d3-a456-426614174000"
+    prefixed_uuid = PrefixedUUID.from_string(uuid_str)
+    assert str(prefixed_uuid) == uuid_str
 
-    def test_serialization(self) -> None:
-        """Test PrefixedUUID serialization."""
-        uuid = PrefixedUUID()
-        assert str(uuid) == uuid.model_dump_json().strip('"')
+    # Test with custom prefix
+    class CustomPrefixUUID(PrefixedUUID):
+        prefix = "test"
 
-    def test_model_validation(self) -> None:
-        """Test JSON validation and deserialization."""
+    prefixed_str = f"test-{uuid_str}"
+    prefixed_uuid = CustomPrefixUUID.from_string(prefixed_str)
+    assert str(prefixed_uuid) == prefixed_str
+    assert str(prefixed_uuid)[5:] == str(prefixed_uuid.uuid)
 
-        class CustomID(PrefixedUUID):
-            prefix = "test"
+    with pytest.raises(ValueError, match="Prefix monkey does not match expected prefix test"):
+        CustomPrefixUUID.from_string("monkey-123e4567-e89b-12d3-a456-426614174000")
 
-        class TestModel(BaseModel):
-            id: CustomID = Field(default_factory=CustomID)
 
-        uuid_str = "123e4567-e89b-12d3-a456-426614174000"
+def test_serialization() -> None:
+    """Test PrefixedUUID serialization."""
+    uuid = PrefixedUUID()
+    assert str(uuid) == uuid.model_dump_json().strip('"')
 
-        # Test with string ID
-        json_data = f'{{"id": "test-{uuid_str}"}}'
-        model = TestModel.model_validate_json(json_data)
-        assert isinstance(model.id, CustomID)
-        assert str(model.id.uuid) == uuid_str
-        assert isinstance(model.id.uuid, UUID)
-        assert model.id.prefix == "test"
 
-        # Test with full representation of ID
-        json_data = json.dumps(
-            {
-                "id": {
-                    "uuid": uuid_str,
-                },
+def test_model_validation() -> None:
+    """Test JSON validation and deserialization."""
+
+    class CustomID(PrefixedUUID):
+        prefix = "test"
+
+    class TestModel(BaseModel):
+        id: CustomID = Field(default_factory=CustomID)
+
+    uuid_str = "123e4567-e89b-12d3-a456-426614174000"
+
+    # Test with string ID
+    json_data = f'{{"id": "test-{uuid_str}"}}'
+    model = TestModel.model_validate_json(json_data)
+    assert isinstance(model.id, CustomID)
+    assert str(model.id.uuid) == uuid_str
+    assert isinstance(model.id.uuid, UUID)
+    assert model.id.prefix == "test"
+
+    # Test with full representation of ID
+    json_data = json.dumps(
+        {
+            "id": {
+                "uuid": uuid_str,
             },
-        )
-        model = TestModel.model_validate_json(json_data)
-        assert isinstance(model.id, CustomID)
-        assert str(model.id.uuid) == uuid_str
-        assert isinstance(model.id.uuid, UUID)
-        assert model.id.prefix == "test"
+        },
+    )
+    model = TestModel.model_validate_json(json_data)
+    assert isinstance(model.id, CustomID)
+    assert str(model.id.uuid) == uuid_str
+    assert isinstance(model.id.uuid, UUID)
+    assert model.id.prefix == "test"
 
-        json_data = f'{{"id": "monkey-{uuid_str}"}}'
-        with pytest.raises(ValueError, match="Prefix monkey does not match expected prefix test"):
-            TestModel.model_validate_json(json_data)
+    json_data = f'{{"id": "monkey-{uuid_str}"}}'
+    with pytest.raises(ValueError, match="Prefix monkey does not match expected prefix test"):
+        TestModel.model_validate_json(json_data)
 
-        class TestModelNoPrefix(BaseModel):
-            id: PrefixedUUID
+    class TestModelNoPrefix(BaseModel):
+        id: PrefixedUUID
 
-        json_data = f'{{"id": "{uuid_str}"}}'
-        model = TestModelNoPrefix.model_validate_json(json_data)
-        assert isinstance(model.id, PrefixedUUID)
-        assert str(model.id.uuid) == uuid_str
-        assert isinstance(model.id.uuid, UUID)
-        assert model.id.prefix == ""
+    json_data = f'{{"id": "{uuid_str}"}}'
+    model = TestModelNoPrefix.model_validate_json(json_data)
+    assert isinstance(model.id, PrefixedUUID)
+    assert str(model.id.uuid) == uuid_str
+    assert isinstance(model.id.uuid, UUID)
+    assert model.id.prefix == ""
 
-    def test_hash(self) -> None:
-        """Test PrefixedUUID hash."""
-        uuid = PrefixedUUID()
-        assert hash(uuid) == hash(uuid.uuid)
+
+def test_hash() -> None:
+    """Test PrefixedUUID hash."""
+    uuid = PrefixedUUID()
+    assert hash(uuid) == hash(uuid.uuid)
 
 
 def test_validate_extras_dependencies() -> None:
