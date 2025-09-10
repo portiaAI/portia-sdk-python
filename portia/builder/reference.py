@@ -28,14 +28,17 @@ Example:
 
 from __future__ import annotations
 
+import re
 import sys
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from inspect import signature
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
 else:
     from typing_extensions import override  # pragma: no cover
+
 
 import pydash
 from pydantic import BaseModel, ConfigDict, Field
@@ -45,6 +48,9 @@ from portia.logger import logger
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
     from portia.run_context import RunContext
+
+_KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")
+_POSITIONAL_ARG_REGEX = re.compile(r"^\s*(.+)\s*$")
 
 
 def default_step_name(step_index: int) -> str:
@@ -58,6 +64,9 @@ def default_step_name(step_index: int) -> str:
 
     """
     return f"step_{step_index}"
+
+
+T = TypeVar("T", bound="Reference")
 
 
 class Reference(BaseModel, ABC):
@@ -102,6 +111,97 @@ class Reference(BaseModel, ABC):
 
         """
         raise NotImplementedError  # pragma: no cover
+
+    @classmethod
+    def from_str(cls: type[T], input_str: str) -> T:
+        """Create a reference from a string representation.
+
+        Args:
+            input_str: The string representation of the reference.
+
+        Returns:
+            The reference object.
+
+        Examples:
+            ```python
+            StepOutput.from_str("StepOutput(step_name, path='field.name')")
+            Input.from_str("Input(input_name, path='field.name')")
+            ```
+
+        """
+        parsed_args, kwargs = cls._parse_argument(input_str)
+        init_kwargs = cls._parse_init_args()
+        for param, init_kwarg in zip(parsed_args, init_kwargs, strict=False):
+            name = next(iter(init_kwarg.keys()))
+            kwargs[name] = param
+        kwargs = {k: cls._convert_argument(v) for k, v in kwargs.items()}
+        return cls(**kwargs)
+
+    @classmethod
+    def _parse_argument(cls, input_str: str) -> tuple[list[str], dict[str, Any]]:
+        """Parse the arguments from the input string into positional and keyword arguments."""
+        # Use regex to capture class name and arguments, optionally handling {{ }} wrapper
+        match = re.search(r"(?:{{ )?(\w+)\((.*)\)(?: }})?", input_str)
+        if not match:
+            raise ValueError(f"Invalid input string format: {input_str}")
+        class_name = match.group(1)
+        if class_name != cls.__name__:
+            raise ValueError(f"Invalid input string format: {input_str}")
+        raw_args = match.group(2)
+        if raw_args is None or raw_args == "":
+            raise ValueError(f"Invalid input string format: {input_str}")
+        args = raw_args.split(",")
+        must_be_closed = ['"', "'"]
+        must_be_matched = ["{", "}", "[", "]", "(", ")"]
+        counts = {char: input_str.count(char) for char in must_be_closed + must_be_matched}
+        if (
+            counts["{"] != counts["}"]
+            or counts["["] != counts["]"]
+            or counts["("] != counts[")"]
+            or counts["'"] % 2 != 0
+            or counts['"'] % 2 != 0
+        ):
+            raise ValueError(f"Invalid input string format: {input_str}")
+        kwargs = {}
+        parsed_args = []
+        for arg in args:
+            if arg.strip() == "":
+                raise ValueError(f"Invalid input string format: {input_str}")
+            if "=" in arg:
+                matcher = _KWARGS_ARG_REGEX.match(arg)
+                if not matcher:
+                    raise ValueError(f"Invalid input string format: {input_str}")
+                key, value = matcher.groups()
+                kwargs[key.strip()] = value.strip()
+            elif matcher := _POSITIONAL_ARG_REGEX.match(arg):
+                parsed_args.append(matcher.group(1).strip())
+            else:
+                raise ValueError(f"Invalid input string format: {input_str}")
+        return parsed_args, kwargs
+
+    @classmethod
+    def _convert_argument(cls, input_str: str) -> Any:  # noqa: ANN401
+        """Parse an argument from a string."""
+        if (
+            (input_str.startswith('"')
+            and input_str.endswith('"'))
+            or (input_str.startswith("'")
+            and input_str.endswith("'"))
+        ):
+            return input_str[1:-1]
+        types = [int, float, bool]
+        for t in types:
+            try:
+                return t(input_str)
+            except ValueError:
+                continue
+        return input_str
+
+    @classmethod
+    def _parse_init_args(cls: type[T]) -> list[dict[str, Any]]:
+        """Return the kwargs required to call the __init__ method in the order they are defined."""
+        class_init_args = signature(cls.__init__).parameters
+        return [{arg: class_init_args[arg]} for arg in class_init_args if arg != "self"]
 
 
 class StepOutput(Reference):
@@ -319,3 +419,22 @@ class Input(Reference):
         if self.path:
             return f"{{{{ Input('{self.name}', path='{self.path}') }}}}"
         return f"{{{{ Input('{self.name}') }}}}"
+
+
+def test_method(name: str):
+    pass
+
+
+if __name__ == "__main__":
+    print(StepOutput.from_str("StepOutput(0) }}"))
+    # print(Input.from_str("Input('input_name')"))
+
+    # input_str = "Input('input_name',)"
+    # input_instance = Input.from_str(input_str)
+    # input_str_from_instance = str(input_instance)
+    # print(input_str_from_instance)
+    print(
+        test_method(
+            name="input_name",
+        )
+    )

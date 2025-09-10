@@ -169,16 +169,8 @@ class StepV2(BaseModel, ABC):
 
         def replace_reference(match: re.Match[str]) -> str:
             full_match = match.group(0)
-            ref_type_str = match.group(1)
-
-            # Extract the content inside the parentheses
-            # e.g., from "{{ StepOutput('step', path='field.name') }}"
-            # get "'step', path='field.name'"
-            paren_content = full_match[full_match.find("(") + 1 : full_match.rfind(")")]
-
             try:
-                ref_cls = StepOutput if ref_type_str == "StepOutput" else Input
-                ref_obj = self._parse_reference_expression(ref_cls, paren_content)
+                ref_obj = self._parse_reference_expression(full_match)
                 resolved = self._resolve_references(ref_obj, run_data)
                 return str(resolved)
             except (ValueError, AttributeError, KeyError):  # pragma: no cover
@@ -188,13 +180,13 @@ class StepV2(BaseModel, ABC):
         return re.sub(pattern, replace_reference, value)
 
     def _parse_reference_expression(
-        self, ref_cls: type[Reference], paren_content: str
+        self, templated_str: str
     ) -> Reference:
         """Parse the content inside StepOutput(...) or Input(...) to create the reference object.
 
         Args:
             ref_cls: The Reference class to instantiate (StepOutput or Input)
-            paren_content: The content inside the parentheses
+            templated_str: The content inside the parentheses
 
         Supports the following reference types:
         - StepOutput(step_name)
@@ -202,66 +194,13 @@ class StepV2(BaseModel, ABC):
         - Input(input_name)
 
         """
-        paren_content = paren_content.strip()
-
-        if paren_content.isdigit() and ref_cls == StepOutput:
-            # Reference with a step index - e.g. StepOutput(0)
-            return StepOutput(int(paren_content))
-
-        if ", path=" in paren_content:
-            return self._parse_reference_with_path(ref_cls, paren_content)
-
-        # Simple reference with no path - e.g. StepOutput("step_name") or Input("input_name")
-        if (paren_content.startswith('"') and paren_content.endswith('"')) or (
-            paren_content.startswith("'") and paren_content.endswith("'")
-        ):
-            name = paren_content[1:-1]  # Remove quotes
-            if ref_cls == StepOutput:
-                return StepOutput(name)
-            return Input(name)
-
-        raise ValueError(f"Invalid reference format: {paren_content}")  # pragma: no cover
-
-    def _parse_reference_with_path(self, ref_cls: type[Reference], paren_content: str) -> Reference:
-        """Parse reference expressions that include path parameters.
-
-        Args:
-            ref_cls: The Reference class to instantiate (StepOutput or Input)
-            paren_content: The content inside the parentheses
-
-        Handles cases like:
-        - 'step_name', path='field.name'
-        - 42, path='field.name'  (numeric step index)
-
-        Step/input names must be quoted strings, except for numeric step indices.
-
-        """
-        # Extract path parameter - should always be present since we detected a comma
-        path_match = re.search(r"\bpath\s*=\s*['\"]([^'\"]*)['\"]", paren_content)
-        if not path_match:
-            raise ValueError(  # pragma: no cover
-                f"Expected path parameter in reference expression: {paren_content}"
-            )
-        path_param = path_match.group(1)
-
-        # Extract the first parameter (step/input name)
-        # Split by comma and take the first part
-        first_param = paren_content.split(",")[0].strip()
-
-        if first_param.isdigit():
-            step_param = int(first_param)
-        elif (first_param.startswith('"') and first_param.endswith('"')) or (
-            first_param.startswith("'") and first_param.endswith("'")
-        ):
-            step_param = first_param[1:-1]  # Remove quotes
-        else:
-            raise ValueError(  # pragma: no cover
-                f"Expected quoted string or number for step/input name, got: {first_param}"
-            )
-
-        if ref_cls == StepOutput:
-            return StepOutput(step_param, path=path_param)
-        return Input(str(step_param), path=path_param)
+        match templated_str:
+            case s if "StepOutput" in s:
+                return StepOutput.from_str(templated_str)
+            case s if "Input" in s:
+                return Input.from_str(templated_str)
+            case _:
+                raise ValueError(f"Invalid reference format: {templated_str}")  # pragma: no cover
 
     def _resolve_input_names_for_printing(
         self,
