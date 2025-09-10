@@ -148,6 +148,7 @@ class Reference(BaseModel, ABC):
         Examples:
             ```python
             StepOutput.from_str("StepOutput(step_name, path='field.name')")
+            StepOutput.from_str("{{ StepOutput(0, path='field.name') }}")
             Input.from_str("Input(input_name, path='field.name')")
             ```
 
