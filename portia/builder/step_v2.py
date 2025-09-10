@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import itertools
 import re
+import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import TYPE_CHECKING, Any, Self
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override  # pragma: no cover
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -396,7 +402,8 @@ class LLMStep(StepV2):
 
         tool_ctx = run_data.get_tool_run_ctx()
         task_data = self._resolve_input_references_with_descriptions(self.inputs, run_data)
-        return await wrapped_tool.arun(tool_ctx, task=self.task, task_data=task_data)
+        task = self._template_references(self.task, run_data)
+        return await wrapped_tool.arun(tool_ctx, task=task, task_data=task_data)
 
     @override
     def to_legacy_step(self, plan: PlanV2) -> Step:
