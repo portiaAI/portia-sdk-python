@@ -28,8 +28,14 @@ Example:
 
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 import pydash
 from pydantic import BaseModel, ConfigDict, Field

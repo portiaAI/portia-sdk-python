@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import itertools
 import re
+import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import TYPE_CHECKING, Any, Self
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from langsmith import traceable
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
