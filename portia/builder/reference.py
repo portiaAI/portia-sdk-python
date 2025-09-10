@@ -187,7 +187,7 @@ class Reference(BaseModel, ABC):
             input_str.startswith("'") and input_str.endswith("'")
         ):
             return input_str[1:-1]
-        types = [int, float, bool]
+        types = [int, float]
         for t in types:
             try:
                 return t(input_str)

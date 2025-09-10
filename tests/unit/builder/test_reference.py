@@ -957,6 +957,7 @@ def test_from_str_preserves_type_consistency() -> None:
         ("'step_name'", "step_name"),
         ("'my_step'", "my_step"),
         ("'search_results'", "search_results"),
+        ("regular_string", "regular_string"),
     ],
 )
 def test_reference_argument_conversion(input_str: str, expected_argument: Any) -> None:  # noqa: ANN401
