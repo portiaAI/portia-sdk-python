@@ -787,8 +787,8 @@ def test_step_output_from_str_valid_cases(
     "input_str",
     [
         # Malformed input strings
-        "{{ StepOutput(0) ", # missing closing brace
-        "StepOutput(0) }}", # missing opening brace
+        "{{ StepOutput(0) ",  # missing closing brace
+        "StepOutput(0) }}",  # missing opening brace
         "StepOutput()",  # Missing arguments
         "StepOutput",  # Missing parentheses
         "StepOutput(",  # Incomplete
@@ -859,8 +859,8 @@ def test_input_from_str_valid_cases(
     "input_str",
     [
         # Malformed input strings
-        "{{ Input('name') ", # missing closing brace
-        "Input('name') }}", # missing opening brace
+        "{{ Input('name') ",  # missing closing brace
+        "Input('name') }}",  # missing opening brace
         "Input()",  # Missing arguments
         "Input",  # Missing parentheses
         "Input(",  # Incomplete

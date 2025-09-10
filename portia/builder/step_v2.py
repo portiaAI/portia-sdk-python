@@ -179,9 +179,7 @@ class StepV2(BaseModel, ABC):
 
         return re.sub(pattern, replace_reference, value)
 
-    def _parse_reference_expression(
-        self, templated_str: str
-    ) -> Reference:
+    def _parse_reference_expression(self, templated_str: str) -> Reference:
         """Parse the content inside StepOutput(...) or Input(...) to create the reference object.
 
         Args:

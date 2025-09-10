@@ -182,11 +182,8 @@ class Reference(BaseModel, ABC):
     @classmethod
     def _convert_argument(cls, input_str: str) -> Any:  # noqa: ANN401
         """Parse an argument from a string."""
-        if (
-            (input_str.startswith('"')
-            and input_str.endswith('"'))
-            or (input_str.startswith("'")
-            and input_str.endswith("'"))
+        if (input_str.startswith('"') and input_str.endswith('"')) or (
+            input_str.startswith("'") and input_str.endswith("'")
         ):
             return input_str[1:-1]
         types = [int, float, bool]
