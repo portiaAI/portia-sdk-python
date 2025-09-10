@@ -949,6 +949,9 @@ def test_from_str_preserves_type_consistency() -> None:
     [
         ("0", 0),
         ("-0", 0),
+        ("None", None),
+        ("True", True),
+        ("False", False),
         ("-1", -1),
         ("1.0", 1.0),
         ("-1.0", -1.0),

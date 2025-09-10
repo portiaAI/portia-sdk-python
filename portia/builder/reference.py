@@ -31,8 +31,9 @@ from __future__ import annotations
 import re
 import sys
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from inspect import signature
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -69,6 +70,22 @@ def default_step_name(step_index: int) -> str:
 T = TypeVar("T", bound="Reference")
 
 
+def string_to_none(input_str: str) -> None:
+    """Convert a string to None."""
+    if input_str.lower() == "none":
+        return
+    raise ValueError(f"Invalid none string: {input_str}")
+
+
+def string_to_bool(input_str: str) -> bool:
+    """Convert a string to a boolean."""
+    if input_str.lower() == "true":
+        return True
+    if input_str.lower() == "false":
+        return False
+    raise ValueError(f"Invalid boolean string: {input_str}")
+
+
 class Reference(BaseModel, ABC):
     """Abstract base class for all reference types in Portia plans.
 
@@ -84,6 +101,12 @@ class Reference(BaseModel, ABC):
     # Allow setting temporary/mock attributes in tests (e.g. patch.object(..., "get_value"))
     # Without this, Pydantic v2 prevents setting non-field attributes on instances.
     model_config = ConfigDict(extra="allow")
+    _converters: ClassVar[list[Callable[[str], Any]]] = [
+        int,
+        float,
+        string_to_none,
+        string_to_bool,
+    ]
 
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -187,8 +210,7 @@ class Reference(BaseModel, ABC):
             input_str.startswith("'") and input_str.endswith("'")
         ):
             return input_str[1:-1]
-        types = [int, float]
-        for t in types:
+        for t in cls._converters:
             try:
                 return t(input_str)
             except ValueError:
