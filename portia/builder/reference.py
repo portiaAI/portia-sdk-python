@@ -72,16 +72,16 @@ T = TypeVar("T", bound="Reference")
 
 def string_to_none(input_str: str) -> None:
     """Convert a string to None."""
-    if input_str.lower() == "none":
+    if input_str.strip() == "None":
         return
     raise ValueError(f"Invalid none string: {input_str}")
 
 
 def string_to_bool(input_str: str) -> bool:
     """Convert a string to a boolean."""
-    if input_str.lower() == "true":
+    if input_str.strip() == "True":
         return True
-    if input_str.lower() == "false":
+    if input_str.strip() == "False":
         return False
     raise ValueError(f"Invalid boolean string: {input_str}")
 
