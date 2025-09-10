@@ -419,22 +419,3 @@ class Input(Reference):
         if self.path:
             return f"{{{{ Input('{self.name}', path='{self.path}') }}}}"
         return f"{{{{ Input('{self.name}') }}}}"
-
-
-def test_method(name: str):
-    pass
-
-
-if __name__ == "__main__":
-    print(StepOutput.from_str("StepOutput(0) }}"))
-    # print(Input.from_str("Input('input_name')"))
-
-    # input_str = "Input('input_name',)"
-    # input_instance = Input.from_str(input_str)
-    # input_str_from_instance = str(input_instance)
-    # print(input_str_from_instance)
-    print(
-        test_method(
-            name="input_name",
-        )
-    )
