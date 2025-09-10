@@ -755,6 +755,8 @@ def test_multiple_inputs_and_outputs() -> None:
 @pytest.mark.parametrize(
     ("input_str", "expected_step", "expected_path"),
     [
+        # Basic cases with double braces
+        ("{{ StepOutput(0) }}", 0, None),
         # Basic cases with integer step
         ("StepOutput(0)", 0, None),
         ("StepOutput(1)", 1, None),
@@ -818,9 +820,7 @@ def test_step_output_from_str_invalid_cases(input_str: str) -> None:
 def test_step_output_from_str_roundtrip(step_output: StepOutput) -> None:
     """Test that from_str and str produce consistent results."""
     str_repr = str(step_output)
-    # Remove the double braces for the from_str input
-    from_str_input = str_repr.replace("{{ ", "").replace(" }}", "")
-    reconstructed = StepOutput.from_str(from_str_input)
+    reconstructed = StepOutput.from_str(str_repr)
 
     assert reconstructed.step == step_output.step
     assert reconstructed.path == step_output.path
@@ -829,6 +829,8 @@ def test_step_output_from_str_roundtrip(step_output: StepOutput) -> None:
 @pytest.mark.parametrize(
     ("input_str", "expected_name", "expected_path"),
     [
+        # Basic cases with double braces
+        ("{{ Input('input_name') }}", "input_name", None),
         # Basic cases
         ("Input('input_name')", "input_name", None),
         ("Input('user_query')", "user_query", None),
@@ -889,9 +891,7 @@ def test_input_from_str_invalid_cases(input_str: str) -> None:
 def test_input_from_str_roundtrip(input_ref: Input) -> None:
     """Test that from_str and str produce consistent results."""
     str_repr = str(input_ref)
-    # Remove the double braces for the from_str input
-    from_str_input = str_repr.replace("{{ ", "").replace(" }}", "")
-    reconstructed = Input.from_str(from_str_input)
+    reconstructed = Input.from_str(str_repr)
 
     assert reconstructed.name == input_ref.name
     assert reconstructed.path == input_ref.path
