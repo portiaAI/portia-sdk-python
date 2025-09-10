@@ -314,6 +314,7 @@ class ReActAgent:
         langchain_tools = [
             tool.to_langchain_with_artifact(
                 ctx=tool_run_ctx,
+                sync=False,
             )
             for tool in self.tools
         ]
