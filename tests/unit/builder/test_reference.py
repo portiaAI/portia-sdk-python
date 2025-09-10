@@ -960,6 +960,6 @@ def test_from_str_preserves_type_consistency() -> None:
     ],
 )
 def test_reference_argument_conversion(input_str: str, expected_argument: Any) -> None:  # noqa: ANN401
-    """Test StepOutput.from_str with double braces."""
+    """Test reference argument conversion."""
     assert StepOutput._convert_argument(input_str) == expected_argument
     assert Input._convert_argument(input_str) == expected_argument
