@@ -176,7 +176,8 @@ class Reference(BaseModel, ABC):
             elif matcher := _POSITIONAL_ARG_REGEX.match(arg):
                 parsed_args.append(matcher.group(1).strip())
             else:
-                raise ValueError(f"Invalid input string format: {input_str}")
+                # this shouldn't be reachable
+                raise ValueError(f"Invalid input string format: {input_str}")  # pragma: no cover
         return parsed_args, kwargs
 
     @classmethod

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -799,6 +800,7 @@ def test_step_output_from_str_valid_cases(
         "StepOutput(0, path=)",  # Missing path value
         "StepOutput(0, path='unclosed)",  # Unclosed quote
         "StepOutput(0, path='field.name', extra='value')",  # Extra parameter
+        "Input('test')",  # Not a StepOutput
     ],
 )
 def test_step_output_from_str_invalid_cases(input_str: str) -> None:
@@ -940,3 +942,24 @@ def test_from_str_preserves_type_consistency() -> None:
     step_output_str = StepOutput.from_str("StepOutput('step_name')")
     assert isinstance(step_output_str.step, str)
     assert step_output_str.step == "step_name"
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_argument"),
+    [
+        ("0", 0),
+        ("-0", 0),
+        ("-1", -1),
+        ("1.0", 1.0),
+        ("-1.0", -1.0),
+        ("1", 1),
+        ("42", 42),
+        ("'step_name'", "step_name"),
+        ("'my_step'", "my_step"),
+        ("'search_results'", "search_results"),
+    ],
+)
+def test_reference_argument_conversion(input_str: str, expected_argument: Any) -> None:  # noqa: ANN401
+    """Test StepOutput.from_str with double braces."""
+    assert StepOutput._convert_argument(input_str) == expected_argument
+    assert Input._convert_argument(input_str) == expected_argument

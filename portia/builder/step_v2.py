@@ -197,7 +197,9 @@ class StepV2(BaseModel, ABC):
                 return StepOutput.from_str(templated_str)
             case s if "Input" in s:
                 return Input.from_str(templated_str)
-            case _:
+            case _:  # pragma: no cover
+                # this shouldn't be reachable unless we've added a new Reference type and haven't
+                # updated this method to handle it
                 raise ValueError(f"Invalid reference format: {templated_str}")  # pragma: no cover
 
     def _resolve_input_names_for_printing(
