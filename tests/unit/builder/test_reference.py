@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
@@ -975,3 +977,220 @@ def test_step_output_full_empty_list_when_no_outputs() -> None:
 
     result = step_output.get_value(mock_run_data)
     assert result == []
+# Test cases for the from_str method
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_step", "expected_path"),
+    [
+        # Basic cases with double braces
+        ("{{ StepOutput(0) }}", 0, None),
+        # Basic cases with integer step
+        ("StepOutput(0)", 0, None),
+        ("StepOutput(1)", 1, None),
+        ("StepOutput(42)", 42, None),
+        # Basic cases with string step
+        ("StepOutput('step_name')", "step_name", None),
+        ("StepOutput('my_step')", "my_step", None),
+        ("StepOutput('search_results')", "search_results", None),
+        # Cases with path parameter
+        ("StepOutput(0, path='field.name')", 0, "field.name"),
+        ("StepOutput('step_name', path='results.0.title')", "step_name", "results.0.title"),
+        ("StepOutput(1, path='data.user.profile')", 1, "data.user.profile"),
+        # Edge cases with quotes in path
+        ("StepOutput('step', path='field.subfield')", "step", "field.subfield"),
+        ("StepOutput(0, path='complex.path.with.dots')", 0, "complex.path.with.dots"),
+    ],
+)
+def test_step_output_from_str_valid_cases(
+    input_str: str, expected_step: str | int, expected_path: str | None
+) -> None:
+    """Test StepOutput.from_str with valid input strings."""
+    result = StepOutput.from_str(input_str)
+
+    assert isinstance(result, StepOutput)
+    assert result.step == expected_step
+    assert result.path == expected_path
+
+
+@pytest.mark.parametrize(
+    "input_str",
+    [
+        # Malformed input strings
+        "{{ StepOutput(0) ",  # missing closing brace
+        "StepOutput(0) }}",  # missing opening brace
+        "StepOutput()",  # Missing arguments
+        "StepOutput",  # Missing parentheses
+        "StepOutput(",  # Incomplete
+        "StepOutput)",  # Missing opening
+        "StepOutput(,)",  # Empty arguments
+        "StepOutput(0, path=)",  # Missing path value
+        "StepOutput(0, path='unclosed)",  # Unclosed quote
+        "StepOutput(0, path='field.name', extra='value')",  # Extra parameter
+        "Input('test')",  # Not a StepOutput
+    ],
+)
+def test_step_output_from_str_invalid_cases(input_str: str) -> None:
+    """Test StepOutput.from_str with invalid input strings."""
+    with pytest.raises((ValueError, IndexError, TypeError)):
+        StepOutput.from_str(input_str)
+
+
+@pytest.mark.parametrize(
+    "step_output",
+    [
+        StepOutput(0, path=None),
+        StepOutput(0),
+        StepOutput("step_name"),
+        StepOutput(1, path="field.name"),
+        StepOutput("search", path="results.0.title"),
+    ],
+)
+def test_step_output_from_str_roundtrip(step_output: StepOutput) -> None:
+    """Test that from_str and str produce consistent results."""
+    str_repr = str(step_output)
+    reconstructed = StepOutput.from_str(str_repr)
+
+    assert reconstructed.step == step_output.step
+    assert reconstructed.path == step_output.path
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_name", "expected_path"),
+    [
+        # Basic cases with double braces
+        ("{{ Input('input_name') }}", "input_name", None),
+        # Basic cases
+        ("Input('input_name')", "input_name", None),
+        ("Input('user_query')", "user_query", None),
+        ("Input('api_key')", "api_key", None),
+        ("Input('max_results')", "max_results", None),
+        # Cases with path parameter
+        ("Input('user_data', path='profile.name')", "user_data", "profile.name"),
+        ("Input('search_input', path='query.terms')", "search_input", "query.terms"),
+        ("Input('config', path='settings.database.url')", "config", "settings.database.url"),
+        # Edge cases with various path formats
+        ("Input('data', path='field.subfield')", "data", "field.subfield"),
+        ("Input('items', path='list.0.name')", "items", "list.0.name"),
+        ("Input('complex', path='a.b.c.d.e')", "complex", "a.b.c.d.e"),
+    ],
+)
+def test_input_from_str_valid_cases(
+    input_str: str, expected_name: str, expected_path: str | None
+) -> None:
+    """Test Input.from_str with valid input strings."""
+    result = Input.from_str(input_str)
+
+    assert isinstance(result, Input)
+    assert result.name == expected_name
+    assert result.path == expected_path
+
+
+@pytest.mark.parametrize(
+    "input_str",
+    [
+        # Malformed input strings
+        "{{ Input('name') ",  # missing closing brace
+        "Input('name') }}",  # missing opening brace
+        "Input()",  # Missing arguments
+        "Input",  # Missing parentheses
+        "Input(",  # Incomplete
+        "Input)",  # Missing opening
+        "Input(,)",  # Empty arguments
+        "Input('name', path=)",  # Missing path value
+        "Input('name', path='unclosed)",  # Unclosed quote
+        "Input('name', path='field.name', extra='value')",  # Extra parameter
+    ],
+)
+def test_input_from_str_invalid_cases(input_str: str) -> None:
+    """Test Input.from_str with invalid input strings."""
+    with pytest.raises((ValueError, IndexError, TypeError)):
+        Input.from_str(input_str)
+
+
+@pytest.mark.parametrize(
+    "input_ref",
+    [
+        Input("input_name"),
+        Input("user_query"),
+        Input("api_key", path="field.name"),
+        Input("search_input", path="results.0.title"),
+    ],
+)
+def test_input_from_str_roundtrip(input_ref: Input) -> None:
+    """Test that from_str and str produce consistent results."""
+    str_repr = str(input_ref)
+    reconstructed = Input.from_str(str_repr)
+
+    assert reconstructed.name == input_ref.name
+    assert reconstructed.path == input_ref.path
+
+
+def test_input_from_str_with_special_characters() -> None:
+    """Test Input.from_str with special characters in names and paths."""
+    # Test with underscores, numbers, and other valid characters
+    result = Input.from_str("Input('input_123', path='field_1.sub_field')")
+    assert result.name == "input_123"
+    assert result.path == "field_1.sub_field"
+
+
+def test_from_str_with_whitespace() -> None:
+    """Test that from_str handles whitespace correctly."""
+    # Test with extra spaces - quoted strings preserve internal whitespace
+    step_output = StepOutput.from_str("StepOutput( 0 , path=' field.name ' )")
+    assert step_output.step == 0
+    assert step_output.path == " field.name "  # Quoted strings preserve whitespace
+
+    input_ref = Input.from_str("Input( 'input_name' , path=' field.name ' )")
+    assert input_ref.name == "input_name"
+    assert input_ref.path == " field.name "  # Quoted strings preserve whitespace
+
+
+def test_from_str_with_empty_path() -> None:
+    """Test from_str with empty path values."""
+    # This should work but path should be empty string, not None
+    step_output = StepOutput.from_str("StepOutput(0, path='')")
+    assert step_output.step == 0
+    assert step_output.path == ""
+
+    input_ref = Input.from_str("Input('name', path='')")
+    assert input_ref.name == "name"
+    assert input_ref.path == ""
+
+
+def test_from_str_preserves_type_consistency() -> None:
+    """Test that from_str preserves the original type consistency."""
+    # Test that integer steps remain integers
+    step_output_int = StepOutput.from_str("StepOutput(42)")
+    assert isinstance(step_output_int.step, int)
+    assert step_output_int.step == 42
+
+    # Test that string steps remain strings
+    step_output_str = StepOutput.from_str("StepOutput('step_name')")
+    assert isinstance(step_output_str.step, str)
+    assert step_output_str.step == "step_name"
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_argument"),
+    [
+        ("0", 0),
+        ("-0", 0),
+        ("None", None),
+        ("True", True),
+        ("False", False),
+        ("-1", -1),
+        ("1.0", 1.0),
+        ("-1.0", -1.0),
+        ("1", 1),
+        ("42", 42),
+        ("'step_name'", "step_name"),
+        ("'my_step'", "my_step"),
+        ("'search_results'", "search_results"),
+        ("regular_string", "regular_string"),
+    ],
+)
+def test_reference_argument_conversion(input_str: str, expected_argument: Any) -> None:  # noqa: ANN401
+    """Test reference argument conversion."""
+    assert StepOutput._convert_argument(input_str) == expected_argument
+    assert Input._convert_argument(input_str) == expected_argument
