@@ -981,29 +981,32 @@ def test_step_output_full_empty_list_when_no_outputs() -> None:
 
 
 @pytest.mark.parametrize(
-    ("input_str", "expected_step", "expected_path"),
+    ("input_str", "expected_step", "expected_path", "expected_full"),
     [
         # Basic cases with double braces
-        ("{{ StepOutput(0) }}", 0, None),
+        ("{{ StepOutput(0) }}", 0, None, False),
         # Basic cases with integer step
-        ("StepOutput(0)", 0, None),
-        ("StepOutput(1)", 1, None),
-        ("StepOutput(42)", 42, None),
+        ("StepOutput(0)", 0, None, False),
+        ("StepOutput(1)", 1, None, False),
+        ("StepOutput(42)", 42, None, False),
         # Basic cases with string step
-        ("StepOutput('step_name')", "step_name", None),
-        ("StepOutput('my_step')", "my_step", None),
-        ("StepOutput('search_results')", "search_results", None),
+        ("StepOutput('step_name')", "step_name", None, False),
+        ("StepOutput('my_step')", "my_step", None, False),
+        ("StepOutput('search_results')", "search_results", None, False),
         # Cases with path parameter
-        ("StepOutput(0, path='field.name')", 0, "field.name"),
-        ("StepOutput('step_name', path='results.0.title')", "step_name", "results.0.title"),
-        ("StepOutput(1, path='data.user.profile')", 1, "data.user.profile"),
+        ("StepOutput(0, path='field.name')", 0, "field.name", False),
+        ("StepOutput('step_name', path='results.0.title')", "step_name", "results.0.title", False),
+        ("StepOutput(1, path='data.user.profile')", 1, "data.user.profile", False),
         # Edge cases with quotes in path
-        ("StepOutput('step', path='field.subfield')", "step", "field.subfield"),
-        ("StepOutput(0, path='complex.path.with.dots')", 0, "complex.path.with.dots"),
+        ("StepOutput('step', path='field.subfield')", "step", "field.subfield", False),
+        ("StepOutput(0, path='complex.path.with.dots')", 0, "complex.path.with.dots", False),
+        # Cases with full parameter
+        ("StepOutput(0, full=True)", 0, None, True),
+        ("StepOutput('step_name', full=True)", "step_name", None, True),
     ],
 )
 def test_step_output_from_str_valid_cases(
-    input_str: str, expected_step: str | int, expected_path: str | None
+    input_str: str, expected_step: str | int, expected_path: str | None, expected_full: bool 
 ) -> None:
     """Test StepOutput.from_str with valid input strings."""
     result = StepOutput.from_str(input_str)
@@ -1011,6 +1014,7 @@ def test_step_output_from_str_valid_cases(
     assert isinstance(result, StepOutput)
     assert result.step == expected_step
     assert result.path == expected_path
+    assert result.full == expected_full
 
 
 @pytest.mark.parametrize(
