@@ -471,15 +471,3 @@ class Input(Reference):
         if self.path:
             return f"{{{{ Input('{self.name}', path='{self.path}') }}}}"
         return f"{{{{ Input('{self.name}') }}}}"
-
-
-class TestPydantic(BaseModel):
-    """Test Pydantic model."""
-
-    step: str | int = Field(description="The step to reference the output of.")
-    path: str | None = Field(default=None, description="The path to the field to reference.")
-    full: bool = Field(default=False, description="Whether to return the full step output values as a list.")
-
-if __name__ == "__main__":
-    t = TestPydantic(step=0, path="data.user.profile", full=True)
-    print(t)
