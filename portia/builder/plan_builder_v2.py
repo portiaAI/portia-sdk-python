@@ -5,12 +5,15 @@ You can view an example of this class in use in example_builder.py.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, Any
+
+from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
 from portia.builder.loops import LoopBlock, LoopStepType, LoopType
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Reference, default_step_name
+from portia.builder.reference import Reference, StepOutput, default_step_name
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
@@ -84,6 +87,59 @@ class PlanBuilderV2:
             PlanInput(name=name, description=description, value=default_value)
         )
         return self
+
+    def _convert_step_output_indices_to_names(self, sub_plan: PlanV2) -> None:
+        """Convert integer-based StepOutput references in a sub-plan to use step names.
+
+        When a sub-plan is merged into a larger plan using :meth:`add_steps`, any
+        :class:`StepOutput` references that were created using integer indices
+        (e.g. ``StepOutput(0)``) would otherwise point to the wrong step once the
+        sub-plan's steps are appended to an existing plan. To keep these references
+        stable, this method rewrites them to reference step names instead of
+        numeric indexes.
+
+        Args:
+            sub_plan: The plan whose :class:`StepOutput` references should be
+                normalised.
+        """
+
+        step_names = [step.step_name for step in sub_plan.steps]
+
+        def replace(value: Any, visited: set[int]) -> Any:  # noqa: ANN401
+            if isinstance(value, StepOutput) and isinstance(value.step, int):
+                return StepOutput(step_names[value.step], path=value.path)
+
+            if isinstance(value, list):
+                return [replace(v, visited) for v in value]
+
+            if isinstance(value, dict):
+                return {k: replace(v, visited) for k, v in value.items()}
+
+            if isinstance(value, str):
+                pattern = r"\{\{\s*StepOutput\((\d+)([^)]*)\)\s*\}\}"
+
+                def repl(match: re.Match[str]) -> str:
+                    idx = int(match.group(1))
+                    remainder = match.group(2)
+                    return f"{{{{ StepOutput('{step_names[idx]}'{remainder}) }}}}"
+
+                return re.sub(pattern, repl, value)
+
+            if isinstance(value, BaseModel):
+                obj_id = id(value)
+                if obj_id in visited:
+                    return value
+                visited.add(obj_id)
+                for field in value.model_fields:
+                    setattr(value, field, replace(getattr(value, field), visited))
+                return value
+
+            return value
+
+        for step in sub_plan.steps:
+            replace(step, set())
+        for plan_input in sub_plan.plan_inputs:
+            plan_input.value = replace(plan_input.value, set())
 
     @property
     def _current_conditional_block(self) -> ConditionalBlock | None:
@@ -730,6 +786,7 @@ class PlanBuilderV2:
 
         """
         if isinstance(plan, PlanV2):
+            self._convert_step_output_indices_to_names(plan)
             # Ensure there are no duplicate plan inputs
             existing_input_names = {p.name for p in self.plan.plan_inputs}
             for _input in plan.plan_inputs:
