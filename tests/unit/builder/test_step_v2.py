@@ -3219,3 +3219,83 @@ def test_current_loop_variable_with_mixed_types() -> None:
     result = step._current_loop_variable(mock_run_data)
 
     assert result == "string"
+
+
+def test_current_loop_variable_with_string_over() -> None:
+    """Test _current_loop_variable when over is a string."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over="single_string",
+        loop_type=LoopType.FOR_EACH,
+        loop_step_type=LoopStepType.START,
+        index=0,
+    )
+
+    mock_run_data = Mock()
+    result = step._current_loop_variable(mock_run_data)
+
+    assert result == "single_string"
+
+
+def test_current_loop_variable_with_string_over_different_index() -> None:
+    """Test _current_loop_variable when over is a string with different index."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over="single_string",
+        loop_type=LoopType.FOR_EACH,
+        loop_step_type=LoopStepType.START,
+        index=1,
+    )
+
+    mock_run_data = Mock()
+    result = step._current_loop_variable(mock_run_data)
+
+    # When over is a string, it's treated as a single-element list, so index 1 should return None
+    assert result is None
+
+
+def test_current_loop_variable_with_reference_resolving_to_string() -> None:
+    """Test _current_loop_variable when _resolve_references returns a string."""
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput("previous_step"),
+        loop_type=LoopType.FOR_EACH,
+        loop_step_type=LoopStepType.START,
+        index=0,
+    )
+
+    mock_run_data = Mock()
+
+    # Mock the _resolve_references method to return a string
+    with patch.object(step, "_resolve_references", return_value="resolved_string"):
+        result = step._current_loop_variable(mock_run_data)
+
+    assert result == "resolved_string"
+
+
+def test_current_loop_variable_with_reference_resolving_to_string_different_index() -> None:
+    """Test _current_loop_variable when _resolve_references returns a string.
+
+    Tests with different index value.
+    """
+    step = LoopStep(
+        step_name="test_loop",
+        condition=None,
+        over=StepOutput("previous_step"),
+        loop_type=LoopType.FOR_EACH,
+        loop_step_type=LoopStepType.START,
+        index=1,
+    )
+
+    mock_run_data = Mock()
+
+    # Mock the _resolve_references method to return a string
+    with patch.object(step, "_resolve_references", return_value="resolved_string"):
+        result = step._current_loop_variable(mock_run_data)
+
+    # When resolved value is a string, it's treated as a single-element list,
+    # so index 1 should return None
+    assert result is None
