@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13' and python_full_version < '4'",
@@ -2095,7 +2095,7 @@ wheels = [
 
 [[package]]
 name = "portia-sdk-python"
-version = "0.8.0"
+version = "0.8.1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
