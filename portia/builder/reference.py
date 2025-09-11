@@ -171,7 +171,7 @@ class Reference(BaseModel, ABC):
 
         """
         parsed_args, kwargs = cls._parse_argument(input_str)
-        init_kwargs = list(signature(cls.__init__).parameters.values())[1:]
+        init_kwargs = list(signature(cls.__init__).parameters.values())[1:]  # exclude self
         for param, init_kwarg in zip(parsed_args, init_kwargs, strict=False):
             kwargs[init_kwarg.name] = param
         kwargs = {k: cls._convert_argument(v) for k, v in kwargs.items()}
