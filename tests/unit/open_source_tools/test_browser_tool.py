@@ -6,6 +6,7 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 try:
     from browser_use import Browser  # pyright: ignore[reportMissingImports]
 except Exception:  # pragma: no cover

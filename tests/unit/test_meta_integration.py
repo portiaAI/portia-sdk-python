@@ -122,11 +122,10 @@ def test_meta_missing_base_url_error() -> None:
         pass  # No base_url class variable set
 
     with pytest.raises(
-        ValueError,
-        match="base_url must be provided either in constructor or as class variable"
+        ValueError, match="base_url must be provided either in constructor or as class variable"
     ):
         TestModelWithoutBaseUrl(
             model_name="test-model",
-            api_key=SecretStr("test-key")
+            api_key=SecretStr("test-key"),
             # No base_url parameter provided
         )

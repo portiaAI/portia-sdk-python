@@ -1004,7 +1004,7 @@ class Config(BaseModel):
 
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
-                    api_key=self.must_get_api_key("google_api_key"),
+                    api_key=self.must_get_api_key("google_api_key"),  # pyright: ignore[reportCallIssue]
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AMAZON:

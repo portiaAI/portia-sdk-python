@@ -227,7 +227,7 @@ def test_formatter_sanitizes_stack_trace() -> None:
     captured_exc = None
     try:
         will_fail()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         captured_exc = exc
 
     logger_formatter = Formatter()

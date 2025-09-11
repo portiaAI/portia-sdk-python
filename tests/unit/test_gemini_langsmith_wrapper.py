@@ -4,6 +4,7 @@ from collections.abc import Callable
 from unittest.mock import Mock, patch
 
 import pytest
+
 try:
     from google.genai import types  # pyright: ignore[reportMissingImports]
 except Exception:  # pragma: no cover

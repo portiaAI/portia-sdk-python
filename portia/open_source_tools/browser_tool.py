@@ -26,7 +26,12 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 try:  # Optional dependency
-    from browser_use import Agent, Browser, BrowserConfig, Controller  # pyright: ignore[reportMissingImports]
+    from browser_use import (  # pyright: ignore[reportMissingImports]
+        Agent,
+        Browser,
+        BrowserConfig,
+        Controller,
+    )
 except Exception:  # pragma: no cover
     Agent = Browser = BrowserConfig = Controller = object  # type: ignore[assignment]
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl

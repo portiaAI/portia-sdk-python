@@ -90,6 +90,7 @@ EXTRAS_GROUPS_DEPENDENCIES = {
     "tools-pdf-reader": ["mistralai"],
     "cache": ["langchain_redis"],
     "amazon": ["langchain_aws", "boto3"],
+    "google": ["google", "langchain_google_genai"],
 }
 
 

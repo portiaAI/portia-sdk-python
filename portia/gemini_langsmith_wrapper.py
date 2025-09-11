@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Literal, Any, cast
+from typing import Any, Literal, cast
 
 try:  # Optional dependency for runtime
     from google.genai import types  # pyright: ignore[reportMissingImports]
@@ -12,9 +12,6 @@ except Exception:  # pragma: no cover
 from langsmith import run_helpers
 
 from portia.logger import logger
-
-if TYPE_CHECKING:  # pragma: no cover
-    from google import genai  # pyright: ignore[reportMissingImports]
 
 
 def _get_ls_params(model_name: str, _: dict) -> dict[str, str]:
@@ -105,7 +102,7 @@ def _process_inputs(
 
         return {"messages": [{"content": part} for part in parts]}
 
-    except Exception:  # pragma: no cover  # noqa: BLE001
+    except Exception:  # pragma: no cover
         return {"messages": []}  # pragma: no cover
 
 
@@ -130,7 +127,7 @@ def wrap_gemini(client: Any) -> Any:  # pyright: ignore[reportPrivateImportUsage
         )
         try:
             return decorator(original_generate_content)(model, contents, config)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # We should never fail because of tracing, so fall back to calling the original method
             logger().error(f"Error tracing Google Generative AI: {e}")
             return original_generate_content(model, contents, config)  # type: ignore  # noqa: PGH003

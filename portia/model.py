@@ -590,7 +590,8 @@ class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
             base_url=effective_base_url,
             **kwargs,
         )
-        super(OpenAIGenerativeModel, self).__init__(client, model_name)
+        # Initialize the grandparent class directly to attach the prepared LangChain client
+        LangChainGenerativeModel.__init__(self, client, model_name)
         self._instructor_client = instructor.from_openai(
             client=wrappers.wrap_openai(
                 OpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
@@ -1119,8 +1120,8 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
 
 
 if validate_extras_dependencies("mistralai", raise_error=False):
-    from langchain_mistralai import ChatMistralAI
-    from mistralai import Mistral
+    from langchain_mistralai import ChatMistralAI  # pyright: ignore[reportMissingImports]
+    from mistralai import Mistral  # pyright: ignore[reportMissingImports]
 
     class MistralAIGenerativeModel(LangChainGenerativeModel):
         """MistralAI model implementation."""
@@ -1330,55 +1331,58 @@ if validate_extras_dependencies("amazon", raise_error=False):
 
 if validate_extras_dependencies("google", raise_error=False):
     from google import genai  # pyright: ignore[reportMissingImports,reportAttributeAccessIssue]
-    from langchain_google_genai import ChatGoogleGenerativeAI  # pyright: ignore[reportMissingImports]
+    from langchain_google_genai import (
+        ChatGoogleGenerativeAI,  # pyright: ignore[reportMissingImports]
+    )
+
     from portia.gemini_langsmith_wrapper import wrap_gemini
 
     class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
         """Google Generative AI (Gemini)model implementation."""
 
-    provider: LLMProvider = LLMProvider.GOOGLE
+        provider: LLMProvider = LLMProvider.GOOGLE
 
-    def __init__(
-        self,
-        *,
-        model_name: str = "gemini-2.0-flash",
-        api_key: SecretStr,
-        max_retries: int = 3,
-        temperature: float | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize with Google Generative AI client.
+        def __init__(
+            self,
+            *,
+            model_name: str = "gemini-2.0-flash",
+            api_key: SecretStr,
+            max_retries: int = 3,
+            temperature: float | None = None,
+            **kwargs: Any,
+        ) -> None:
+            """Initialize with Google Generative AI client.
 
-        Args:
-            model_name: Name of the Google Generative AI model
-            api_key: API key for Google Generative AI
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter for model sampling
-            **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
+            Args:
+                model_name: Name of the Google Generative AI model
+                api_key: API key for Google Generative AI
+                max_retries: Maximum number of retries
+                temperature: Temperature parameter for model sampling
+                **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
-        """
-        # Configure genai with the api key
-        genai_client = genai.Client(api_key=api_key.get_secret_value())
+            """
+            # Configure genai with the api key
+            genai_client = genai.Client(api_key=api_key.get_secret_value())
 
-        client = ChatGoogleGenerativeAI(
-            model=model_name,
-            api_key=api_key,
-            max_retries=max_retries,
-            temperature=temperature or 0,
-            **kwargs,
-        )
-        super().__init__(client, model_name)
-        wrapped_gemini_client = wrap_gemini(genai_client)
+            client = ChatGoogleGenerativeAI(
+                model=model_name,
+                api_key=api_key,
+                max_retries=max_retries,
+                temperature=temperature or 0,
+                **kwargs,
+            )
+            LangChainGenerativeModel.__init__(self, client, model_name)
+            wrapped_gemini_client = wrap_gemini(genai_client)
 
-        self._instructor_client = instructor.from_genai(
-            client=wrapped_gemini_client,
-            mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
-        )
-        self._instructor_client_async = instructor.from_genai(
-            client=wrapped_gemini_client,
-            mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
-            use_async=True,
-        )
+            self._instructor_client = instructor.from_genai(
+                client=wrapped_gemini_client,
+                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+            )
+            self._instructor_client_async = instructor.from_genai(
+                client=wrapped_gemini_client,
+                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+                use_async=True,
+            )
 
 
 if validate_extras_dependencies("ollama", raise_error=False):
