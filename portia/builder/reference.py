@@ -7,12 +7,13 @@ inputs. When the plan is run, these references are then resolved to their actual
 The Reference class provides an interface for all reference types. It then has the following
 implementations:
     StepOutput: References the output value from a previous step.
+    AllStepOutputs: References all outputs from previously executed steps.
     Input: References a user-provided input value.
 
 Example:
     ```python
     from portia.builder import PlanBuilderV2
-    from portia.builder.reference import StepOutput, Input
+    from portia.builder.reference import AllStepOutputs, StepOutput, Input
 
     builder = PlanBuilderV2()
     builder.input("user_query", description="The user's search query")
@@ -44,6 +45,7 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
+    from portia.plan import PlanInput
     from portia.run_context import RunContext
 
 
@@ -97,10 +99,12 @@ class Reference(BaseModel, ABC):
         Returns:
             The resolved value, or None if the reference cannot be resolved.
 
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
-
         """
+        raise NotImplementedError  # pragma: no cover
+
+    @abstractmethod
+    def get_description(self, run_data: RunContext) -> str:
+        """Get the description of the reference."""
         raise NotImplementedError  # pragma: no cover
 
 
@@ -222,6 +226,33 @@ class StepOutput(Reference):
         return ""
 
 
+class AllStepOutputs(Reference):
+    """A reference to all outputs from previously executed steps.
+
+    This reference resolves to a dictionary mapping step names to their
+    corresponding output values. It can be used when a step needs access to
+    every prior result rather than a single step's output.
+    """
+
+    def __str__(self) -> str:
+        """Get the string representation of the reference."""
+        return "{{ AllStepOutputs() }}"
+
+    @override
+    def get_legacy_name(self, plan: PlanV2) -> str:
+        step_outputs = [StepOutput(i) for i in range(len(plan.steps))]
+        return ",".join(s.get_legacy_name(plan) for s in step_outputs)
+
+    @override
+    def get_value(self, run_data: RunContext) -> dict[str, Any]:
+        """Return all previous step outputs as a dictionary."""
+        return {s.step_name: s.value for s in run_data.step_output_values}
+
+    def get_description(self, run_data: RunContext) -> str:  # noqa: ARG002
+        """Get a description of the reference."""
+        return "All previous step outputs"
+
+
 class Input(Reference):
     """A reference to a user-provided plan input.
 
@@ -310,6 +341,20 @@ class Input(Reference):
 
         # If there is a path, use pydash to traverse the object
         return pydash.get(resolved_value, self.path) if self.path else resolved_value
+
+    def get_description(self, run_data: RunContext) -> str:
+        """Get the description of the input."""
+        plan_input = self._get_plan_input(run_data)
+        if plan_input and plan_input.description:
+            return plan_input.description
+        if plan_input and isinstance(plan_input.value, Reference):
+            return plan_input.value.get_description(run_data)
+        return ""
+
+    def _get_plan_input(self, run_data: RunContext) -> PlanInput | None:
+        return next(
+            (_input for _input in run_data.plan.plan_inputs if _input.name == self.name), None
+        )
 
     def __str__(self) -> str:
         """Get the string representation of the input."""

@@ -15,7 +15,7 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.loops import LoopStepType, LoopType
-from portia.builder.reference import Input, StepOutput
+from portia.builder.reference import AllStepOutputs, Input, StepOutput
 from portia.builder.step_v2 import (
     ConditionalStep,
     InvokeToolStep,
@@ -328,6 +328,49 @@ def test_string_templating_with_path_comprehensive() -> None:
         "Result from step 0: {{ StepOutput(0, path='results.0.title') }}", mock_run_data
     )
     assert result == "Result from step 0: AI Research"
+
+
+@pytest.mark.asyncio
+async def test_llm_step_run_with_all_step_outputs_inputs() -> None:
+    """Test LLMStep run with AllStepOutputs reference and string template."""
+    all_outputs_ref = AllStepOutputs()
+    step = LLMStep(
+        task="Analyze outputs",
+        step_name="analysis",
+        inputs=[all_outputs_ref, f"Summary: {AllStepOutputs()}"],
+    )
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="first", value="result1", description="First step"),
+        StepOutputValue(step_num=1, step_name="second", value="result2", description="Second step"),
+    ]
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+        patch.object(all_outputs_ref, "get_value") as mock_get_value,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        mock_get_value.return_value = {"first": "result1", "second": "result2"}
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Analysis complete"
+        mock_wrapper_instance.arun.assert_called_once()
+        call_args = mock_wrapper_instance.arun.call_args
+        assert call_args[1]["task"] == "Analyze outputs"
+
+        expected_task_data = [
+            LocalDataValue(
+                value={"first": "result1", "second": "result2"}, summary="All previous step outputs"
+            ),
+            "Summary: {'first': 'result1', 'second': 'result2'}",  # String template resolved
+        ]
+        assert call_args[1]["task_data"] == expected_task_data
 
 
 def test_resolve_input_names_for_printing_with_reference() -> None:
@@ -768,6 +811,55 @@ def test_llm_step_to_legacy_step() -> None:
         # Verify mocks were called
         mock_input_name.assert_called_once_with(mock_plan)
         mock_stepoutput_name.assert_called_once_with(mock_plan)
+        mock_plan.step_output_name.assert_called_once_with(step)
+
+
+def test_llm_step_to_legacy_step_with_all_step_outputs() -> None:
+    """Test LLMStep to_legacy_step method with AllStepOutputs input."""
+    all_outputs_ref = AllStepOutputs()
+    step = LLMStep(
+        task="Analyze all previous outputs",
+        step_name="analysis",
+        inputs=[all_outputs_ref, "Additional context"],
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$analysis_output"
+
+    # Mock the plan to have some previous steps
+    mock_step1 = Mock()
+    mock_step1.step_name = "step1"
+    mock_step2 = Mock()
+    mock_step2.step_name = "step2"
+    mock_step3 = Mock()
+    mock_step3.step_name = "step3"
+
+    mock_plan.steps = [mock_step1, mock_step2, mock_step3, step]  # Include current step
+
+    # Mock the get_legacy_name method on AllStepOutputs
+    with patch.object(all_outputs_ref, "get_legacy_name") as mock_all_outputs_name:
+        # AllStepOutputs should return comma-separated names for all previous step outputs
+        mock_all_outputs_name.return_value = "step1_output,step2_output,step3_output"
+
+        legacy_step = step.to_legacy_step(mock_plan)
+
+        # Verify the PlanStep has the correct attributes
+        assert isinstance(legacy_step, PlanStep)
+        assert legacy_step.task == "Analyze all previous outputs"
+        assert legacy_step.tool_id == "llm_tool"  # LLMTool.LLM_TOOL_ID
+        assert legacy_step.output == "$analysis_output"
+
+        # Verify inputs are converted to Variables
+        # Should have 3 Variables (one for each previous step output)
+        # The "Additional context" string input doesn't create a Variable
+        assert len(legacy_step.inputs) == 3
+        assert all(isinstance(inp, Variable) for inp in legacy_step.inputs)
+        assert legacy_step.inputs[0].name == "step1_output"
+        assert legacy_step.inputs[1].name == "step2_output"
+        assert legacy_step.inputs[2].name == "step3_output"
+
+        # Verify mocks were called
+        mock_all_outputs_name.assert_called_once_with(mock_plan)
         mock_plan.step_output_name.assert_called_once_with(step)
 
 

@@ -23,7 +23,7 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.loops import LoopBlock, LoopStepResult, LoopStepType, LoopType
-from portia.builder.reference import Input, Reference, StepOutput
+from portia.builder.reference import AllStepOutputs, Input, Reference, StepOutput
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -43,7 +43,7 @@ from portia.execution_agents.react_agent import ReActAgent
 from portia.logger import logger
 from portia.model import Message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import PlanInput, Step, Variable
+from portia.plan import Step, Variable
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
 
@@ -125,7 +125,7 @@ class StepV2(BaseModel, ABC):
         resolved_inputs = []
         for _input in inputs:
             if isinstance(_input, Reference):
-                description = self._get_ref_description(_input, run_data)
+                description = _input.get_description(run_data)
                 value = self._resolve_references(_input, run_data)
                 value = LocalDataValue(value=value, summary=description)
             else:
@@ -133,25 +133,6 @@ class StepV2(BaseModel, ABC):
             if value is not None or not isinstance(_input, Reference):
                 resolved_inputs.append(value)
         return resolved_inputs
-
-    def _get_ref_description(self, ref: Reference, run_data: RunContext) -> str:
-        """Get the description of a reference."""
-        if isinstance(ref, StepOutput):
-            return ref.get_description(run_data)
-        if isinstance(ref, Input):
-            plan_input = self._plan_input_from_name(ref.name, run_data)
-            if plan_input.description:
-                return plan_input.description
-            if isinstance(plan_input.value, Reference):
-                return self._get_ref_description(plan_input.value, run_data)
-        return ""
-
-    def _plan_input_from_name(self, name: str, run_data: RunContext) -> PlanInput:
-        """Get the plan input from the name."""
-        for plan_input in run_data.plan.plan_inputs:
-            if plan_input.name == name:
-                return plan_input
-        raise ValueError(f"Plan input {name} not found")  # pragma: no cover
 
     def _template_references(self, value: str, run_data: RunContext) -> str:
         """Replace any Reference objects in a string with their resolved values.
@@ -162,10 +143,11 @@ class StepV2(BaseModel, ABC):
         Supports the following reference types:
         - {{ StepOutput(step_name) }}
         - {{ StepOutput('step_name', path='field.name') }}
+        - {{ AllStepOutputs() }}
         - {{ Input(input_name) }}
         """
-        # Find all {{ ... }} blocks that contain StepOutput or Input
-        pattern = r"\{\{\s*(StepOutput|Input)\s*\([^}]+\)\s*\}\}"
+        # Find all {{ ... }} blocks that contain StepOutput, AllStepOutputs or Input
+        pattern = r"\{\{\s*(StepOutput|Input|AllStepOutputs)\s*\([^}]*\)\s*\}\}"
 
         def replace_reference(match: re.Match[str]) -> str:
             full_match = match.group(0)
@@ -177,8 +159,11 @@ class StepV2(BaseModel, ABC):
             paren_content = full_match[full_match.find("(") + 1 : full_match.rfind(")")]
 
             try:
-                ref_cls = StepOutput if ref_type_str == "StepOutput" else Input
-                ref_obj = self._parse_reference_expression(ref_cls, paren_content)
+                if ref_type_str == "AllStepOutputs":
+                    ref_obj = AllStepOutputs()
+                else:
+                    ref_cls = StepOutput if ref_type_str == "StepOutput" else Input
+                    ref_obj = self._parse_reference_expression(ref_cls, paren_content)
                 resolved = self._resolve_references(ref_obj, run_data)
                 return str(resolved)
             except (ValueError, AttributeError, KeyError):  # pragma: no cover
@@ -274,19 +259,28 @@ class StepV2(BaseModel, ABC):
         represents. This is useful for printing inputs before the plan is run.
         """
         if isinstance(_input, Reference):
-            name = _input.get_legacy_name(plan)
-            # Ensure name starts with a $ so that it is clear it is a reference
+            ref_name = _input.get_legacy_name(plan)
+            # If the reference name is a comma-separated list, split it into a list of names
+            ref_names = ref_name.split(",") if "," in ref_name else [ref_name]
+            # Ensure all name starts with a $ so that it is clear it is a reference
             # This is done so it appears nicely in the UI
-            if not name.startswith("$"):
-                name = f"${name}"
-            return name
+            names = [f"${n}" if not n.startswith("$") else n for n in ref_names]
+            return names[0] if len(names) == 1 else names
         if isinstance(_input, list):
             return [self._resolve_input_names_for_printing(v, plan) for v in _input]
         return _input
 
     def _inputs_to_legacy_plan_variables(self, inputs: list[Any], plan: PlanV2) -> list[Variable]:
         """Convert a list of inputs to a list of legacy plan variables."""
-        return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
+        names = []
+        for v in inputs:
+            if isinstance(v, Reference):
+                legacy_name = v.get_legacy_name(plan)
+                if "," in legacy_name:
+                    names.extend(legacy_name.split(","))
+                else:
+                    names.append(legacy_name)
+        return [Variable(name=n) for n in names]
 
     def _get_legacy_condition(self, plan: PlanV2) -> str | None:
         """Get the legacy condition for a step."""
