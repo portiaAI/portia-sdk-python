@@ -941,10 +941,14 @@ class LoopStep(StepV2):
         """Get the current loop variable if over is set."""
         if self.over is None:
             return None
-        if isinstance(self.over, Sequence):
+        if isinstance(self.over, str):
+            values = [self.over]
+        elif isinstance(self.over, Sequence):
             values = self.over[self.index]
         else:
             values = self._resolve_references(self.over, run_data)
+        if isinstance(values, str):
+            values = [values]
         if not isinstance(values, Sequence):
             raise TypeError("Loop variable is not indexable")
         try:
