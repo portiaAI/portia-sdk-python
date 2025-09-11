@@ -977,6 +977,8 @@ def test_step_output_full_empty_list_when_no_outputs() -> None:
 
     result = step_output.get_value(mock_run_data)
     assert result == []
+
+
 # Test cases for the from_str method
 
 
@@ -1006,7 +1008,7 @@ def test_step_output_full_empty_list_when_no_outputs() -> None:
     ],
 )
 def test_step_output_from_str_valid_cases(
-    input_str: str, expected_step: str | int, expected_path: str | None, expected_full: bool 
+    input_str: str, expected_step: str | int, expected_path: str | None, expected_full: bool
 ) -> None:
     """Test StepOutput.from_str with valid input strings."""
     result = StepOutput.from_str(input_str)
