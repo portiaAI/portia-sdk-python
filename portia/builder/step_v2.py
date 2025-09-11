@@ -22,6 +22,7 @@ from portia.builder.conditionals import (
     ConditionalBlockClauseType,
     ConditionalStepResult,
 )
+from portia.builder.exit import ExitStepResult
 from portia.builder.loops import LoopBlock, LoopStepResult, LoopStepType, LoopType
 from portia.builder.reference import Input, Reference, StepOutput
 from portia.clarification import (
@@ -717,6 +718,48 @@ class ReActAgentStep(StepV2):
             tool_id=",".join(tool if isinstance(tool, str) else tool.id for tool in self.tools),
             output=plan.step_output_name(self),
             structured_output_schema=self.output_schema,
+            condition=self._get_legacy_condition(plan),
+        )
+
+
+class ExitStep(StepV2):
+    """A step that causes the plan to exit gracefully.
+
+    This step allows for early termination of a plan with an optional message and error flag. When
+    executed, the plan will stop execution and return the specified output.
+    """
+
+    message: str = Field(default="", description="The message to include when exiting the plan.")
+    error: bool = Field(
+        default=False, description="Whether this exit represents an error condition."
+    )
+
+    def __str__(self) -> str:
+        """Return a description of this step for logging purposes."""
+        error_indicator = " (ERROR)" if self.error else ""
+        message_info = f" - {self.message}" if self.message else ""
+        return f"ExitStep{error_indicator}{message_info}"
+
+    @override
+    @traceable(name="Exit Step - Run")
+    async def run(self, run_data: RunContext) -> ExitStepResult:  # pyright: ignore[reportIncompatibleMethodOverride] - needed due to Langsmith decorator
+        """Execute the exit step, causing the plan to terminate gracefully."""
+        message = self._template_references(self.message, run_data)
+        return ExitStepResult(message=message, error=self.error)
+
+    @override
+    def to_legacy_step(self, plan: PlanV2) -> Step:
+        """Convert this ExitStep to a legacy Step."""
+        if self.error:
+            task = f"Exit plan with error: {self.message}"
+        else:
+            task = f"Exit plan: {self.message}"
+
+        return Step(
+            task=task,
+            inputs=[],
+            tool_id=None,
+            output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),
         )
 

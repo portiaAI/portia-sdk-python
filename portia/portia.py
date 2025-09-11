@@ -32,7 +32,7 @@ from pydantic import BaseModel
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.loops import LoopStepResult, LoopStepType
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import LoopStep
+from portia.builder.step_v2 import ExitStepResult, LoopStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -2136,7 +2136,7 @@ class Portia:
         plan: Plan,
         index: int,
         step: Step,
-        error: Exception,
+        error: Exception | str,
     ) -> PlanRun:
         error_output = LocalDataValue(value=str(error))
         self._set_step_output(error_output, plan_run, step)
@@ -2728,7 +2728,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
@@ -2773,6 +2773,7 @@ class Portia:
                         tool_id=step.to_legacy_step(plan).tool_id,
                     )
                 )
+
             jump_to_step_index = None
             match result:
                 case ConditionalStepResult():
@@ -2781,6 +2782,17 @@ class Portia:
                     if isinstance(step, LoopStep):
                         jump_to_step_index = self._handle_loop_step(result, step)
                         result = result.value
+                case ExitStepResult():
+                    logger().info(f"Exit step executed: {result.message}")
+                    if result.error:
+                        return self._handle_execution_error(
+                            run_data.plan_run,
+                            run_data.legacy_plan,
+                            index,
+                            legacy_step,
+                            result.message,
+                        )
+                    jump_to_step_index = len(plan.steps)
 
             # Some steps output a LocalDataValue so they can attach a summary to the output, but
             # we don't enforce that all steps do this so we need to handle both cases.
