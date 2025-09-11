@@ -312,9 +312,12 @@ class StepOutput(Reference):
         # The double braces are used when the plan is running to template the StepOutput value so it
         # can be substituted at runtime.
         step_repr = f"'{self.step}'" if isinstance(self.step, str) else str(self.step)
+        base_repr = f"StepOutput({step_repr}"
         if self.path:
-            return f"{{{{ StepOutput({step_repr}, path='{self.path}') }}}}"
-        return f"{{{{ StepOutput({step_repr}) }}}}"
+            base_repr += f", path='{self.path}'"
+        if self.full:
+            base_repr += ", full=True"
+        return f"{{{{ {base_repr}) }}}}"
 
     @override
     def get_value(self, run_data: RunContext) -> Any | None:
@@ -464,3 +467,15 @@ class Input(Reference):
         if self.path:
             return f"{{{{ Input('{self.name}', path='{self.path}') }}}}"
         return f"{{{{ Input('{self.name}') }}}}"
+
+
+class TestPydantic(BaseModel):
+    """Test Pydantic model."""
+
+    step: str | int = Field(description="The step to reference the output of.")
+    path: str | None = Field(default=None, description="The path to the field to reference.")
+    full: bool = Field(default=False, description="Whether to return the full step output values as a list.")
+
+if __name__ == "__main__":
+    t = TestPydantic(step=0, path="data.user.profile", full=True)
+    print(t)

@@ -772,14 +772,14 @@ def test_step_output_full_str_representation() -> None:
     """Test StepOutput string representation with full=True."""
     step_output = StepOutput("custom_step", full=True)
     result = str(step_output)
-    assert result == "{{ StepOutput('custom_step') }}"
+    assert result == "{{ StepOutput('custom_step', full=True) }}"
 
 
 def test_step_output_full_with_path_str_representation() -> None:
     """Test StepOutput string representation with full=True and path."""
     step_output = StepOutput("my_step", path="field.name", full=True)
     result = str(step_output)
-    assert result == "{{ StepOutput('my_step', path='field.name') }}"
+    assert result == "{{ StepOutput('my_step', path='field.name', full=True) }}"
 
 
 def test_step_output_full_get_value_single_output() -> None:
