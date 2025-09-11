@@ -54,6 +54,10 @@ _KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")
 _POSITIONAL_ARG_REGEX = re.compile(r"^\s*(.+)\s*$")
 _PARENTHESIS_STRING_REGEX = re.compile(r"(?:{{ )?(\w+)\((.*)\)(?: }})?")
 
+_KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")
+_POSITIONAL_ARG_REGEX = re.compile(r"^\s*(.+)\s*$")
+_PARENTHESIS_STRING_REGEX = re.compile(r"(?:{{ )?(\w+)\((.*)\)(?: }})?")
+
 
 def default_step_name(step_index: int) -> str:
     """Generate a default name for a step based on its index.
