@@ -46,7 +46,6 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import PlanInput, Step, Variable
 from portia.tool import Tool
 from portia.tool_wrapper import ToolCallWrapper
-from portia.portia import Portia
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -865,58 +864,6 @@ class UserInputStep(StepV2):
         return Step(
             task=f"User input ({input_type}): {self.message}",
             inputs=[],
-            tool_id=None,
-            output=plan.step_output_name(self),
-            condition=self._get_legacy_condition(plan),
-        )
-
-
-class SubplanStep(StepV2):
-    """A step that executes a nested PlanV2 and returns its final result."""
-
-    plan: "PlanV2" = Field(description="The sub-plan to execute.")
-    input_values: dict[str, Reference | Any] = Field(
-        default_factory=dict,
-        description="Mapping of sub-plan input names to values or references passed at runtime.",
-    )
-
-    def __str__(self) -> str:  # pragma: no cover - simple string representation
-        return f"SubplanStep(plan_label='{self.plan.label}')"
-
-    @override
-    @traceable(name="Subplan Step - Run")
-    async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Run the sub-plan using the current Portia configuration."""
-        sub_portia = Portia(
-            config=run_data.config,
-            tools=run_data.tool_registry,
-            execution_hooks=run_data.execution_hooks,
-            telemetry=run_data.telemetry,
-        )
-
-        plan_inputs: list[PlanInput] = []
-        for plan_input in self.plan.plan_inputs:
-            value = self.input_values.get(plan_input.name, plan_input.value)
-            if value is not None:
-                resolved = self._resolve_references(value, run_data)
-                plan_inputs.append(PlanInput(name=plan_input.name, value=resolved))
-
-        plan_run = await sub_portia.arun_plan(
-            self.plan, run_data.end_user, plan_run_inputs=plan_inputs
-        )
-
-        if plan_run.outputs.final_output:
-            return plan_run.outputs.final_output.value
-        return None
-
-    @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this SubplanStep to a legacy Step."""
-        return Step(
-            task=f"Run sub-plan: {self.plan.label}",
-            inputs=self._inputs_to_legacy_plan_variables(
-                list(self.input_values.values()), plan
-            ),
             tool_id=None,
             output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),

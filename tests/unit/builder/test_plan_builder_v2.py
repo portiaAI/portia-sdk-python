@@ -22,11 +22,11 @@ from portia.builder.step_v2 import (
     ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
-    SubplanStep,
+    SubPlanStep,
     UserInputStep,
     UserVerifyStep,
 )
-from portia.plan import PlanInput, Step
+from portia.plan import Step
 from portia.tool import Tool
 from portia.tool_decorator import tool
 
@@ -696,7 +696,7 @@ def test_add_sub_plan_method() -> None:
 
     assert len(result.plan.steps) == 1
     sub_step = result.plan.steps[0]
-    assert isinstance(sub_step, SubplanStep)
+    assert isinstance(sub_step, SubPlanStep)
     assert sub_step.step_name == "run_sub"
     assert sub_step.plan is sub_plan
 
@@ -714,16 +714,14 @@ def test_add_sub_plan_with_input_values() -> None:
     result = builder.add_sub_plan(sub_plan, input_values={"sub_input": "provided_value"})
 
     sub_step = result.plan.steps[0]
-    assert isinstance(sub_step, SubplanStep)
+    assert isinstance(sub_step, SubPlanStep)
     assert sub_step.input_values["sub_input"] == "provided_value"
 
 
 def test_add_sub_plan_with_invalid_input_name_error() -> None:
     """Test add_sub_plan raises error for invalid input names."""
     builder = PlanBuilderV2()
-    sub_plan = (
-        PlanBuilderV2().input(name="valid_input").llm_step(task="Task").build()
-    )
+    sub_plan = PlanBuilderV2().input(name="valid_input").llm_step(task="Task").build()
 
     with pytest.raises(PlanBuilderError):
         builder.add_sub_plan(sub_plan, input_values={"invalid": "value"})

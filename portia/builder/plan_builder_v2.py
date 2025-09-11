@@ -5,6 +5,7 @@ You can view an example of this class in use in example_builder.py.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
@@ -18,18 +19,18 @@ from portia.builder.step_v2 import (
     LoopStep,
     ReActAgentStep,
     SingleToolAgentStep,
-    SubplanStep,
     StepV2,
     UserInputStep,
     UserVerifyStep,
 )
+from portia.builder.steps.sub_plan_step import SubPlanStep
 from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
 from portia.telemetry.views import PlanV2BuildTelemetryEvent
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
-from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Sequence
 
     from pydantic import BaseModel
 
@@ -693,15 +694,44 @@ class PlanBuilderV2:
 
     def add_sub_plan(
         self,
-        plan: PlanV2,
+        plan: PlanV2 | Iterable[StepV2],
         input_values: dict[str, Any] | None = None,
         step_name: str | None = None,
     ) -> PlanBuilderV2:
-        """Add a step that runs a sub-plan and returns its result."""
+        """Add a step that runs a sub-plan and returns its final output.
+
+        The sub-plan executes completely as an independent workflow with its own  step sequence.
+        From the parent plan's perspective, the entire sub-plan execution appears as a single step
+        that produces one output value. Inputs for the sub-plan can be provided by the plan run
+        inputs when the parent plan is run or via the input_values parameter.
+
+        Args:
+            plan: The sub-plan to run.
+            input_values: Optional mapping of inputs in the sub-plan to values. This is
+               only used when plan is a PlanV2, and is useful if a sub-plan has an input
+               and you want to provide a value for it from a step in the top-level plan.
+               For example:
+
+           ```python
+               sub_plan = builder.input(name="input_name").build()
+               top_plan = builder.llm_step(step_name="llm_step", task="Task")
+                          .add_steps(sub_plan, input_values={"input_name": StepOutput("llm_step")})
+                          .build()
+           ```
+
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
+
+        """
+        if not isinstance(plan, PlanV2):
+            builder = PlanBuilderV2()
+            for step in plan:
+                builder.add_step(step)
+            plan = builder.build()
 
         if input_values:
             allowed_input_names = {p.name for p in plan.plan_inputs}
-            for input_name in input_values.keys():
+            for input_name in input_values:
                 if input_name not in allowed_input_names:
                     raise PlanBuilderError(
                         f"Tried to provide value for input {input_name} not found in "
@@ -709,7 +739,7 @@ class PlanBuilderV2:
                     )
 
         self.plan.steps.append(
-            SubplanStep(
+            SubPlanStep(
                 plan=plan,
                 input_values=input_values or {},
                 step_name=step_name or default_step_name(len(self.plan.steps)),
