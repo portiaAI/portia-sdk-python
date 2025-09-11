@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
 _KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")
 _POSITIONAL_ARG_REGEX = re.compile(r"^\s*(.+)\s*$")
+_PARENTHESIS_STRING_REGEX = re.compile(r"(?:{{ )?(\w+)\((.*)\)(?: }})?")
 
 
 def default_step_name(step_index: int) -> str:
@@ -86,6 +87,24 @@ def string_to_bool(input_str: str) -> bool:
     raise ValueError(f"Invalid boolean string: {input_str}")
 
 
+def parenthesis_string_to_str(input_str: str) -> str:
+    """Convert a parenthesis string to a string."""
+    if (input_str.startswith('"') and input_str.endswith('"')) or (
+        input_str.startswith("'") and input_str.endswith("'")
+    ):
+        return input_str[1:-1]
+    raise ValueError(f"Invalid parenthesis string: {input_str}")
+
+
+_DEFAULT_CONVERTERS: list[Callable[[str], Any]] = [
+    parenthesis_string_to_str,
+    int,
+    float,
+    string_to_none,
+    string_to_bool,
+]
+
+
 class Reference(BaseModel, ABC):
     """Abstract base class for all reference types in Portia plans.
 
@@ -101,12 +120,10 @@ class Reference(BaseModel, ABC):
     # Allow setting temporary/mock attributes in tests (e.g. patch.object(..., "get_value"))
     # Without this, Pydantic v2 prevents setting non-field attributes on instances.
     model_config = ConfigDict(extra="allow")
-    _converters: ClassVar[list[Callable[[str], Any]]] = [
-        int,
-        float,
-        string_to_none,
-        string_to_bool,
-    ]
+    # Converters are used to convert strings to the appropriate type after string parsing,
+    # in order of precedence. First to convert without raising valueerror is the type that is used
+    # when rebuilding the object. If you need to support a new type or custom type, add a converter
+    _converters: ClassVar[list[Callable[[str], Any]]] = _DEFAULT_CONVERTERS
 
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -154,10 +171,9 @@ class Reference(BaseModel, ABC):
 
         """
         parsed_args, kwargs = cls._parse_argument(input_str)
-        init_kwargs = cls._parse_init_args()
+        init_kwargs = list(signature(cls.__init__).parameters.values())[1:]
         for param, init_kwarg in zip(parsed_args, init_kwargs, strict=False):
-            name = next(iter(init_kwarg.keys()))
-            kwargs[name] = param
+            kwargs[init_kwarg.name] = param
         kwargs = {k: cls._convert_argument(v) for k, v in kwargs.items()}
         return cls(**kwargs)
 
@@ -165,7 +181,7 @@ class Reference(BaseModel, ABC):
     def _parse_argument(cls, input_str: str) -> tuple[list[str], dict[str, Any]]:
         """Parse the arguments from the input string into positional and keyword arguments."""
         # Use regex to capture class name and arguments, optionally handling {{ }} wrapper
-        match = re.search(r"(?:{{ )?(\w+)\((.*)\)(?: }})?", input_str)
+        match = re.search(_PARENTHESIS_STRING_REGEX, input_str)
         if not match:
             raise ValueError(f"Invalid input string format: {input_str}")
         class_name = match.group(1)
@@ -207,22 +223,12 @@ class Reference(BaseModel, ABC):
     @classmethod
     def _convert_argument(cls, input_str: str) -> Any:  # noqa: ANN401
         """Parse an argument from a string."""
-        if (input_str.startswith('"') and input_str.endswith('"')) or (
-            input_str.startswith("'") and input_str.endswith("'")
-        ):
-            return input_str[1:-1]
-        for t in cls._converters:
+        for converter in cls._converters:
             try:
-                return t(input_str)
+                return converter(input_str)
             except ValueError:
                 continue
         return input_str
-
-    @classmethod
-    def _parse_init_args(cls: type[T]) -> list[dict[str, Any]]:
-        """Return the kwargs required to call the __init__ method in the order they are defined."""
-        class_init_args = signature(cls.__init__).parameters
-        return [{arg: class_init_args[arg]} for arg in class_init_args if arg != "self"]
 
 
 class StepOutput(Reference):
