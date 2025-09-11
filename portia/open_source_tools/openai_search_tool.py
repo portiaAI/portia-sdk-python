@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 from openai import AsyncOpenAI, OpenAI
@@ -120,10 +121,10 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
             response = self._client.responses.create(
                 model=self._model,
                 input=(
-                    f"search the web using search term '{search_query}' and provide all results "
-                    f"in the specified JSON format with url, title, and content for each result"
+                    f"Search the web for '{search_query}' and provide results as a JSON array "
+                    f"where each result has url, title, and content fields. Format: "
+                    f'[{{"url": "...", "title": "...", "content": "..."}}, ...]'
                 ),
-                response_format=self._get_response_format(),
                 tools=[
                     {
                         "type": "web_search_preview",
@@ -143,10 +144,10 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
             response = await self._async_client.responses.create(
                 model=self._model,
                 input=(
-                    f"search the web using search term '{search_query}' and provide all results "
-                    f"in the specified JSON format with url, title, and content for each result"
+                    f"Search the web for '{search_query}' and provide results as a JSON array "
+                    f"where each result has url, title, and content fields. Format: "
+                    f'[{{"url": "...", "title": "...", "content": "..."}}, ...]'
                 ),
-                response_format=self._get_response_format(),
                 tools=[
                     {
                         "type": "web_search_preview",
@@ -171,16 +172,32 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
         raise ToolSoftError(f"OpenAI API error: {e}") from e
 
     def _parse_formatted_response(self, response: object) -> list[dict[str, Any]]:
-        """Parse the structured JSON response from OpenAI Response API."""
+        """Parse the JSON response from OpenAI Response API."""
         if not hasattr(response, "output") or not response.output:
             return []
 
         try:
-            # OpenAI Response API with JSON schema returns structured output consistently
+            # OpenAI Response API returns text in response.output.text
             response_text = response.output.text
+            
+            # Try to parse as JSON array directly
+            if response_text.strip().startswith('['):
+                return json.loads(response_text.strip())
+            
+            # If not direct JSON array, try to extract JSON from response text
+            # Look for JSON array pattern in the response
+            json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            
+            # Fallback: try to parse entire response as JSON
             parsed_response = json.loads(response_text)
-            results = parsed_response.get("results", [])
-            return results if isinstance(results, list) else []
+            if isinstance(parsed_response, list):
+                return parsed_response
+            elif isinstance(parsed_response, dict) and "results" in parsed_response:
+                return parsed_response["results"]
+            
+            return []
         except (json.JSONDecodeError, AttributeError, KeyError):
             # Return empty results if parsing fails - don't raise errors for empty results
             return []
