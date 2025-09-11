@@ -22,15 +22,15 @@ from portia.builder.step_v2 import (
     ReActAgentStep,
     SingleToolAgentStep,
     StepV2,
-    SubPlanStep,
     UserInputStep,
     UserVerifyStep,
 )
-from portia.plan import Step
+from portia.builder.steps.sub_plan_step import SubPlanStep
 from portia.tool import Tool
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
+    from portia.plan import Step
     from portia.run_context import RunContext
 
 
@@ -697,8 +697,9 @@ def test_add_sub_plan_method() -> None:
     assert len(result.plan.steps) == 1
     sub_step = result.plan.steps[0]
     assert isinstance(sub_step, SubPlanStep)
-    assert sub_step.step_name == "run_sub"
-    assert sub_step.plan is sub_plan
+    sub_step_typed: SubPlanStep = sub_step
+    assert sub_step_typed.step_name == "run_sub"
+    assert sub_step_typed.plan is sub_plan
 
 
 def test_add_sub_plan_with_input_values() -> None:
@@ -715,7 +716,8 @@ def test_add_sub_plan_with_input_values() -> None:
 
     sub_step = result.plan.steps[0]
     assert isinstance(sub_step, SubPlanStep)
-    assert sub_step.input_values["sub_input"] == "provided_value"
+    sub_step_typed: SubPlanStep = sub_step
+    assert sub_step_typed.input_values["sub_input"] == "provided_value"
 
 
 def test_add_sub_plan_with_invalid_input_name_error() -> None:

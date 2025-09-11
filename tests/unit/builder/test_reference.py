@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Input, StepOutput, default_step_name
+from portia.builder.reference import Input, Reference, StepOutput, default_step_name
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
-from portia.run_context import StepOutputValue
+from portia.run_context import RunContext, StepOutputValue
 
 # Test cases for the default_step_name function
 
@@ -746,3 +748,480 @@ def test_multiple_inputs_and_outputs() -> None:
     # Test Input references
     assert Input("input1").get_legacy_name(plan) == "input1"
     assert Input("input2").get_legacy_name(plan) == "input2"
+
+
+# Test cases for StepOutput with full=True parameter
+
+
+def test_step_output_full_initialization() -> None:
+    """Test StepOutput initialization with full=True."""
+    step_output = StepOutput("my_step", full=True)
+    assert step_output.step == "my_step"
+    assert step_output.full is True
+
+
+def test_step_output_full_with_path_initialization() -> None:
+    """Test StepOutput initialization with full=True and path."""
+    step_output = StepOutput("my_step", path="field.name", full=True)
+    assert step_output.step == "my_step"
+    assert step_output.path == "field.name"
+    assert step_output.full is True
+
+
+def test_step_output_full_str_representation() -> None:
+    """Test StepOutput string representation with full=True."""
+    step_output = StepOutput("custom_step", full=True)
+    result = str(step_output)
+    assert result == "{{ StepOutput('custom_step', full=True) }}"
+
+
+def test_step_output_full_with_path_str_representation() -> None:
+    """Test StepOutput string representation with full=True and path."""
+    step_output = StepOutput("my_step", path="field.name", full=True)
+    result = str(step_output)
+    assert result == "{{ StepOutput('my_step', path='field.name', full=True) }}"
+
+
+def test_step_output_full_get_value_single_output() -> None:
+    """Test StepOutput with full=True returns list even for single output."""
+    step_output = StepOutput("my_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="my_step", value="test result", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="test", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["test result"]
+
+
+def test_step_output_full_get_value_multiple_outputs() -> None:
+    """Test StepOutput with full=True returns all matching outputs as list."""
+    step_output = StepOutput("loop_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="loop_step", value="first iteration", description=""),
+        StepOutputValue(
+            step_num=2, step_name="loop_step", value="second iteration", description=""
+        ),
+        StepOutputValue(step_num=3, step_name="loop_step", value="third iteration", description=""),
+        StepOutputValue(step_num=4, step_name="step_4", value="final", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["first iteration", "second iteration", "third iteration"]
+
+
+def test_step_output_full_get_value_with_path() -> None:
+    """Test StepOutput with full=True and path extracts from all matching outputs."""
+    step_output = StepOutput("loop_step", path="result.value", full=True)
+
+    mock_data1 = {"result": {"value": "first_value"}}
+    mock_data2 = {"result": {"value": "second_value"}}
+    mock_data3 = {"result": {"value": "third_value"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="loop_step", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="loop_step", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="loop_step", value=mock_data3, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["first_value", "second_value", "third_value"]
+
+
+def test_step_output_full_get_value_with_path_mixed_data() -> None:
+    """Test StepOutput with full=True and path handles mixed data types."""
+    step_output = StepOutput("mixed_step", path="data", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(
+            step_num=1, step_name="mixed_step", value={"data": "string_value"}, description=""
+        ),
+        StepOutputValue(step_num=2, step_name="mixed_step", value={"data": 42}, description=""),
+        StepOutputValue(
+            step_num=3, step_name="mixed_step", value={"data": [1, 2, 3]}, description=""
+        ),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["string_value", 42, [1, 2, 3]]
+
+
+def test_step_output_full_get_value_no_matches() -> None:
+    """Test StepOutput with full=True returns empty list when no matches found."""
+    step_output = StepOutput("nonexistent_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == []
+
+
+def test_step_output_full_get_value_with_path_missing_field() -> None:
+    """Test StepOutput with full=True and path handles missing fields gracefully."""
+    step_output = StepOutput("loop_step", path="missing.field", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=1, step_name="loop_step", value={"data": "value1"}, description=""
+        ),
+        StepOutputValue(
+            step_num=2, step_name="loop_step", value={"data": "value2"}, description=""
+        ),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == [None, None]
+
+
+def test_step_output_full_get_value_with_int_step() -> None:
+    """Test StepOutput with full=True using integer step index."""
+    step_output = StepOutput(1, full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="first", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="final", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["first", "second"]
+
+
+# Test cases for loop scenarios and complex use cases
+
+
+def test_step_output_full_loop_scenario() -> None:
+    """Test StepOutput with full=True in a typical loop scenario."""
+    # Simulate a loop that processes items and produces multiple outputs
+    step_output = StepOutput("process_item", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="get_items", value=[1, 2, 3], description=""),
+        StepOutputValue(step_num=1, step_name="process_item", value="processed_1", description=""),
+        StepOutputValue(step_num=2, step_name="process_item", value="processed_2", description=""),
+        StepOutputValue(step_num=3, step_name="process_item", value="processed_3", description=""),
+        StepOutputValue(step_num=4, step_name="finalize", value="done", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == ["processed_1", "processed_2", "processed_3"]
+
+
+def test_step_output_full_loop_with_path_scenario() -> None:
+    """Test StepOutput with full=True and path in a loop scenario."""
+    step_output = StepOutput("analyze_item", path="result.score", full=True)
+
+    mock_data1 = {"result": {"score": 85, "status": "good"}}
+    mock_data2 = {"result": {"score": 92, "status": "excellent"}}
+    mock_data3 = {"result": {"score": 78, "status": "fair"}}
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="get_items", value=[1, 2, 3], description=""),
+        StepOutputValue(step_num=1, step_name="analyze_item", value=mock_data1, description=""),
+        StepOutputValue(step_num=2, step_name="analyze_item", value=mock_data2, description=""),
+        StepOutputValue(step_num=3, step_name="analyze_item", value=mock_data3, description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == [85, 92, 78]
+
+
+def test_step_output_full_vs_normal_behavior() -> None:
+    """Test that full=True returns list while full=False returns single value."""
+    step_output_full = StepOutput("my_step", full=True)
+    step_output_normal = StepOutput("my_step", full=False)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="initial", description=""),
+        StepOutputValue(step_num=1, step_name="my_step", value="first", description=""),
+        StepOutputValue(step_num=2, step_name="my_step", value="second", description=""),
+        StepOutputValue(step_num=3, step_name="step_3", value="final", description=""),
+    ]
+
+    result_full = step_output_full.get_value(mock_run_data)
+    result_normal = step_output_normal.get_value(mock_run_data)
+
+    assert result_full == ["first", "second"]
+    assert result_normal == "second"  # Returns the last matching output
+
+
+def test_step_output_full_empty_list_when_no_outputs() -> None:
+    """Test StepOutput with full=True returns empty list when step has no outputs."""
+    step_output = StepOutput("empty_step", full=True)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
+    ]
+
+    result = step_output.get_value(mock_run_data)
+    assert result == []
+
+
+# Test cases for the from_str method
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_step", "expected_path", "expected_full"),
+    [
+        # Basic cases with double braces
+        ("{{ StepOutput(0) }}", 0, None, False),
+        # Basic cases with integer step
+        ("StepOutput(0)", 0, None, False),
+        ("StepOutput(1)", 1, None, False),
+        ("StepOutput(42)", 42, None, False),
+        # Basic cases with string step
+        ("StepOutput('step_name')", "step_name", None, False),
+        ("StepOutput('my_step')", "my_step", None, False),
+        ("StepOutput('search_results')", "search_results", None, False),
+        # Cases with path parameter
+        ("StepOutput(0, path='field.name')", 0, "field.name", False),
+        ("StepOutput('step_name', path='results.0.title')", "step_name", "results.0.title", False),
+        ("StepOutput(1, path='data.user.profile')", 1, "data.user.profile", False),
+        # Edge cases with quotes in path
+        ("StepOutput('step', path='field.subfield')", "step", "field.subfield", False),
+        ("StepOutput(0, path='complex.path.with.dots')", 0, "complex.path.with.dots", False),
+        # Cases with full parameter
+        ("StepOutput(0, full=True)", 0, None, True),
+        ("StepOutput('step_name', full=True)", "step_name", None, True),
+    ],
+)
+def test_step_output_from_str_valid_cases(
+    input_str: str, expected_step: str | int, expected_path: str | None, expected_full: bool
+) -> None:
+    """Test StepOutput.from_str with valid input strings."""
+    result = StepOutput.from_str(input_str)
+
+    assert isinstance(result, StepOutput)
+    assert result.step == expected_step
+    assert result.path == expected_path
+    assert result.full == expected_full
+
+
+@pytest.mark.parametrize(
+    "input_str",
+    [
+        # Malformed input strings
+        "{{ StepOutput(0) ",  # missing closing brace
+        "StepOutput(0) }}",  # missing opening brace
+        "StepOutput()",  # Missing arguments
+        "StepOutput",  # Missing parentheses
+        "StepOutput(",  # Incomplete
+        "StepOutput)",  # Missing opening
+        "StepOutput(,)",  # Empty arguments
+        "StepOutput(0, path=)",  # Missing path value
+        "StepOutput(0, path='unclosed)",  # Unclosed quote
+        "StepOutput(0, path='field.name', extra='value')",  # Extra parameter
+        "Input('test')",  # Not a StepOutput
+    ],
+)
+def test_step_output_from_str_invalid_cases(input_str: str) -> None:
+    """Test StepOutput.from_str with invalid input strings."""
+    with pytest.raises((ValueError, IndexError, TypeError)):
+        StepOutput.from_str(input_str)
+
+
+@pytest.mark.parametrize(
+    "step_output",
+    [
+        StepOutput(0, path=None),
+        StepOutput(0),
+        StepOutput("step_name"),
+        StepOutput(1, path="field.name"),
+        StepOutput("search", path="results.0.title"),
+    ],
+)
+def test_step_output_from_str_roundtrip(step_output: StepOutput) -> None:
+    """Test that from_str and str produce consistent results."""
+    str_repr = str(step_output)
+    reconstructed = StepOutput.from_str(str_repr)
+
+    assert reconstructed.step == step_output.step
+    assert reconstructed.path == step_output.path
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_name", "expected_path"),
+    [
+        # Basic cases with double braces
+        ("{{ Input('input_name') }}", "input_name", None),
+        # Basic cases
+        ("Input('input_name')", "input_name", None),
+        ("Input('user_query')", "user_query", None),
+        ("Input('api_key')", "api_key", None),
+        ("Input('max_results')", "max_results", None),
+        # Cases with path parameter
+        ("Input('user_data', path='profile.name')", "user_data", "profile.name"),
+        ("Input('search_input', path='query.terms')", "search_input", "query.terms"),
+        ("Input('config', path='settings.database.url')", "config", "settings.database.url"),
+        # Edge cases with various path formats
+        ("Input('data', path='field.subfield')", "data", "field.subfield"),
+        ("Input('items', path='list.0.name')", "items", "list.0.name"),
+        ("Input('complex', path='a.b.c.d.e')", "complex", "a.b.c.d.e"),
+    ],
+)
+def test_input_from_str_valid_cases(
+    input_str: str, expected_name: str, expected_path: str | None
+) -> None:
+    """Test Input.from_str with valid input strings."""
+    result = Input.from_str(input_str)
+
+    assert isinstance(result, Input)
+    assert result.name == expected_name
+    assert result.path == expected_path
+
+
+@pytest.mark.parametrize(
+    "input_str",
+    [
+        # Malformed input strings
+        "{{ Input('name') ",  # missing closing brace
+        "Input('name') }}",  # missing opening brace
+        "Input()",  # Missing arguments
+        "Input",  # Missing parentheses
+        "Input(",  # Incomplete
+        "Input)",  # Missing opening
+        "Input(,)",  # Empty arguments
+        "Input('name', path=)",  # Missing path value
+        "Input('name', path='unclosed)",  # Unclosed quote
+        "Input('name', path='field.name', extra='value')",  # Extra parameter
+    ],
+)
+def test_input_from_str_invalid_cases(input_str: str) -> None:
+    """Test Input.from_str with invalid input strings."""
+    with pytest.raises((ValueError, IndexError, TypeError)):
+        Input.from_str(input_str)
+
+
+@pytest.mark.parametrize(
+    "input_ref",
+    [
+        Input("input_name"),
+        Input("user_query"),
+        Input("api_key", path="field.name"),
+        Input("search_input", path="results.0.title"),
+    ],
+)
+def test_input_from_str_roundtrip(input_ref: Input) -> None:
+    """Test that from_str and str produce consistent results."""
+    str_repr = str(input_ref)
+    reconstructed = Input.from_str(str_repr)
+
+    assert reconstructed.name == input_ref.name
+    assert reconstructed.path == input_ref.path
+
+
+def test_input_from_str_with_special_characters() -> None:
+    """Test Input.from_str with special characters in names and paths."""
+    # Test with underscores, numbers, and other valid characters
+    result = Input.from_str("Input('input_123', path='field_1.sub_field')")
+    assert result.name == "input_123"
+    assert result.path == "field_1.sub_field"
+
+
+def test_from_str_with_whitespace() -> None:
+    """Test that from_str handles whitespace correctly."""
+    # Test with extra spaces - quoted strings preserve internal whitespace
+    step_output = StepOutput.from_str("StepOutput( 0 , path=' field.name ' )")
+    assert step_output.step == 0
+    assert step_output.path == " field.name "  # Quoted strings preserve whitespace
+
+    input_ref = Input.from_str("Input( 'input_name' , path=' field.name ' )")
+    assert input_ref.name == "input_name"
+    assert input_ref.path == " field.name "  # Quoted strings preserve whitespace
+
+
+def test_from_str_with_empty_path() -> None:
+    """Test from_str with empty path values."""
+    # This should work but path should be empty string, not None
+    step_output = StepOutput.from_str("StepOutput(0, path='')")
+    assert step_output.step == 0
+    assert step_output.path == ""
+
+    input_ref = Input.from_str("Input('name', path='')")
+    assert input_ref.name == "name"
+    assert input_ref.path == ""
+
+
+def test_from_str_preserves_type_consistency() -> None:
+    """Test that from_str preserves the original type consistency."""
+    # Test that integer steps remain integers
+    step_output_int = StepOutput.from_str("StepOutput(42)")
+    assert isinstance(step_output_int.step, int)
+    assert step_output_int.step == 42
+
+    # Test that string steps remain strings
+    step_output_str = StepOutput.from_str("StepOutput('step_name')")
+    assert isinstance(step_output_str.step, str)
+    assert step_output_str.step == "step_name"
+
+
+@pytest.mark.parametrize(
+    ("input_str", "expected_argument"),
+    [
+        ("0", 0),
+        ("-0", 0),
+        ("None", None),
+        ("True", True),
+        ("False", False),
+        ("-1", -1),
+        ("1.0", 1.0),
+        ("-1.0", -1.0),
+        ("1", 1),
+        ("42", 42),
+        ("'step_name'", "step_name"),
+        ("'my_step'", "my_step"),
+        ("'search_results'", "search_results"),
+        ("regular_string", "regular_string"),
+    ],
+)
+def test_reference_argument_conversion(input_str: str, expected_argument: Any) -> None:  # noqa: ANN401
+    """Test reference argument conversion."""
+    assert StepOutput._convert_argument(input_str) == expected_argument
+    assert Input._convert_argument(input_str) == expected_argument
+
+
+class TestReference(Reference):
+    """Test Reference class. Implements the abstract methods of the Reference class."""
+
+    def get_legacy_name(self, plan: PlanV2) -> str:  # noqa: ARG002
+        """Get the legacy name of the reference."""
+        return "test_reference"
+
+    def get_value(self, run_data: RunContext) -> Any | None:  # noqa: ANN401, ARG002
+        """Get the value of the reference."""
+        return "test_value"
+
+
+@pytest.mark.parametrize(
+    "input_str",
+    [
+        "TestReference()",
+        "TestReference( )",
+        "{{ TestReference() }}",
+    ],
+)
+def test_reference_from_str(input_str: str) -> None:
+    """Test Reference.from_str."""
+    TestReference.from_str(input_str)
