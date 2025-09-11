@@ -6,7 +6,10 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from browser_use import Browser
+try:
+    from browser_use import Browser  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover
+    Browser = object  # type: ignore[assignment]
 from pydantic import BaseModel, Field, HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext

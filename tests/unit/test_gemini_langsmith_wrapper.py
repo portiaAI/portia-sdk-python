@@ -4,7 +4,10 @@ from collections.abc import Callable
 from unittest.mock import Mock, patch
 
 import pytest
-from google.genai import types
+try:
+    from google.genai import types  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover
+    types = None  # type: ignore[assignment]
 
 from portia.gemini_langsmith_wrapper import (
     _extract_parts,

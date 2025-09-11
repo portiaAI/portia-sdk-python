@@ -321,6 +321,12 @@ def test_set_default_model_from_string_with_alternative_provider(
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     c = Config.from_default(default_model="mistralai/mistral-tiny-latest", llm_provider="anthropic")
     model = c.get_default_model()
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     assert isinstance(model, MistralAIGenerativeModel)
     assert str(model) == "mistralai/mistral-tiny-latest"
 
@@ -363,10 +369,16 @@ def test_set_default_model_and_planning_model_alternative_provider(
         llm_provider="anthropic",
     )
     model = c.get_default_model()
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     assert isinstance(model, MistralAIGenerativeModel)
     assert str(model) == "mistralai/mistral-tiny-latest"
 
     model = c.get_planning_model()
+    if GoogleGenAiGenerativeModel is None:
+        pytest.skip("google extra not installed")
+    if GoogleGenAiGenerativeModel is None:
+        pytest.skip("google extra not installed")
     assert isinstance(model, GoogleGenAiGenerativeModel)
     assert str(model) == "google/gemini-1.5-flash"
 
@@ -380,6 +392,8 @@ def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
     set in the constructor of GenerativeModel.
     """
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     config = Config.from_default(
         default_model=MistralAIGenerativeModel(
             model_name="mistral-tiny-latest",
@@ -393,6 +407,8 @@ def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
 
 def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
     """Test setting default model and planning_model with model instances, and no provider set."""
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     config = Config.from_default(
         default_model=MistralAIGenerativeModel(
             model_name="mistral-tiny-latest",

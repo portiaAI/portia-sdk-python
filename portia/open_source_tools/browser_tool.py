@@ -25,7 +25,10 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from browser_use import Agent, Browser, BrowserConfig, Controller
+try:  # Optional dependency
+    from browser_use import Agent, Browser, BrowserConfig, Controller  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover
+    Agent = Browser = BrowserConfig = Controller = object  # type: ignore[assignment]
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
@@ -37,7 +40,7 @@ from portia.model import GenerativeModel  # noqa: TC001 - used in Pydantic Schem
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
-    from browserbase.types import SessionCreateResponse
+    from browserbase.types import SessionCreateResponse  # pyright: ignore[reportMissingImports]
 
     from portia import Plan, PlanRun
 

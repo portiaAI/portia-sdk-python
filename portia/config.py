@@ -544,7 +544,7 @@ class Config(BaseModel):
     def setup_cache(self) -> Self:
         """Set up LLM cache if Redis URL is provided."""
         if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
-            from langchain_redis import RedisCache
+            from langchain_redis import RedisCache  # pyright: ignore[reportMissingImports]
 
             cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
             LangChainGenerativeModel.set_cache(cache)

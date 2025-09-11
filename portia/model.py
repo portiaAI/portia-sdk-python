@@ -551,7 +551,8 @@ class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
     For dynamic base_url (like Meta), pass it via constructor.
     """
 
-    base_url: str | None = None  # Override in subclasses for fixed endpoints
+    # Use empty string to represent unset to avoid Optional override issues in subclasses
+    base_url: str = ""  # Override in subclasses for fixed endpoints
 
     def __init__(
         self,
@@ -1258,8 +1259,8 @@ if validate_extras_dependencies("mistralai", raise_error=False):
 if validate_extras_dependencies("amazon", raise_error=False):
     import logging
 
-    import boto3
-    from langchain_aws import ChatBedrock
+    import boto3  # pyright: ignore[reportMissingImports]
+    from langchain_aws import ChatBedrock  # pyright: ignore[reportMissingImports]
 
     def set_amazon_logging_level(level: int) -> None:
         """Set the logging level for boto3 client."""
@@ -1327,8 +1328,13 @@ if validate_extras_dependencies("amazon", raise_error=False):
             self._instructor_client = instructor.from_bedrock(bedrock_client)
 
 
-class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
-    """Google Generative AI (Gemini) model implementation."""
+if validate_extras_dependencies("google", raise_error=False):
+    from google import genai  # pyright: ignore[reportMissingImports,reportAttributeAccessIssue]
+    from langchain_google_genai import ChatGoogleGenerativeAI  # pyright: ignore[reportMissingImports]
+    from portia.gemini_langsmith_wrapper import wrap_gemini
+
+    class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
+        """Google Generative AI (Gemini)model implementation."""
 
     provider: LLMProvider = LLMProvider.GOOGLE
 
@@ -1376,7 +1382,7 @@ class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
 
 
 if validate_extras_dependencies("ollama", raise_error=False):
-    from langchain_ollama import ChatOllama
+    from langchain_ollama import ChatOllama  # pyright: ignore[reportMissingImports]
 
     class OllamaGenerativeModel(LangChainGenerativeModel):
         """Wrapper for Ollama models."""
