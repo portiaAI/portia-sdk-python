@@ -180,6 +180,26 @@ def test_resolve_input_reference_with_string_template_step_output() -> None:
     assert result == "The result was step result"
 
 
+def test_resolve_input_reference_with_string_template_step_output_negative_index() -> None:
+    """Test _resolve_references with StepOutput using negative index."""
+    step = ConcreteStepV2()
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value="step result",
+            description="Step 0",
+            step_name="test_step",
+            step_num=0,
+        )
+    ]
+
+    template = f"The result was {StepOutput(-1)}"
+    result = step._resolve_references(template, mock_run_data)
+
+    assert result == "The result was step result"
+
+
 def test_resolve_input_reference_with_string_template_input() -> None:
     """Test _resolve_input_reference with string containing Input template."""
     step = ConcreteStepV2()
