@@ -699,7 +699,7 @@ class PlanBuilderV2:
     ) -> PlanBuilderV2:
         """Add a step that runs a sub-plan and returns its final output.
 
-        The sub-plan executes completely as an independent workflow with its own  step sequence.
+        The sub-plan executes completely as an independent workflow with its own step sequence.
         From the parent plan's perspective, the entire sub-plan execution appears as a single step
         that produces one output value. Inputs for the sub-plan can be provided by the plan run
         inputs when the parent plan is run or via the input_values parameter.
@@ -714,7 +714,7 @@ class PlanBuilderV2:
            ```python
                sub_plan = builder.input(name="input_name").build()
                top_plan = builder.llm_step(step_name="llm_step", task="Task")
-                          .add_steps(sub_plan, input_values={"input_name": StepOutput("llm_step")})
+                          .add_sub_plan(sub_plan, input_values={"input": StepOutput("llm_step")})
                           .build()
            ```
 
@@ -727,15 +727,6 @@ class PlanBuilderV2:
             for step in plan:
                 builder.add_step(step)
             plan = builder.build()
-
-        if input_values:
-            allowed_input_names = {p.name for p in plan.plan_inputs}
-            for input_name in input_values:
-                if input_name not in allowed_input_names:
-                    raise PlanBuilderError(
-                        f"Tried to provide value for input {input_name} not found in "
-                        "sub-plan passed into add_sub_plan().",
-                    )
 
         self.plan.steps.append(
             SubPlanStep(

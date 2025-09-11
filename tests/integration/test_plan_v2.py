@@ -941,34 +941,121 @@ async def test_example_builder_plan_scenarios(
     assert len(final_output.receipt) > 0
 
 
-def test_plan_v2_subplan_step() -> None:
-    """Test executing a sub-plan within a plan."""
+def collect_fn(
+    top_no_def: str,
+    top_with_def: str,
+    sub_no_def_1: str,
+    sub_no_def_2: str,
+    sub_with_def_1: str,
+    sub_with_def_2: str,
+) -> dict[str, str]:
+    """Collect all input values."""
+    return {
+        "top_input_no_default": top_no_def,
+        "top_input_with_default": top_with_def,
+        "sub_input_no_default_1": sub_no_def_1,
+        "sub_input_no_default_2": sub_no_def_2,
+        "sub_input_with_default_1": sub_with_def_1,
+        "sub_input_with_default_2": sub_with_def_2,
+    }
+
+
+def test_plan_v2_input_linking_with_add_steps() -> None:
+    """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
     config = Config.from_default()
     portia = Portia(config=config)
 
+    # Create sub-plan with 4 inputs (2 with defaults, 2 without)
     sub_plan = (
-        PlanBuilderV2("Sub-plan")
-        .input(name="msg", description="Message")
+        PlanBuilderV2("Sub-plan with multiple inputs")
+        .input(name="sub_input_no_default_1", description="Sub input 1 without default")
+        .input(name="sub_input_no_default_2", description="Sub input 2 without default")
+        .input(
+            name="sub_input_with_default_1",
+            description="Sub input 1 with default",
+            default_value="original_default_1",
+        )
+        .input(
+            name="sub_input_with_default_2",
+            description="Sub input 2 with default",
+            default_value="original_default_2",
+        )
         .function_step(
-            function=lambda msg: f"Message: {msg}",
-            args={"msg": Input("msg")},
-            step_name="sub_step",
+            function=lambda: "sub_plan_executed",
+            step_name="sub_execution_step",
         )
         .build()
     )
 
+    # Create top-level plan with 2 inputs (1 with default, 1 without)
     plan = (
-        PlanBuilderV2("Top-level plan")
-        .function_step(function=lambda: "hello", step_name="producer")
-        .add_sub_plan(sub_plan, input_values={"msg": StepOutput("producer")}, step_name="run_sub")
+        PlanBuilderV2("Top-level plan with input linking")
+        .input(name="top_input_no_default", description="Top input without default")
+        .input(
+            name="top_input_with_default",
+            description="Top input with default",
+            default_value="top_default_value",
+        )
+        .function_step(
+            function=lambda: 100,
+            step_name="first_number",
+        )
+        .function_step(
+            function=lambda: 200,
+            step_name="second_number",
+        )
+        # Add sub-plan steps with input values for 2 of the 4 sub-plan inputs
+        .add_sub_plan(
+            sub_plan,
+            input_values={
+                "sub_input_no_default_1": (
+                    f"Number 1: {StepOutput('first_number')}. "
+                    f"Number 2: {StepOutput('second_number')}"
+                ),
+                "sub_input_with_default_1": StepOutput("second_number"),
+            },
+        )
+        # Final step that outputs all input values for verification
+        .function_step(
+            function=collect_fn,
+            args={
+                "top_no_def": Input("top_input_no_default"),
+                "top_with_def": Input("top_input_with_default"),
+                "sub_no_def_1": Input("sub_input_no_default_1"),
+                "sub_no_def_2": Input("sub_input_no_default_2"),
+                "sub_with_def_1": Input("sub_input_with_default_1"),
+                "sub_with_def_2": Input("sub_input_with_default_2"),
+            },
+            step_name="collect_all_inputs",
+        )
         .build()
     )
 
-    plan_run = portia.run_plan(plan)
+    # Run the plan with only 2 input values:
+    # - One for top-level plan without default
+    # - One for sub-plan without default that wasn't set via input_values
+    plan_run = portia.run_plan(
+        plan,
+        plan_run_inputs={
+            "top_input_no_default": "top_value",
+            "sub_input_no_default_2": "sub_value",
+        },
+    )
 
     assert plan_run.state == PlanRunState.COMPLETE
-    assert plan_run.outputs.final_output is not None
-    assert plan_run.outputs.final_output.get_value() == "Message: hello"
+
+    # Verify final step collected all input values correctly
+    final_output = plan_run.outputs.step_outputs["$step_3_output"]
+    all_inputs = final_output.get_value()
+
+    # Verify all input values are as expected
+    assert all_inputs is not None
+    assert all_inputs.get("top_input_no_default", "") == "top_value"
+    assert all_inputs.get("top_input_with_default") == "top_default_value"
+    assert all_inputs.get("sub_input_no_default_1", "") == "Number 1: 100. Number 2: 200"
+    assert all_inputs.get("sub_input_no_default_2", "") == "sub_value"
+    assert all_inputs.get("sub_input_with_default_1", "") == 200
+    assert all_inputs.get("sub_input_with_default_2", "") == "original_default_2"
 
 
 # Loop integration tests

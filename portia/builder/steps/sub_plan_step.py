@@ -1,9 +1,9 @@
 """Step that executes a sub-plan within a parent plan."""
 
-from typing import Any, override
+from typing import Any, Self, override
 
 from langsmith import traceable
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Reference
@@ -11,6 +11,10 @@ from portia.builder.step_v2 import StepV2
 from portia.plan import PlanInput, Step
 from portia.portia import Portia
 from portia.run_context import RunContext
+
+
+class SubPlanStepError(ValueError):
+    """Error in SubPlanStep configuration."""
 
 
 class SubPlanStep(StepV2):
@@ -37,6 +41,19 @@ class SubPlanStep(StepV2):
         default_factory=dict,
         description="Mapping of sub-plan input names to values or references passed at runtime.",
     )
+
+    @model_validator(mode="after")
+    def validate_input_values(self) -> Self:
+        """Validate that input_values keys correspond to actual plan inputs."""
+        if self.input_values:
+            allowed_input_names = {p.name for p in self.plan.plan_inputs}
+            for input_name in self.input_values:
+                if input_name not in allowed_input_names:
+                    raise SubPlanStepError(
+                        f"Tried to provide value for input '{input_name}' not found in "
+                        f"sub-plan. Available inputs: {sorted(allowed_input_names)}"
+                    )
+        return self
 
     def __str__(self) -> str:  # pragma: no cover - simple string representation
         """Return a description of this step for logging purposes."""

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from portia.builder.conditionals import ConditionalBlockClauseType
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
@@ -26,6 +26,7 @@ from portia.builder.step_v2 import (
     UserVerifyStep,
 )
 from portia.builder.steps.sub_plan_step import SubPlanStep
+from portia.plan import PlanInput
 from portia.tool import Tool
 from portia.tool_decorator import tool
 
@@ -702,22 +703,65 @@ def test_add_sub_plan_method() -> None:
     assert sub_step_typed.plan is sub_plan
 
 
-def test_add_sub_plan_with_input_values() -> None:
-    """Test add_sub_plan with input values."""
+def test_add_steps_method_with_iterable() -> None:
+    """Test the add_steps() method with an iterable of steps."""
     builder = PlanBuilderV2()
-    sub_plan = (
-        PlanBuilderV2()
-        .input(name="sub_input", description="Input for sub plan")
-        .llm_step(task="Sub task")
-        .build()
+
+    steps = [
+        LLMStep(task="First task", step_name="step1"),
+        InvokeToolStep(tool="test_tool", args={"input": "test"}, step_name="step2"),
+        InvokeToolStep(
+            tool=tool(example_function_for_testing)(),
+            args={"x": 42, "y": "hello"},
+            step_name="step3",
+        ),
+    ]
+
+    result = builder.add_sub_plan(steps)
+
+    # The steps are all added to the sub-plan
+    assert len(result.plan.steps) == 1
+    assert isinstance(result.plan.steps[0], SubPlanStep)
+    assert result.plan.steps[0].plan.steps == steps
+
+
+def test_add_steps_method_with_empty_iterable() -> None:
+    """Test the add_steps() method with an empty iterable."""
+    builder = PlanBuilderV2().llm_step(task="Initial step").add_sub_plan([])
+    # The add_sub_plan still adds a step - it just does nothing
+    assert len(builder.plan.steps) == 2
+
+
+def test_add_steps_method_with_empty_plan_v2() -> None:
+    """Test the add_steps() method with an empty PlanV2."""
+    builder = PlanBuilderV2().input(name="existing_input").llm_step(task="Initial step")
+    empty_plan = PlanBuilderV2().build()
+
+    result = builder.add_sub_plan(empty_plan)
+
+    assert len(result.plan.steps) == 2
+    assert len(result.plan.plan_inputs) == 1
+
+
+def test_add_steps_method_chaining_with_different_sources() -> None:
+    """Test chaining add_steps() method with different sources."""
+    builder = PlanBuilderV2()
+
+    step_list = [LLMStep(task="List step", step_name="list_step")]
+    plan_with_steps = PlanV2(
+        label="Source plan",
+        steps=[InvokeToolStep(tool="plan_tool", args={}, step_name="plan_step")],
+        plan_inputs=[PlanInput(name="plan_input", description="From plan")],
     )
 
-    result = builder.add_sub_plan(sub_plan, input_values={"sub_input": "provided_value"})
+    result = builder.add_sub_plan(step_list).add_sub_plan(plan_with_steps)
 
-    sub_step = result.plan.steps[0]
-    assert isinstance(sub_step, SubPlanStep)
-    sub_step_typed: SubPlanStep = sub_step
-    assert sub_step_typed.input_values["sub_input"] == "provided_value"
+    assert len(result.plan.steps) == 2
+    assert len(result.plan.plan_inputs) == 0
+    assert isinstance(result.plan.steps[0], SubPlanStep)
+    assert result.plan.steps[0].plan.plan_inputs == []
+    assert isinstance(result.plan.steps[1], SubPlanStep)
+    assert result.plan.steps[1].plan.plan_inputs == plan_with_steps.plan_inputs
 
 
 def test_add_sub_plan_with_invalid_input_name_error() -> None:
@@ -725,8 +769,35 @@ def test_add_sub_plan_with_invalid_input_name_error() -> None:
     builder = PlanBuilderV2()
     sub_plan = PlanBuilderV2().input(name="valid_input").llm_step(task="Task").build()
 
-    with pytest.raises(PlanBuilderError):
+    with pytest.raises(ValidationError):
         builder.add_sub_plan(sub_plan, input_values={"invalid": "value"})
+
+
+def test_add_step_and_add_steps_integration() -> None:
+    """Test integration of add_step and add_steps methods together."""
+    step_batch = (
+        PlanBuilderV2()
+        .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
+        .function_step(function=example_function_for_testing, args={}, step_name="batch2")
+        .build()
+    )
+
+    builder = (
+        PlanBuilderV2()
+        .add_step(LLMStep(task="Individual step", step_name="individual"))
+        .add_sub_plan(step_batch)
+        .add_sub_plan(
+            PlanBuilderV2().add_step(LLMStep(task="From plan", step_name="from_plan")).build()
+        )
+        .add_step(SingleToolAgentStep(tool="final_tool", task="Final step", step_name="final"))
+    )
+
+    assert len(builder.plan.steps) == 4
+    assert len(builder.plan.plan_inputs) == 0
+    assert isinstance(builder.plan.steps[0], LLMStep)
+    assert isinstance(builder.plan.steps[1], SubPlanStep)
+    assert isinstance(builder.plan.steps[2], SubPlanStep)
+    assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
 
 def test_basic_if_endif_block() -> None:
@@ -1003,6 +1074,21 @@ def test_conditional_method_chaining() -> None:
     plan = builder.build()
     assert len(plan.steps) == 8  # if, llm, else_if, tool, else, func, endif, final_llm
     assert len(plan.plan_inputs) == 1
+
+
+def test_add_steps_with_input_values_invalid_input_name_error() -> None:
+    """Test add_steps raises error when input_values contains invalid input name."""
+    builder = PlanBuilderV2()
+
+    sub_plan = (
+        PlanBuilderV2()
+        .input(name="valid_input", description="Valid input")
+        .llm_step(task="Sub task", step_name="sub_step")
+        .build()
+    )
+
+    with pytest.raises(ValidationError):
+        builder.add_sub_plan(sub_plan, input_values={"invalid_input": "some_value"})
 
 
 # Loop tests
