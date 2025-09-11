@@ -179,8 +179,6 @@ class PlanBuilderV2:
                 loop_block=loop_block,
                 loop_step_type=LoopStepType.START,
                 loop_type=loop_type,
-                start_index=len(self.plan.steps),
-                end_index=None,
             )
         )
         return self
@@ -216,18 +214,16 @@ class PlanBuilderV2:
         start_loop_step = self.plan.steps[loop_block.start_step_index]
         if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
-        start_loop_step.end_index = len(self.plan.steps)
         self.plan.steps.append(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 condition=start_loop_step.condition,
                 over=start_loop_step.over,
                 index=start_loop_step.index,
+                loop_block=loop_block,
                 loop_step_type=LoopStepType.END,
                 loop_type=start_loop_step.loop_type,
                 args=start_loop_step.args,
-                start_index=start_loop_step.start_index,
-                end_index=len(self.plan.steps),
             )
         )
         self._block_stack.pop()
@@ -524,7 +520,7 @@ class PlanBuilderV2:
     def single_tool_agent_step(
         self,
         *,
-        tool: str,
+        tool: str | Tool,
         task: str,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
@@ -543,7 +539,7 @@ class PlanBuilderV2:
         schema.
 
         Args:
-            tool: The id of the tool the agent can use to complete the task.
+            tool: The id of the tool or the Tool instance the agent can use to complete the task.
             task: Natural language description of what the agent should accomplish.
             inputs: Optional context data for the agent. This can include references such as
                 Input and StepOutput whose values are resolved at runtime and provided as
@@ -570,7 +566,7 @@ class PlanBuilderV2:
         self,
         *,
         task: str,
-        tools: list[str] | None = None,
+        tools: Sequence[str | Tool] | None = None,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
@@ -584,7 +580,7 @@ class PlanBuilderV2:
 
         Args:
             task: The task to perform.
-            tools: The list of tool IDs to make available to the agent.
+            tools: The list of tool IDs or Tool instances to make available to the agent.
             inputs: The inputs to the task. If any of these values are instances of StepOutput or
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
@@ -715,10 +711,13 @@ class PlanBuilderV2:
                 only used when plan is a PlanV2, and is useful if a sub-plan has an input
                 and you want to provide a value for it from a step in the top-level plan.
                 For example:
+
+            ```python
                 sub_plan = builder.input(name="input_name").build()
                 top_plan = builder.llm_step(step_name="llm_step", task="Task")
                            .add_steps(sub_plan, input_values={"input_name": StepOutput("llm_step")})
                            .build()
+            ```
 
             input_values: Optional mapping of input names to default values. Only used
                 when plan is a PlanV2. These values will be set as default values for

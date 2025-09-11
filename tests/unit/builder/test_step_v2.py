@@ -46,6 +46,7 @@ from portia.prefixed_uuid import PlanRunUUID
 from portia.run_context import StepOutputValue
 from portia.tool import Tool
 from portia.tool_decorator import tool
+from portia.tool_registry import ToolRegistry
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
@@ -529,6 +530,49 @@ async def test_llm_step_run_one_reference_input() -> None:
 
 
 @pytest.mark.asyncio
+async def test_llm_step_run_interpolated_reference_in_task() -> None:
+    """Test LLMStep run where the task string contains an interpolated reference."""
+    reference_input = StepOutput(0)
+    step = LLMStep(
+        task=f"Summarize result: {StepOutput(0)}",
+        step_name="summarize",
+        inputs=[reference_input],
+    )
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value="previous step result",
+            description="Step 0",
+            step_name="summarize",
+            step_num=0,
+        )
+    ]
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+        patch.object(reference_input, "get_value") as mock_get_value,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        # Only the input reference is patched; the task interpolation resolves
+        # via StepOutput.get_value
+        mock_get_value.return_value = "Previous step result"
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="Summary: Previous step result")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Summary: Previous step result"
+        mock_wrapper_instance.arun.assert_called_once()
+        call_args = mock_wrapper_instance.arun.call_args
+        assert call_args[1]["task"] == "Summarize result: previous step result"
+        expected_task_data = LocalDataValue(value="Previous step result", summary="Step 0")
+        assert call_args[1]["task_data"] == [expected_task_data]
+
+
+@pytest.mark.asyncio
 async def test_llm_step_run_mixed_inputs() -> None:
     """Test LLMStep run with 2 regular value inputs and 2 reference inputs."""
     ref1 = Input("user_name")
@@ -838,19 +882,6 @@ def test_invoke_tool_step_str_with_tool_instance() -> None:
     assert (
         str(step) == "InvokeToolStep(tool='mock_tool', args={'query': 'test'} -> MockOutputSchema)"
     )
-
-
-def test_tool_name_with_string_tool() -> None:
-    """Test _tool_name method with string tool."""
-    step = InvokeToolStep(tool="search_tool", step_name="search")
-    assert step._tool_name() == "search_tool"
-
-
-def test_tool_name_with_tool_instance() -> None:
-    """Test _tool_name method with Tool instance."""
-    mock_tool = MockTool()
-    step = InvokeToolStep(tool=mock_tool, step_name="search")
-    assert step._tool_name() == "mock_tool"
 
 
 @pytest.mark.asyncio
@@ -1308,6 +1339,43 @@ def test_single_tool_agent_str_with_output_schema() -> None:
     assert str(step) == expected_str
 
 
+def test_single_tool_agent_with_tool_object() -> None:
+    """Test SingleToolAgentStep with a Tool instance."""
+    tool_instance = MockTool()
+    step = SingleToolAgentStep(task="Use tool", tool=tool_instance, step_name="use")
+
+    assert str(step) == "SingleToolAgentStep(task='Use tool', tool='mock_tool')"
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$use_output"
+    legacy_step = step.to_legacy_step(mock_plan)
+    assert legacy_step.tool_id == "mock_tool"
+
+
+def test_single_tool_agent_step_adds_tool_to_registry() -> None:
+    """Ensure SingleToolAgentStep registers Tool objects."""
+    tool_instance = MockTool()
+    step = SingleToolAgentStep(task="Use tool", tool=tool_instance, step_name="use")
+    run_data = Mock()
+    run_data.config.execution_agent_type = ExecutionAgentType.DEFAULT
+    run_data.tool_registry = ToolRegistry()
+    run_data.storage = Mock()
+    run_data.plan_run = Mock()
+    run_data.legacy_plan = Mock()
+    run_data.end_user = Mock()
+    run_data.execution_hooks = Mock()
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_wrapper,
+        patch("portia.builder.step_v2.DefaultExecutionAgent") as mock_agent,
+    ):
+        mock_wrapper.return_value = Mock()
+        mock_agent.return_value = Mock()
+        step._get_agent_for_step(run_data)
+
+    assert tool_instance.id in run_data.tool_registry
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("execution_agent_type", "expected_one_shot"),
@@ -1534,6 +1602,40 @@ def test_react_agent_step_str_with_output_schema() -> None:
 
     expected_str = f"ReActAgentStep(task='Task with schema', tools='{tools}',  -> MockOutputSchema)"
     assert str(step) == expected_str
+
+
+def test_react_agent_step_with_tool_objects() -> None:
+    """Test ReActAgentStep accepts Tool instances."""
+    tools = [MockTool(), "calculator_tool"]
+    step = ReActAgentStep(task="Multi-tool task", tools=tools, step_name="react")
+
+    tools_str = "['mock_tool', 'calculator_tool']"
+    assert str(step) == f"ReActAgentStep(task='Multi-tool task', tools='{tools_str}', )"
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$react_output"
+    legacy_step = step.to_legacy_step(mock_plan)
+    assert legacy_step.tool_id == "mock_tool,calculator_tool"
+
+
+def test_react_agent_step_adds_tool_to_registry() -> None:
+    """Ensure ReActAgentStep registers Tool objects."""
+    tool_instance = MockTool()
+    step = ReActAgentStep(task="Multi-tool", tools=[tool_instance], step_name="test_step")
+    run_data = Mock()
+    run_data.tool_registry = ToolRegistry()
+    run_data.storage = Mock()
+    run_data.plan_run = Mock()
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_wrapper,
+        patch("portia.builder.step_v2.ReActAgent") as mock_agent,
+    ):
+        mock_wrapper.return_value = Mock()
+        mock_agent.return_value = Mock()
+        step._get_agent_for_step(run_data)
+
+    assert tool_instance.id in run_data.tool_registry
 
 
 def test_react_agent_step_to_legacy_step() -> None:
@@ -2397,8 +2499,6 @@ def test_loop_step_initialization_with_condition() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         args={"x": 10},
     )
 
@@ -2406,8 +2506,6 @@ def test_loop_step_initialization_with_condition() -> None:
     assert step.condition is not None
     assert step.loop_type == LoopType.DO_WHILE
     assert step.loop_step_type == LoopStepType.END
-    assert step.start_index == 0
-    assert step.end_index == 5
     assert step.args == {"x": 10}
     assert step.over is None
 
@@ -2420,8 +2518,6 @@ def test_loop_step_initialization_with_over() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
         index=0,
     )
 
@@ -2429,8 +2525,6 @@ def test_loop_step_initialization_with_over() -> None:
     assert step.over is not None
     assert step.loop_type == LoopType.FOR_EACH
     assert step.loop_step_type == LoopStepType.START
-    assert step.start_index == 0
-    assert step.end_index == 3
     assert step.index == 0
     assert step.condition is None
 
@@ -2444,8 +2538,6 @@ def test_loop_step_validation_error_both_none() -> None:
             over=None,
             loop_type=LoopType.DO_WHILE,
             loop_step_type=LoopStepType.END,
-            start_index=0,
-            end_index=5,
         )
 
 
@@ -2456,12 +2548,10 @@ def test_loop_step_validation_success() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
     )
 
-    assert step.start_index == 0
-    assert step.end_index == 5
+    assert step.step_name == "test_loop"
+    assert step.condition is not None
 
 
 def test_current_loop_variable_with_over() -> None:
@@ -2472,8 +2562,6 @@ def test_current_loop_variable_with_over() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
         index=1,
     )
 
@@ -2499,8 +2587,6 @@ def test_current_loop_variable_with_over_none() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
     )
 
     mock_run_data = Mock()
@@ -2516,8 +2602,6 @@ def test_current_loop_variable_with_non_sequence() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
         index=0,
     )
 
@@ -2544,8 +2628,6 @@ def test_current_loop_variable_index_out_of_range() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
         index=5,
     )
 
@@ -2572,18 +2654,13 @@ async def test_loop_step_run_conditional_end_with_callable() -> None:
         condition=lambda x: x > 5,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
         args={"x": 10},
     )
 
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.END
     assert result.loop_result is True
-    assert result.start_index == 0
-    assert result.end_index == 10
 
 
 @pytest.mark.asyncio
@@ -2594,8 +2671,6 @@ async def test_loop_step_run_conditional_end_with_string() -> None:
         condition="x > 5",
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
         args={"x": 10},
     )
 
@@ -2609,10 +2684,7 @@ async def test_loop_step_run_conditional_end_with_string() -> None:
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result.step_type == LoopStepType.END
         assert result.loop_result is True
-        assert result.start_index == 0
-        assert result.end_index == 10
 
 
 @pytest.mark.asyncio
@@ -2624,8 +2696,6 @@ async def test_loop_step_run_conditional_end_missing_condition() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
     )
 
     mock_run_data = Mock()
@@ -2645,8 +2715,6 @@ async def test_loop_step_run_for_each_start() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
         index=0,
     )
 
@@ -2663,11 +2731,8 @@ async def test_loop_step_run_for_each_start() -> None:
 
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.START
     assert result.loop_result is True
     assert result.value == "a"
-    assert result.start_index == 0
-    assert result.end_index == 3
     assert step.index == 1  # Should be incremented
 
 
@@ -2681,8 +2746,6 @@ async def test_loop_step_run_for_each_start_missing_over() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
     )
 
     mock_run_data = Mock()
@@ -2702,8 +2765,6 @@ async def test_loop_step_run_for_each_start_no_value() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=3,
         index=5,  # Out of range
     )
 
@@ -2720,11 +2781,8 @@ async def test_loop_step_run_for_each_start_no_value() -> None:
 
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.START
     assert result.loop_result is False
     assert result.value is None
-    assert result.start_index == 0
-    assert result.end_index == 3
 
 
 @pytest.mark.asyncio
@@ -2735,38 +2793,13 @@ async def test_loop_step_run_default_case() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.WHILE,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=5,
         args={"x": 10},  # Provide the required argument
     )
 
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.START
     assert result.loop_result is True
-    assert result.start_index == 0
-    assert result.end_index == 5
-
-
-@pytest.mark.asyncio
-async def test_loop_step_run_with_none_indexes() -> None:
-    """Test LoopStep run method with None start/end indexes."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=lambda x: x > 0,
-        loop_type=LoopType.DO_WHILE,
-        loop_step_type=LoopStepType.END,
-        start_index=0,  # Provide at least one index
-        end_index=0,  # Set to 0 instead of None to avoid validation error
-        args={"x": 10},
-    )
-
-    mock_run_data = Mock()
-    result = await step.run(run_data=mock_run_data)
-
-    assert result.start_index == 0
-    assert result.end_index == 0
 
 
 def test_loop_step_to_legacy_step_with_callable_condition() -> None:
@@ -2776,8 +2809,6 @@ def test_loop_step_to_legacy_step_with_callable_condition() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         args={"x": 10},
     )
 
@@ -2798,8 +2829,6 @@ def test_loop_step_to_legacy_step_with_string_condition() -> None:
         condition="x > 0",
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         args={"x": 10},
     )
 
@@ -2820,8 +2849,6 @@ def test_loop_step_to_legacy_step_with_reference_args() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         args={"x": StepOutput(0), "y": Input("test_input")},
     )
 
@@ -2847,8 +2874,6 @@ def test_loop_step_validation_error_condition_with_for_each() -> None:
             over=StepOutput(0),
             loop_type=LoopType.FOR_EACH,
             loop_step_type=LoopStepType.START,
-            start_index=0,
-            end_index=5,
         )
 
 
@@ -2861,8 +2886,6 @@ def test_loop_step_validation_error_condition_and_over_both_set() -> None:
             over=StepOutput(0),
             loop_type=LoopType.DO_WHILE,
             loop_step_type=LoopStepType.END,
-            start_index=0,
-            end_index=5,
         )
 
 
@@ -2875,8 +2898,6 @@ def test_loop_step_validation_error_over_with_while() -> None:
             over=StepOutput(0),
             loop_type=LoopType.WHILE,
             loop_step_type=LoopStepType.START,
-            start_index=0,
-            end_index=5,
         )
 
 
@@ -2889,8 +2910,6 @@ def test_loop_step_validation_error_over_with_do_while() -> None:
             over=StepOutput(0),
             loop_type=LoopType.DO_WHILE,
             loop_step_type=LoopStepType.END,
-            start_index=0,
-            end_index=5,
         )
 
 
@@ -2902,18 +2921,13 @@ async def test_loop_step_run_while_start_with_callable() -> None:
         condition=lambda x: x > 5,
         loop_type=LoopType.WHILE,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=10,
         args={"x": 10},
     )
 
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.START
     assert result.loop_result is True
-    assert result.start_index == 0
-    assert result.end_index == 10
 
 
 @pytest.mark.asyncio
@@ -2924,8 +2938,6 @@ async def test_loop_step_run_while_start_with_string() -> None:
         condition="x > 5",
         loop_type=LoopType.WHILE,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=10,
         args={"x": 10},
     )
 
@@ -2939,10 +2951,7 @@ async def test_loop_step_run_while_start_with_string() -> None:
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result.step_type == LoopStepType.START
         assert result.loop_result is True
-        assert result.start_index == 0
-        assert result.end_index == 10
 
 
 @pytest.mark.asyncio
@@ -2953,18 +2962,13 @@ async def test_loop_step_run_do_while_end_with_callable() -> None:
         condition=lambda x: x > 5,
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
         args={"x": 10},
     )
 
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.END
     assert result.loop_result is True
-    assert result.start_index == 0
-    assert result.end_index == 10
 
 
 @pytest.mark.asyncio
@@ -2975,8 +2979,6 @@ async def test_loop_step_run_do_while_end_with_string() -> None:
         condition="x > 5",
         loop_type=LoopType.DO_WHILE,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
         args={"x": 10},
     )
 
@@ -2990,10 +2992,7 @@ async def test_loop_step_run_do_while_end_with_string() -> None:
 
         result = await step.run(run_data=mock_run_data)
 
-        assert result.step_type == LoopStepType.END
         assert result.loop_result is True
-        assert result.start_index == 0
-        assert result.end_index == 10
 
 
 @pytest.mark.asyncio
@@ -3005,8 +3004,6 @@ async def test_loop_step_run_while_start_missing_condition() -> None:
         condition=lambda x: x > 0,
         loop_type=LoopType.WHILE,
         loop_step_type=LoopStepType.START,
-        start_index=0,
-        end_index=10,
     )
 
     mock_run_data = Mock()
@@ -3026,19 +3023,14 @@ async def test_loop_step_run_for_each_end() -> None:
         over=StepOutput(0),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=3,
         index=1,
     )
 
     mock_run_data = Mock()
     result = await step.run(run_data=mock_run_data)
 
-    assert result.step_type == LoopStepType.END
     assert result.loop_result is True
     assert result.value is True
-    assert result.start_index == 0
-    assert result.end_index == 3
 
 
 def test_current_loop_variable_with_none_over() -> None:
@@ -3049,8 +3041,6 @@ def test_current_loop_variable_with_none_over() -> None:
         over=StepOutput("test_step"),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3071,8 +3061,6 @@ def test_current_loop_variable_with_sequence_over() -> None:
         over=[["item1", "item2"], ["item3", "item4"]],
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3090,8 +3078,6 @@ def test_current_loop_variable_with_sequence_over_different_index() -> None:
         over=[["item1", "item2"], ["item3", "item4"]],
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=1,
     )
 
@@ -3109,8 +3095,6 @@ def test_current_loop_variable_with_reference_over() -> None:
         over=StepOutput("previous_step"),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3134,8 +3118,6 @@ def test_current_loop_variable_with_reference_over_different_index() -> None:
         over=StepOutput("previous_step"),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=1,
     )
 
@@ -3156,8 +3138,6 @@ def test_current_loop_variable_with_non_sequence_resolved_value() -> None:
         over=StepOutput("previous_step"),
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3179,8 +3159,6 @@ def test_current_loop_variable_with_index_out_of_bounds() -> None:
         over=[["item1", "item2"], ["item3", "item4"], ["item5", "item6"]],
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=2,  # Valid index for outer sequence
     )
 
@@ -3200,8 +3178,6 @@ def test_current_loop_variable_with_empty_sequence() -> None:
         over=[[]],
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3219,8 +3195,6 @@ def test_current_loop_variable_with_nested_sequences() -> None:
         over=[[{"key": "value1"}, {"key": "value2"}], [{"key": "value3"}]],
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3238,8 +3212,6 @@ def test_current_loop_variable_with_mixed_types() -> None:
         over=[["string", 42, {"dict": "value"}, [1, 2, 3]]],
         loop_type=LoopType.FOR_EACH,
         loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
         index=0,
     )
 
@@ -3247,230 +3219,3 @@ def test_current_loop_variable_with_mixed_types() -> None:
     result = step._current_loop_variable(mock_run_data)
 
     assert result == "string"
-
-
-def test_start_index_value_with_valid_index() -> None:
-    """Test start_index_value with a valid start index."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=5,
-        end_index=10,
-    )
-
-    result = step.start_index_value
-
-    assert result == 5
-
-
-def test_start_index_value_with_zero_index() -> None:
-    """Test start_index_value with zero start index."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
-    )
-
-    result = step.start_index_value
-
-    assert result == 0
-
-
-def test_start_index_value_with_negative_index() -> None:
-    """Test start_index_value with negative start index."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=-1,
-        end_index=10,
-    )
-
-    result = step.start_index_value
-
-    assert result == -1
-
-
-def test_start_index_value_with_none_raises_error() -> None:
-    """Test start_index_value raises ValueError when start_index is None."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=10,
-    )
-
-    # Manually set start_index to None to test the property behavior
-    step.start_index = None  # type: ignore[assignment]
-
-    with pytest.raises(ValueError, match="Start index is None"):
-        _ = step.start_index_value
-
-
-def test_end_index_value_with_valid_index() -> None:
-    """Test end_index_value with a valid end index."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=15,
-    )
-
-    result = step.end_index_value
-
-    assert result == 15
-
-
-def test_end_index_value_with_zero_index() -> None:
-    """Test end_index_value with zero end index."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=0,
-    )
-
-    result = step.end_index_value
-
-    assert result == 0
-
-
-def test_end_index_value_with_negative_index() -> None:
-    """Test end_index_value with negative end index."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=-5,
-    )
-
-    result = step.end_index_value
-
-    assert result == -5
-
-
-def test_end_index_value_with_none_raises_error() -> None:
-    """Test end_index_value raises ValueError when end_index is None."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=None,
-    )
-
-    with pytest.raises(ValueError, match="End index is None"):
-        _ = step.end_index_value
-
-
-def test_start_index_value_with_large_number() -> None:
-    """Test start_index_value with a large number."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=1000000,
-        end_index=2000000,
-    )
-
-    result = step.start_index_value
-
-    assert result == 1000000
-
-
-def test_end_index_value_with_large_number() -> None:
-    """Test end_index_value with a large number."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=999999,
-    )
-
-    result = step.end_index_value
-
-    assert result == 999999
-
-
-def test_both_index_values_together() -> None:
-    """Test both start_index_value and end_index_value together."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=None,
-        over=StepOutput("test_step"),
-        loop_type=LoopType.FOR_EACH,
-        loop_step_type=LoopStepType.END,
-        start_index=3,
-        end_index=7,
-    )
-
-    start_result = step.start_index_value
-    end_result = step.end_index_value
-
-    assert start_result == 3
-    assert end_result == 7
-    assert end_result > start_result
-
-
-def test_index_values_with_while_loop() -> None:
-    """Test index values with WHILE loop type."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=lambda x: x > 0,
-        loop_type=LoopType.WHILE,
-        loop_step_type=LoopStepType.END,
-        start_index=0,
-        end_index=5,
-    )
-
-    start_result = step.start_index_value
-    end_result = step.end_index_value
-
-    assert start_result == 0
-    assert end_result == 5
-
-
-def test_index_values_with_do_while_loop() -> None:
-    """Test index values with DO_WHILE loop type."""
-    step = LoopStep(
-        step_name="test_loop",
-        condition=lambda x: x < 10,
-        loop_type=LoopType.DO_WHILE,
-        loop_step_type=LoopStepType.END,
-        start_index=1,
-        end_index=8,
-    )
-
-    start_result = step.start_index_value
-    end_result = step.end_index_value
-
-    assert start_result == 1
-    assert end_result == 8

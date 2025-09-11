@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.loops import LoopStepResult, LoopStepType
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.step_v2 import LoopStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -2772,14 +2773,14 @@ class Portia:
                         tool_id=step.to_legacy_step(plan).tool_id,
                     )
                 )
+            jump_to_step_index = None
             match result:
                 case ConditionalStepResult():
                     jump_to_step_index = self._handle_conditional_step(result, branch_stack)
                 case LoopStepResult():
-                    jump_to_step_index = self._handle_loop_step(result)
-                    result = result.value
-                case _:
-                    jump_to_step_index = None
+                    if isinstance(step, LoopStep):
+                        jump_to_step_index = self._handle_loop_step(result, step)
+                        result = result.value
 
             # Some steps output a LocalDataValue so they can attach a summary to the output, but
             # we don't enforce that all steps do this so we need to handle both cases.
@@ -2837,7 +2838,7 @@ class Portia:
                 run_data.plan_run.current_step_index = jump_to_step_index
             else:
                 run_data.plan_run.current_step_index = index + 1
-            logger().info(f"Completed step {index}, result: {result}")
+            logger().info(f"Completed step {index}", result=result)
 
         return self._post_plan_run_execution(
             run_data.legacy_plan,
@@ -2846,18 +2847,22 @@ class Portia:
             skip_summarization=not plan.summarize and plan.final_output_schema is None,
         )
 
-    def _handle_loop_step(self, result: LoopStepResult) -> int | None:
+    def _handle_loop_step(self, result: LoopStepResult, step: LoopStep) -> int | None:
         """Handle a loop step."""
-        match result.step_type, result.loop_result:
+        match step.loop_step_type, result.loop_result:
             case LoopStepType.START, True:
                 logger().debug("Running loop")
                 return None  # just iterate the loop as usual
             case LoopStepType.END, True:
                 logger().debug("Returning to loop start")
-                return result.start_index
+                return step.loop_block.start_step_index if step.loop_block else None
             case (_, False):
                 logger().debug("Loop condition is false, jumping to exit")
-                return result.end_index + 1
+                return (
+                    step.loop_block.end_step_index + 1
+                    if step.loop_block and step.loop_block.end_step_index
+                    else None
+                )
 
     def _handle_conditional_step(
         self, result: ConditionalStepResult, branch_stack: list[ConditionalStepResult]

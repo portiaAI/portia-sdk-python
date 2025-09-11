@@ -85,7 +85,7 @@ class WrappedToolNode(ToolNode):
                     )
                 }
 
-        logger().info(f"🛠️ Calling tool{"s" if len(tool_names) > 1 else ""}: {",".join(tool_names)}")
+        logger().info(f"🛠️ Calling tool{'s' if len(tool_names) > 1 else ''}: {','.join(tool_names)}")
         result = await super().ainvoke(input, config, **kwargs)
         logger().debug(f"🛠️ Tool result: {result}")
 
@@ -314,6 +314,7 @@ class ReActAgent:
         langchain_tools = [
             tool.to_langchain_with_artifact(
                 ctx=tool_run_ctx,
+                sync=False,
             )
             for tool in self.tools
         ]

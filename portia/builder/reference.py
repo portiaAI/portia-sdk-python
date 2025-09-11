@@ -28,8 +28,14 @@ Example:
 
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override  # pragma: no cover
 
 import pydash
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,7 +54,7 @@ def default_step_name(step_index: int) -> str:
         step_index: The zero-based index of the step in the plan.
 
     Returns:
-        A string in the format "step_{index}" (e.g., "step_0", "step_1").
+        A string in the format `"step_{index}" (e.g., "step_0", "step_1")`.
 
     """
     return f"step_{step_index}"
