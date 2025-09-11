@@ -187,9 +187,9 @@ class Reference(BaseModel, ABC):
         class_name = match.group(1)
         if class_name != cls.__name__:
             raise ValueError(f"Invalid input string format: {input_str}")
-        raw_args = match.group(2)
+        raw_args = match.group(2).strip()
         if raw_args is None or raw_args == "":
-            raise ValueError(f"Invalid input string format: {input_str}")
+            return [], {}
         args = raw_args.split(",")
         must_be_closed = ['"', "'"]
         must_be_matched = ["{", "}", "[", "]", "(", ")"]

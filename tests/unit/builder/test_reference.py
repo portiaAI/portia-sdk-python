@@ -9,11 +9,11 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Input, StepOutput, default_step_name
+from portia.builder.reference import Input, Reference, StepOutput, default_step_name
 from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
-from portia.run_context import StepOutputValue
+from portia.run_context import RunContext, StepOutputValue
 
 # Test cases for the default_step_name function
 
@@ -967,3 +967,28 @@ def test_reference_argument_conversion(input_str: str, expected_argument: Any) -
     """Test reference argument conversion."""
     assert StepOutput._convert_argument(input_str) == expected_argument
     assert Input._convert_argument(input_str) == expected_argument
+
+
+class TestReference(Reference):
+    """Test Reference class. Implements the abstract methods of the Reference class."""
+
+    def get_legacy_name(self, plan: PlanV2) -> str:  # noqa: ARG002
+        """Get the legacy name of the reference."""
+        return "test_reference"
+
+    def get_value(self, run_data: RunContext) -> Any | None:  # noqa: ANN401, ARG002
+        """Get the value of the reference."""
+        return "test_value"
+
+
+@pytest.mark.parametrize(
+    "input_str",
+    [
+        "TestReference()",
+        "TestReference( )",
+        "{{ TestReference() }}",
+    ],
+)
+def test_reference_from_str(input_str: str) -> None:
+    """Test Reference.from_str."""
+    TestReference.from_str(input_str)
