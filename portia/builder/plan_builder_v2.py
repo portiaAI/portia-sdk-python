@@ -18,6 +18,7 @@ from portia.builder.step_v2 import (
     LoopStep,
     ReActAgentStep,
     SingleToolAgentStep,
+    SubplanStep,
     StepV2,
     UserInputStep,
     UserVerifyStep,
@@ -28,7 +29,7 @@ from portia.telemetry.views import PlanV2BuildTelemetryEvent
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Sequence
 
     from pydantic import BaseModel
 
@@ -690,69 +691,31 @@ class PlanBuilderV2:
         self.plan.steps.append(step)
         return self
 
-    def add_steps(
+    def add_sub_plan(
         self,
-        plan: PlanV2 | Iterable[StepV2],
+        plan: PlanV2,
         input_values: dict[str, Any] | None = None,
+        step_name: str | None = None,
     ) -> PlanBuilderV2:
-        """Add multiple steps or merge another plan into this builder.
+        """Add a step that runs a sub-plan and returns its result."""
 
-        This allows you to compose plans by merging smaller plans together, or to add
-        a sequence of pre-built steps all at once. When merging a PlanV2, both the
-        steps and the plan inputs are merged into the current builder.
-
-        This is useful for creating reusable sub-plans that can be incorporated into
-        larger workflows.
-
-        Args:
-            plan: Either a complete PlanV2 to merge (including its steps and inputs),
-                or any iterable of StepV2 instances to add to the current plan.
-            input_values: Optional mapping of inputs in the sub-plan to values. This is
-                only used when plan is a PlanV2, and is useful if a sub-plan has an input
-                and you want to provide a value for it from a step in the top-level plan.
-                For example:
-
-            ```python
-                sub_plan = builder.input(name="input_name").build()
-                top_plan = builder.llm_step(step_name="llm_step", task="Task")
-                           .add_steps(sub_plan, input_values={"input_name": StepOutput("llm_step")})
-                           .build()
-            ```
-
-            input_values: Optional mapping of input names to default values. Only used
-                when plan is a PlanV2. These values will be set as default values for
-                the corresponding plan inputs.
-
-        Raises:
-            PlanBuilderError: If duplicate input names are detected when merging plans,
-                or if you try to provide values for inputs that don't exist in the
-                sub-plan.
-
-        """
-        if isinstance(plan, PlanV2):
-            # Ensure there are no duplicate plan inputs
-            existing_input_names = {p.name for p in self.plan.plan_inputs}
-            for _input in plan.plan_inputs:
-                if _input.name in existing_input_names:
-                    raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
-            self.plan.plan_inputs.extend(plan.plan_inputs)
-            self.plan.steps.extend(plan.steps)
-        else:
-            self.plan.steps.extend(plan)
-
-        if input_values and isinstance(plan, PlanV2):
+        if input_values:
             allowed_input_names = {p.name for p in plan.plan_inputs}
-            for input_name, input_value in input_values.items():
+            for input_name in input_values.keys():
                 if input_name not in allowed_input_names:
                     raise PlanBuilderError(
                         f"Tried to provide value for input {input_name} not found in "
-                        "sub-plan passed into add_steps()."
+                        "sub-plan passed into add_sub_plan().",
                     )
-                for plan_input in self.plan.plan_inputs:
-                    if plan_input.name == input_name:
-                        plan_input.value = input_value
-                        break
 
+        self.plan.steps.append(
+            SubplanStep(
+                plan=plan,
+                input_values=input_values or {},
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+            )
+        )
         return self
 
     def final_output(

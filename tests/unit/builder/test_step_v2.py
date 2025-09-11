@@ -793,7 +793,7 @@ async def test_llm_step_run_linked_inputs() -> None:
     ]
     mock_run_data.plan = Mock()
     # A plan input being the output value from another step can happen with linked plans using
-    # .add_steps().
+    # .add_sub_plan().
     mock_run_data.plan.plan_inputs = [
         PlanInput(name="user_name"),
         PlanInput(name="user_height", value=StepOutput(1)),
