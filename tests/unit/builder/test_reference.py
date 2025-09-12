@@ -99,6 +99,19 @@ def test_get_legacy_name_with_string_step() -> None:
     mock_plan.step_output_name.assert_called_once_with("named_step")
 
 
+def test_get_legacy_name_with_negative_step() -> None:
+    """Test get_legacy_name with negative step index."""
+    step_output = StepOutput(-1)
+
+    mock_plan = Mock(spec=PlanV2)
+    mock_plan.step_output_name.return_value = "$step_2_output"
+
+    result = step_output.get_legacy_name(mock_plan)
+
+    assert result == "$step_2_output"
+    mock_plan.step_output_name.assert_called_once_with(-1)
+
+
 def test_get_value_with_int_step_success() -> None:
     """Test get_value method with integer step - successful case."""
     step_output = StepOutput(1)
@@ -109,10 +122,29 @@ def test_get_value_with_int_step_success() -> None:
         StepOutputValue(step_num=1, step_name="step_1", value="test result", description=""),
         StepOutputValue(step_num=2, step_name="step_2", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
 
     assert result == "test result"
+
+
+def test_get_value_with_negative_step_success() -> None:
+    """Test get_value method with negative step index."""
+    step_output = StepOutput(-1)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="first", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="third", description=""),
+    ]
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = [Mock(), Mock(), Mock()]
+
+    result = step_output.get_value(mock_run_data)
+
+    assert result == "third"
 
 
 def test_get_value_with_string_step_success() -> None:
@@ -125,6 +157,7 @@ def test_get_value_with_string_step_success() -> None:
         StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
         StepOutputValue(step_num=2, step_name="my_step", value="test result", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "test result"
@@ -147,6 +180,7 @@ def test_get_value_with_path_success() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=MockData(), description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "extracted_value"
@@ -161,6 +195,7 @@ def test_get_value_with_path_dict_access() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="search", value=mock_data, description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "First Result"
@@ -175,6 +210,7 @@ def test_get_value_with_path_array_access() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=mock_data, description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "second"
@@ -189,6 +225,7 @@ def test_get_value_with_path_complex_key() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=mock_data, description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "found_it"
@@ -207,6 +244,7 @@ def test_get_value_with_path_mixed_notation() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=MockResult(), description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "First"
@@ -231,6 +269,7 @@ def test_get_value_with_int_step_index_error() -> None:
             description="",
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
 
@@ -246,6 +285,7 @@ def test_get_value_with_string_step_value_error() -> None:
         StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
         StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
 
@@ -265,6 +305,7 @@ def test_get_value_with_path_attribute_error() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=MockData(), description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result is None
@@ -280,6 +321,7 @@ def test_get_value_with_path_key_error() -> None:
             step_num=0, step_name="step_0", value={"existing_key": "value"}, description=""
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result is None
@@ -293,6 +335,7 @@ def test_get_value_with_path_index_error() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=[1, 2, 3], description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result is None
@@ -306,6 +349,7 @@ def test_get_value_with_path_step_not_found() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     with patch("portia.builder.reference.logger") as mock_logger:
         result = step_output.get_value(mock_run_data)
@@ -335,6 +379,7 @@ def test_get_value_with_path_pydantic_model() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value=mock_data, description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == "John Doe"
@@ -350,10 +395,32 @@ def test_get_description_with_int_step() -> None:
             step_num=0, step_name="step_0", value="test", description="First step output"
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_description(mock_run_data)
 
     assert result == "First step output"
+
+
+def test_get_description_with_negative_step() -> None:
+    """Test get_description method with negative step index."""
+    step_output = StepOutput(-1)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=0, step_name="step_0", value="test", description="First step output"
+        ),
+        StepOutputValue(
+            step_num=1, step_name="step_1", value="test", description="Second step output"
+        ),
+    ]
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = [Mock(), Mock()]
+
+    result = step_output.get_description(mock_run_data)
+
+    assert result == "Second step output"
 
 
 def test_get_description_with_string_step() -> None:
@@ -369,6 +436,7 @@ def test_get_description_with_string_step() -> None:
             step_num=1, step_name="my_step", value="test", description="Second step output"
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_description(mock_run_data)
     assert result == "Second step output"
@@ -387,6 +455,7 @@ def test_get_description_with_invalid_step() -> None:
             step_num=1, step_name="step_1", value="test", description="Second step output"
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_description(mock_run_data)
 
@@ -490,6 +559,7 @@ def test_get_value_with_reference() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_output_0", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = input_ref.get_value(mock_run_data)
 
@@ -792,6 +862,7 @@ def test_step_output_full_get_value_single_output() -> None:
         StepOutputValue(step_num=1, step_name="my_step", value="test result", description=""),
         StepOutputValue(step_num=2, step_name="step_2", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == ["test result"]
@@ -811,6 +882,7 @@ def test_step_output_full_get_value_multiple_outputs() -> None:
         StepOutputValue(step_num=3, step_name="loop_step", value="third iteration", description=""),
         StepOutputValue(step_num=4, step_name="step_4", value="final", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == ["first iteration", "second iteration", "third iteration"]
@@ -831,6 +903,7 @@ def test_step_output_full_get_value_with_path() -> None:
         StepOutputValue(step_num=2, step_name="loop_step", value=mock_data2, description=""),
         StepOutputValue(step_num=3, step_name="loop_step", value=mock_data3, description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == ["first_value", "second_value", "third_value"]
@@ -851,6 +924,7 @@ def test_step_output_full_get_value_with_path_mixed_data() -> None:
             step_num=3, step_name="mixed_step", value={"data": [1, 2, 3]}, description=""
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == ["string_value", 42, [1, 2, 3]]
@@ -865,6 +939,7 @@ def test_step_output_full_get_value_no_matches() -> None:
         StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
         StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == []
@@ -883,6 +958,7 @@ def test_step_output_full_get_value_with_path_missing_field() -> None:
             step_num=2, step_name="loop_step", value={"data": "value2"}, description=""
         ),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == [None, None]
@@ -899,6 +975,7 @@ def test_step_output_full_get_value_with_int_step() -> None:
         StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
         StepOutputValue(step_num=2, step_name="step_2", value="final", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == ["first", "second"]
@@ -920,6 +997,7 @@ def test_step_output_full_loop_scenario() -> None:
         StepOutputValue(step_num=3, step_name="process_item", value="processed_3", description=""),
         StepOutputValue(step_num=4, step_name="finalize", value="done", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == ["processed_1", "processed_2", "processed_3"]
@@ -940,6 +1018,7 @@ def test_step_output_full_loop_with_path_scenario() -> None:
         StepOutputValue(step_num=2, step_name="analyze_item", value=mock_data2, description=""),
         StepOutputValue(step_num=3, step_name="analyze_item", value=mock_data3, description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == [85, 92, 78]
@@ -957,6 +1036,7 @@ def test_step_output_full_vs_normal_behavior() -> None:
         StepOutputValue(step_num=2, step_name="my_step", value="second", description=""),
         StepOutputValue(step_num=3, step_name="step_3", value="final", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result_full = step_output_full.get_value(mock_run_data)
     result_normal = step_output_normal.get_value(mock_run_data)
@@ -974,6 +1054,7 @@ def test_step_output_full_empty_list_when_no_outputs() -> None:
         StepOutputValue(step_num=0, step_name="step_0", value="test", description=""),
         StepOutputValue(step_num=1, step_name="step_1", value="test", description=""),
     ]
+    mock_run_data.plan.steps = []
 
     result = step_output.get_value(mock_run_data)
     assert result == []

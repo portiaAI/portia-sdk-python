@@ -124,7 +124,7 @@ class PlanV2(BaseModel):
 
         Args:
             step: The step to get the output name for. Can be:
-                - int: Index of the step in the plan
+                - int: Index of the step in the plan (negative values count from the end)
                 - str: Name of the step
                 - StepV2: The step instance itself
 
@@ -135,7 +135,7 @@ class PlanV2(BaseModel):
             elif isinstance(step, str):
                 step_num = self.idx_by_name(step)
             else:
-                step_num = step
+                step_num = step if step >= 0 else len(self.steps) + step
         except ValueError:
             logger().warning(
                 f"Attempted to retrieve name of step {step} but step not found in plan"
