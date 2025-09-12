@@ -2004,3 +2004,71 @@ async def test_react_agent_weather_with_clarifications() -> None:
 
     # Verify step has summary
     assert weather_step_output.get_summary() is not None
+
+
+def test_plan_v2_on_error_handler_continues_execution() -> None:
+    """If a step fails but has an on_error handler, continue with returned value."""
+    from portia.tool_registry import ToolRegistry
+
+    class Args(BaseModel):
+        pass
+
+    class FailingTool(Tool):
+        id: str = "failing_tool"
+        name: str = "Failing Tool"
+        description: str = "Always fails"
+        args_schema: type[BaseModel] = Args
+        output_schema: tuple[str, str] = ("str", "output")
+
+        def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+            raise RuntimeError("boom")
+
+    config = Config.from_default()
+    portia = Portia(config=config, tools=ToolRegistry([FailingTool()]))
+
+    plan = (
+        PlanBuilderV2("on_error test")
+        .invoke_tool_step(tool="failing_tool")
+        .on_error(lambda e: "recovered")
+        .function_step(function=lambda x: f"next:{x}", args={"x": StepOutput(0)})
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == "next:recovered"
+
+
+def test_plan_v2_ignore_errors_sets_none_and_continues() -> None:
+    """ignore_errors should swallow error and set step output to None."""
+    from portia.tool_registry import ToolRegistry
+
+    class Args(BaseModel):
+        pass
+
+    class FailingTool2(Tool):
+        id: str = "failing_tool_2"
+        name: str = "Failing Tool 2"
+        description: str = "Always fails"
+        args_schema: type[BaseModel] = Args
+        output_schema: tuple[str, str] = ("str", "output")
+
+        def run(self, ctx: ToolRunContext) -> str:  # noqa: ARG002
+            raise RuntimeError("boom2")
+
+    config = Config.from_default()
+    portia = Portia(config=config, tools=ToolRegistry([FailingTool2()]))
+
+    plan = (
+        PlanBuilderV2("ignore_errors test")
+        .invoke_tool_step(tool="failing_tool_2")
+        .ignore_errors()
+        .function_step(function=lambda x: f"next:{x}", args={"x": StepOutput(0)})
+        .build()
+    )
+
+    plan_run = portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    assert plan_run.outputs.final_output.get_value() == "next:None"
