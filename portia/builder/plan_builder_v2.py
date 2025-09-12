@@ -769,6 +769,22 @@ class PlanBuilderV2:
 
         return self
 
+    def on_error(self, handler: "Callable[[Exception], Any]") -> PlanBuilderV2:  # noqa: D401
+        """Attach an error handler to the previously added step.
+
+        The handler is called with the Exception if the step raises. If the handler returns a
+        value, that value becomes the step's output and execution continues. If the handler
+        re-raises, the error propagates and the plan fails.
+        """
+        if len(self.plan.steps) == 0:
+            raise PlanBuilderError("on_error must be called after adding a step")
+        self.plan.steps[-1].on_error = handler  # type: ignore[attr-defined]
+        return self
+
+    def ignore_errors(self) -> PlanBuilderV2:
+        """Ignore errors from the previous step and continue with a None output."""
+        return self.on_error(lambda e: None)
+
     def final_output(
         self,
         output_schema: type[BaseModel] | None = None,
