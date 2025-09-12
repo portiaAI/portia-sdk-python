@@ -26,7 +26,6 @@ from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
 from portia.telemetry.views import PlanV2BuildTelemetryEvent
 from portia.tool_decorator import tool
-from portia.model import GenerativeModel
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -34,6 +33,7 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from portia.common import Serializable
+    from portia.model import GenerativeModel
     from portia.tool import Tool
 
 

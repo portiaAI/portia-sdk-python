@@ -1476,8 +1476,6 @@ def test_single_tool_agent_step_passes_model_to_agent() -> None:
     mock_run_data.plan_run = Mock()
     mock_run_data.legacy_plan = Mock()
     mock_run_data.plan = Mock(id="plan")
-    mock_run_data.end_user = Mock()
-    mock_run_data.execution_hooks = Mock()
 
     mock_tool = Mock()
     with (
@@ -1805,7 +1803,9 @@ async def test_react_agent_step_run() -> None:
 @pytest.mark.asyncio
 async def test_react_agent_step_run_with_model() -> None:
     """Test ReActAgentStep run method with a specified model."""
-    step = ReActAgentStep(task="Research", tools=["search_tool"], model="openai/gpt-4o")
+    step = ReActAgentStep(
+        task="Research", tools=["search_tool"], model="openai/gpt-4o", step_name="react_research"
+    )
     mock_run_data = Mock()
     mock_tool = Mock()
     mock_output = LocalDataValue(value="result")

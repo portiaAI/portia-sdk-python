@@ -323,7 +323,6 @@ class LLMStep(StepV2):
             "The model to use for this step. If not provided, the default model from the config "
             "will be used."
         ),
-        exclude=True,
     )
 
     def __str__(self) -> str:
@@ -506,7 +505,6 @@ class SingleToolAgentStep(StepV2):
             "The model to use for this agent. If not provided, the execution model from the config"
             " will be used."
         ),
-        exclude=True,
     )
 
     def __str__(self) -> str:
@@ -627,7 +625,6 @@ class ReActAgentStep(StepV2):
             "The model to use for this agent. If not provided, the planning model from the config "
             "will be used."
         ),
-        exclude=True,
     )
 
     def __str__(self) -> str:
@@ -675,7 +672,7 @@ class ReActAgentStep(StepV2):
             tool_call_limit=self.tool_call_limit,
             allow_agent_clarifications=self.allow_agent_clarifications,
             output_schema=self.output_schema,
-             model=self.model,
+            model=self.model,
         )
 
     @override

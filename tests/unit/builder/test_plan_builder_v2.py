@@ -353,7 +353,7 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
 
     builder.single_tool_agent_step(
         tool="complex_tool",
-       task="Process complex data",
+        task="Process complex data",
         inputs=inputs,
         output_schema=OutputSchema,
         step_name="agent_step",

@@ -627,6 +627,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             end_user (EndUser): The end user for this execution
             tool (Tool | None): The tool to be used for the task (optional).
             execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
+            model (GenerativeModel | str | None): The model to use for the agent.
 
         """
         super().__init__(
@@ -714,7 +715,10 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         self.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="default",
-                model=str(self.config.get_generative_model(self.model) or self.config.get_execution_model()),
+                model=str(
+                    self.config.get_generative_model(self.model)
+                    or self.config.get_execution_model()
+                ),
                 sync=True,
                 tool_id=self.tool.id if self.tool else None,
             )

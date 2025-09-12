@@ -32,11 +32,11 @@ from portia.execution_agents.execution_utils import (
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
 from portia.logger import logger
+from portia.model import GenerativeModel
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
-from portia.model import GenerativeModel
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -283,6 +283,7 @@ class OneShotAgent(BaseExecutionAgent):
             end_user (EndUser): The end user for the execution.
             tool (Tool | None): The tool to be used for the task (optional).
             execution_hooks (ExecutionHooks | None): The execution hooks for the agent.
+            model (GenerativeModel | str | None): The model to use for the agent.
 
         """
         super().__init__(
@@ -305,7 +306,9 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
-        exec_model = self.config.get_generative_model(self.model) or self.config.get_execution_model()
+        exec_model = (
+            self.config.get_generative_model(self.model) or self.config.get_execution_model()
+        )
         self.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="one_shot",
@@ -331,7 +334,9 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
-        exec_model = self.config.get_generative_model(self.model) or self.config.get_execution_model()
+        exec_model = (
+            self.config.get_generative_model(self.model) or self.config.get_execution_model()
+        )
         self.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="one_shot",
