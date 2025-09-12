@@ -173,6 +173,7 @@ def test_resolve_input_reference_with_string_template_step_output() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     template = f"The result was {StepOutput(0)}"
     result = step._resolve_references(template, mock_run_data)
@@ -211,6 +212,7 @@ def test_resolve_input_reference_with_string_template_step_both() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
     mock_run_data.plan_run = Mock()
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
@@ -267,6 +269,7 @@ def test_string_templating_with_path_comprehensive() -> None:
             description="Analysis results",
         ),
     ]
+    mock_run_data.plan.steps = []
 
     # Test 1: StepOutput with simple path
     result = step._template_references(
@@ -507,6 +510,7 @@ async def test_llm_step_run_one_reference_input() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -548,6 +552,7 @@ async def test_llm_step_run_interpolated_reference_in_task() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     with (
         patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -593,6 +598,7 @@ async def test_llm_step_run_mixed_inputs() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [
         PlanInput(name="user_name", description="The name of the user")
     ]
@@ -708,6 +714,7 @@ async def test_llm_step_run_with_string_template_input() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
     mock_run_data.plan_run = Mock()
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
@@ -835,6 +842,7 @@ async def test_llm_step_run_linked_inputs() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     # A plan input being the output value from another step can happen with linked plans using
     # .add_steps().
     mock_run_data.plan.plan_inputs = [
@@ -1284,6 +1292,7 @@ async def test_invoke_tool_step_with_string_arg_templates() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
     mock_run_data.plan_run = Mock()
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
@@ -1809,6 +1818,7 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
             step_num=1,
         )
     ]
+    mock_run_data.plan.steps = []
 
     mock_output = LocalDataValue(value="ReAct execution with string interpolation")
 
@@ -1884,6 +1894,7 @@ async def test_user_verify_step_requests_clarification() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value="result", description="")
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 
@@ -1953,6 +1964,7 @@ async def test_user_verify_step_with_string_template_message() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 
@@ -2503,6 +2515,7 @@ async def test_user_input_step_message_with_templates() -> None:
             step_num=1,
         ),
     ]
+    mock_run_data.plan.steps = []
     mock_run_data.storage = Mock()
 
     result = await step.run(run_data=mock_run_data)
@@ -2618,6 +2631,7 @@ def test_current_loop_variable_with_over() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = step._current_loop_variable(mock_run_data)
     assert result == "b"
@@ -2658,6 +2672,7 @@ def test_current_loop_variable_with_non_sequence() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     with pytest.raises(TypeError, match="Loop variable is not indexable"):
         step._current_loop_variable(mock_run_data)
@@ -2684,6 +2699,7 @@ def test_current_loop_variable_index_out_of_range() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = step._current_loop_variable(mock_run_data)
     assert result is None
@@ -2771,6 +2787,7 @@ async def test_loop_step_run_for_each_start() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 
@@ -2821,6 +2838,7 @@ async def test_loop_step_run_for_each_start_no_value() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 
