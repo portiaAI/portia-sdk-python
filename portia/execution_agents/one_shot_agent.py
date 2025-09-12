@@ -36,6 +36,7 @@ from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
+from portia.model import GenerativeModel
 
 if TYPE_CHECKING:
     from langchain.tools import StructuredTool
@@ -270,6 +271,7 @@ class OneShotAgent(BaseExecutionAgent):
         end_user: EndUser,
         tool: Tool | None = None,
         execution_hooks: ExecutionHooks | None = None,
+        model: GenerativeModel | str | None = None,
     ) -> None:
         """Initialize the OneShotAgent.
 
@@ -292,6 +294,7 @@ class OneShotAgent(BaseExecutionAgent):
             tool=tool,
             execution_hooks=execution_hooks,
         )
+        self.model = model
 
     def execute_sync(self) -> Output:
         """Run the core execution logic of the task.
@@ -302,10 +305,11 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        exec_model = self.config.get_generative_model(self.model) or self.config.get_execution_model()
         self.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="one_shot",
-                model=str(self.config.get_execution_model()),
+                model=str(exec_model),
                 sync=True,
                 tool_id=self.tool.id if self.tool else None,
             )
@@ -327,10 +331,11 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
+        exec_model = self.config.get_generative_model(self.model) or self.config.get_execution_model()
         self.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="one_shot",
-                model=str(self.config.get_execution_model()),
+                model=str(exec_model),
                 sync=False,
                 tool_id=self.tool.id if self.tool else None,
             )
@@ -355,7 +360,7 @@ class OneShotAgent(BaseExecutionAgent):
             clarifications=self.plan_run.get_clarifications_for_step(),
         )
 
-        model = self.config.get_execution_model()
+        model = self.config.get_generative_model(self.model) or self.config.get_execution_model()
         tools = [
             self.tool.to_langchain_with_artifact(ctx=tool_run_ctx, sync=sync),
         ]

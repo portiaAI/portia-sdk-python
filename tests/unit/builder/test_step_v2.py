@@ -691,6 +691,34 @@ async def test_llm_step_run_without_prompt() -> None:
 
 
 @pytest.mark.asyncio
+async def test_llm_step_run_with_model() -> None:
+    """Test LLMStep run with a specified model."""
+    step = LLMStep(task="Analyze data", step_name="analysis", model="openai/gpt-4o")
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        mock_llm_tool_instance = Mock()
+        mock_llm_tool_class.return_value = mock_llm_tool_instance
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Analysis complete"
+        mock_llm_tool_class.assert_called_once_with(
+            structured_output_schema=None, model="openai/gpt-4o"
+        )
+        mock_wrapper_instance.arun.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_llm_step_run_with_string_template_input() -> None:
     """Test LLMStep run with an input string containing reference templates."""
     step = LLMStep(
@@ -1433,6 +1461,45 @@ async def test_single_tool_agent_step_with_execution_agent_types(
             mock_oneshot_execute.assert_not_called()
 
 
+def test_single_tool_agent_step_passes_model_to_agent() -> None:
+    """Ensure SingleToolAgentStep passes model to the execution agent."""
+    step = SingleToolAgentStep(
+        tool="mock_tool",
+        task="test task",
+        step_name="agent_step",
+        model="openai/gpt-4o",
+    )
+    mock_run_data = Mock()
+    mock_run_data.config.execution_agent_type = ExecutionAgentType.DEFAULT
+    mock_run_data.tool_registry = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.plan_run = Mock()
+    mock_run_data.legacy_plan = Mock()
+    mock_run_data.plan = Mock(id="plan")
+    mock_run_data.end_user = Mock()
+    mock_run_data.execution_hooks = Mock()
+
+    mock_tool = Mock()
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id", return_value=mock_tool),
+        patch("portia.builder.step_v2.DefaultExecutionAgent") as mock_agent_class,
+    ):
+        mock_agent = Mock()
+        mock_agent_class.return_value = mock_agent
+        agent = step._get_agent_for_step(mock_run_data)
+        mock_agent_class.assert_called_once_with(
+            mock_run_data.legacy_plan,
+            mock_run_data.plan_run,
+            mock_run_data.config,
+            mock_run_data.storage,
+            mock_run_data.end_user,
+            mock_tool,
+            execution_hooks=mock_run_data.execution_hooks,
+            model="openai/gpt-4o",
+        )
+        assert agent == mock_agent
+
+
 def test_single_tool_agent_to_legacy_step() -> None:
     """Test SingleToolAgent to_legacy_step method."""
     inputs = [Input("query"), StepOutput(0)]
@@ -1729,8 +1796,42 @@ async def test_react_agent_step_run() -> None:
             tool_call_limit=30,
             allow_agent_clarifications=True,
             output_schema=None,
+            model=None,
         )
 
+        mock_agent.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_react_agent_step_run_with_model() -> None:
+    """Test ReActAgentStep run method with a specified model."""
+    step = ReActAgentStep(task="Research", tools=["search_tool"], model="openai/gpt-4o")
+    mock_run_data = Mock()
+    mock_tool = Mock()
+    mock_output = LocalDataValue(value="result")
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
+        patch("portia.builder.step_v2.ReActAgent") as mock_react_agent_class,
+    ):
+        mock_get_tool.return_value = mock_tool
+        mock_agent = Mock()
+        mock_agent.execute = AsyncMock(return_value=mock_output)
+        mock_react_agent_class.return_value = mock_agent
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == mock_output
+        mock_react_agent_class.assert_called_once_with(
+            task="Research",
+            task_data=[],
+            tools=[mock_tool],
+            run_data=mock_run_data,
+            tool_call_limit=25,
+            allow_agent_clarifications=False,
+            output_schema=None,
+            model="openai/gpt-4o",
+        )
         mock_agent.execute.assert_called_once()
 
 
@@ -1792,6 +1893,7 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
         assert resolved_task == "Research and analyze sentiment analysis using analysis result"
         task_data = call_kwargs["task_data"]
         assert len(task_data) == 3
+        assert call_kwargs["model"] is None
         assert task_data[0] == "Static context"
         assert isinstance(task_data[1], LocalDataValue)
         assert task_data[1].value == "search query"

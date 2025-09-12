@@ -615,6 +615,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         end_user: EndUser,
         tool: Tool | None = None,
         execution_hooks: ExecutionHooks | None = None,
+        model: GenerativeModel | str | None = None,
     ) -> None:
         """Initialize the agent.
 
@@ -637,6 +638,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             tool=tool,
             execution_hooks=execution_hooks,
         )
+        self.model = model
         self.verified_args: VerifiedToolInputs | None = None
 
     def clarifications_or_continue(
@@ -712,7 +714,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
         self.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="default",
-                model=str(self.config.get_execution_model()),
+                model=str(self.config.get_generative_model(self.model) or self.config.get_execution_model()),
                 sync=True,
                 tool_id=self.tool.id if self.tool else None,
             )
@@ -729,7 +731,7 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             clarifications=self.plan_run.get_clarifications_for_step(),
         )
 
-        model = self.config.get_execution_model()
+        model = self.config.get_generative_model(self.model) or self.config.get_execution_model()
 
         tools = [
             self.tool.to_langchain_with_artifact(
