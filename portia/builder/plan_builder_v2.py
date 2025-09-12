@@ -728,14 +728,36 @@ class PlanBuilderV2:
                 builder.add_step(step)
             plan = builder.build()
 
+        if isinstance(plan, PlanV2):
+            # Ensure there are no duplicate plan inputs
+            existing_input_names = {p.name for p in self.plan.plan_inputs}
+            for _input in plan.plan_inputs:
+                if _input.name in existing_input_names:
+                    raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
+
+        if input_values:
+            allowed_input_names = {p.name for p in plan.plan_inputs}
+            for input_name in input_values:
+                if input_name not in allowed_input_names:
+                    raise PlanBuilderError(
+                        f"Tried to provide value for input '{input_name}' not found in "
+                        f"sub-plan. Available inputs: {sorted(allowed_input_names)}"
+                    )
+            for plan_input in plan.plan_inputs:
+                # Input values passed in here overwrite any default values for the input
+                plan_input.value = input_values.get(plan_input.name, plan_input.value)
+
         self.plan.steps.append(
             SubPlanStep(
                 plan=plan,
-                input_values=input_values or {},
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
             )
         )
+
+        # Add the plan inputs from the sub-plan to the parent plan
+        self.plan.plan_inputs.extend(plan.plan_inputs)
+
         return self
 
     def final_output(

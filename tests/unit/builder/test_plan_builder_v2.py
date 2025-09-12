@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
@@ -725,6 +725,26 @@ def test_add_steps_method_with_iterable() -> None:
     assert result.plan.steps[0].plan.steps == steps
 
 
+def test_add_steps_method_with_plan_v2_duplicate_inputs_error() -> None:
+    """Test the add_steps() method raises error for duplicate plan inputs."""
+    builder = PlanBuilderV2()
+
+    builder.input(name="shared_input", description="Shared input name")
+
+    other_plan = PlanV2(
+        label="Other plan",
+        steps=[LLMStep(task="Task", step_name="step1")],
+        plan_inputs=[
+            PlanInput(name="shared_input", description="Duplicate input name"),
+            PlanInput(name="unique_input", description="Unique input"),
+        ],
+    )
+
+    # Should raise PlanBuilderError due to duplicate input
+    with pytest.raises(PlanBuilderError, match="Duplicate input shared_input found in plan"):
+        builder.add_sub_plan(other_plan)
+
+
 def test_add_steps_method_with_empty_iterable() -> None:
     """Test the add_steps() method with an empty iterable."""
     builder = PlanBuilderV2().llm_step(task="Initial step").add_sub_plan([])
@@ -757,7 +777,7 @@ def test_add_steps_method_chaining_with_different_sources() -> None:
     result = builder.add_sub_plan(step_list).add_sub_plan(plan_with_steps)
 
     assert len(result.plan.steps) == 2
-    assert len(result.plan.plan_inputs) == 0
+    assert len(result.plan.plan_inputs) == 1
     assert isinstance(result.plan.steps[0], SubPlanStep)
     assert result.plan.steps[0].plan.plan_inputs == []
     assert isinstance(result.plan.steps[1], SubPlanStep)
@@ -769,7 +789,7 @@ def test_add_sub_plan_with_invalid_input_name_error() -> None:
     builder = PlanBuilderV2()
     sub_plan = PlanBuilderV2().input(name="valid_input").llm_step(task="Task").build()
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(PlanBuilderError):
         builder.add_sub_plan(sub_plan, input_values={"invalid": "value"})
 
 
@@ -1076,6 +1096,63 @@ def test_conditional_method_chaining() -> None:
     assert len(plan.plan_inputs) == 1
 
 
+def test_add_steps_with_input_values_single_value() -> None:
+    """Test add_steps with input_values setting a single input value."""
+    builder = PlanBuilderV2()
+
+    sub_plan = (
+        PlanBuilderV2()
+        .input(name="sub_input", description="Input for sub plan")
+        .llm_step(task="Sub task", step_name="sub_step")
+        .build()
+    )
+
+    result = builder.add_sub_plan(sub_plan, input_values={"sub_input": "provided_value"})
+
+    assert len(result.plan.plan_inputs) == 1
+    assert result.plan.plan_inputs[0].name == "sub_input"
+    assert result.plan.plan_inputs[0].value == "provided_value"
+
+
+def test_add_steps_with_input_values_multiple_values_override_default() -> None:
+    """Test add_steps with input_values setting 2 out of 4 values, overriding default."""
+    builder = PlanBuilderV2()
+
+    sub_plan = (
+        PlanBuilderV2()
+        .input(name="input_no_default", description="Input without default")
+        .input(
+            name="input_with_default",
+            description="Input with default",
+            default_value="original_default",
+        )
+        .input(name="input_unchanged1", description="Unchanged input 1")
+        .input(
+            name="input_unchanged2",
+            description="Unchanged input 2",
+            default_value="unchanged_default",
+        )
+        .llm_step(task="Sub task", step_name="sub_step")
+        .build()
+    )
+
+    result = builder.add_sub_plan(
+        sub_plan,
+        input_values={
+            "input_no_default": "new_value_no_default",
+            "input_with_default": "overridden_value",
+        },
+    )
+
+    assert len(result.plan.plan_inputs) == 4
+
+    inputs = {inp.name: inp for inp in result.plan.plan_inputs}
+    assert inputs["input_no_default"].value == "new_value_no_default"
+    assert inputs["input_with_default"].value == "overridden_value"  # Should override default
+    assert inputs["input_unchanged1"].value is None
+    assert inputs["input_unchanged2"].value == "unchanged_default"
+
+
 def test_add_steps_with_input_values_invalid_input_name_error() -> None:
     """Test add_steps raises error when input_values contains invalid input name."""
     builder = PlanBuilderV2()
@@ -1087,7 +1164,7 @@ def test_add_steps_with_input_values_invalid_input_name_error() -> None:
         .build()
     )
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(PlanBuilderError):
         builder.add_sub_plan(sub_plan, input_values={"invalid_input": "some_value"})
 
 

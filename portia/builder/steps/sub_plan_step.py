@@ -1,20 +1,16 @@
 """Step that executes a sub-plan within a parent plan."""
 
-from typing import Any, Self, override
+from typing import Any, override
 
 from langsmith import traceable
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.reference import Reference
+from portia.builder.reference import Input
 from portia.builder.step_v2 import StepV2
 from portia.plan import PlanInput, Step
 from portia.portia import Portia
 from portia.run_context import RunContext
-
-
-class SubPlanStepError(ValueError):
-    """Error in SubPlanStep configuration."""
 
 
 class SubPlanStep(StepV2):
@@ -29,31 +25,12 @@ class SubPlanStep(StepV2):
     into manageable components, or implementing conditional execution of entire
     plan segments. The sub-plan's final output becomes the output of this step,
     which can then be referenced by subsequent steps in the parent plan.
-
-    Input values can be provided to the sub-plan through the input_values mapping,
-    allowing data to flow from the parent plan into the sub-plan. These values can
-    be references to previous step outputs (using StepOutput), plan inputs (using Input),
-    or literal values.
     """
 
     plan: PlanV2 = Field(description="The sub-plan to execute.")
-    input_values: dict[str, Reference | Any] = Field(
-        default_factory=dict,
-        description="Mapping of sub-plan input names to values or references passed at runtime.",
+    sub_portia: Portia | None = Field(
+        default=None, exclude=True, description="Cached Portia instance for sub-plan execution."
     )
-
-    @model_validator(mode="after")
-    def validate_input_values(self) -> Self:
-        """Validate that input_values keys correspond to actual plan inputs."""
-        if self.input_values:
-            allowed_input_names = {p.name for p in self.plan.plan_inputs}
-            for input_name in self.input_values:
-                if input_name not in allowed_input_names:
-                    raise SubPlanStepError(
-                        f"Tried to provide value for input '{input_name}' not found in "
-                        f"sub-plan. Available inputs: {sorted(allowed_input_names)}"
-                    )
-        return self
 
     def __str__(self) -> str:  # pragma: no cover - simple string representation
         """Return a description of this step for logging purposes."""
@@ -63,29 +40,22 @@ class SubPlanStep(StepV2):
     @traceable(name="Subplan Step - Run")
     async def run(self, run_data: RunContext) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Run the sub-plan using the current Portia configuration."""
-        sub_portia = Portia(
-            config=run_data.config,
-            tools=run_data.tool_registry,
-            execution_hooks=run_data.execution_hooks,
-            telemetry=run_data.telemetry,
-        )
+        # Lazy initialization of Portia instance for reuse across multiple executions
+        if self.sub_portia is None:
+            self.sub_portia = Portia(
+                config=run_data.config,
+                tools=run_data.tool_registry,
+                execution_hooks=run_data.execution_hooks,
+                telemetry=run_data.telemetry,
+            )
 
         plan_run_inputs: list[PlanInput] = []
         for plan_input in self.plan.plan_inputs:
-            step_input_value = self.input_values.get(plan_input.name, None)
-            if step_input_value is not None:
-                value = self._resolve_references(step_input_value, run_data)
-                plan_run_inputs.append(PlanInput(name=plan_input.name, value=value))
-                continue
+            value = run_data.plan_run.plan_run_inputs.get(plan_input.name, plan_input.value)
+            resolved_value = self._resolve_references(value, run_data)
+            plan_run_inputs.append(PlanInput(name=plan_input.name, value=resolved_value))
 
-            run_input_value = run_data.plan_run.plan_run_inputs.get(plan_input.name, None)
-            if run_input_value is not None:
-                plan_run_inputs.append(PlanInput(name=plan_input.name, value=run_input_value))
-                continue
-
-            plan_run_inputs.append(PlanInput(name=plan_input.name, value=plan_input.value))
-
-        plan_run = await sub_portia.arun_plan(
+        plan_run = await self.sub_portia.arun_plan(
             self.plan, run_data.end_user, plan_run_inputs=plan_run_inputs
         )
 
@@ -97,9 +67,10 @@ class SubPlanStep(StepV2):
     def to_legacy_step(self, plan: PlanV2) -> Step:
         """Convert this SubPlanStep to a legacy Step."""
         tools = [s.to_legacy_step(plan).tool_id for s in self.plan.steps]
+        inputs = [Input(plan_input.name) for plan_input in self.plan.plan_inputs]
         return Step(
             task=f"Run sub-plan: {self.plan.label}",
-            inputs=self._inputs_to_legacy_plan_variables(list(self.input_values.values()), plan),
+            inputs=self._inputs_to_legacy_plan_variables(inputs, plan),
             tool_id=",".join([t for t in tools if t is not None]),
             output=plan.step_output_name(self),
             condition=self._get_legacy_condition(plan),

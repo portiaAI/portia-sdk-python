@@ -27,7 +27,6 @@ def test_sub_plan_step_initialization() -> None:
 
     assert step.step_name == "sub_plan_step"
     assert step.plan == mock_plan
-    assert step.input_values == input_values
 
 
 def test_sub_plan_step_initialization_defaults() -> None:
@@ -41,7 +40,6 @@ def test_sub_plan_step_initialization_defaults() -> None:
 
     assert step.step_name == "sub_plan_step"
     assert step.plan == mock_plan
-    assert step.input_values == {}
 
 
 def test_sub_plan_step_str_with_label() -> None:
@@ -107,14 +105,11 @@ async def test_sub_plan_step_run_with_input_values() -> None:
     """Test SubPlanStep run with input values from step parameters."""
     mock_plan = Mock()
     mock_plan.plan_inputs = [
-        PlanInput(name="username", description="User name"),
-        PlanInput(name="data", description="Previous step data"),
+        PlanInput(name="username", description="User name", value="Alice"),
+        PlanInput(name="data", description="Previous step data", value=StepOutput(0)),
     ]
-    input_values = {"username": "Alice", "data": StepOutput(0)}
 
-    step = SubPlanStep.model_construct(
-        step_name="sub_plan_step", plan=mock_plan, input_values=input_values
-    )
+    step = SubPlanStep.model_construct(step_name="sub_plan_step", plan=mock_plan)
 
     mock_run_data = Mock()
     mock_run_data.plan_run.plan_run_inputs = {}
@@ -164,25 +159,16 @@ async def test_sub_plan_step_run_input_priority() -> None:
     mock_plan.plan_inputs = [
         PlanInput(name="param1", description="Parameter 1", value="default1"),
         PlanInput(name="param2", description="Parameter 2", value="default2"),
-        PlanInput(name="param3", description="Parameter 3", value="default3"),
     ]
-
-    input_values = {
-        "param1": "step_value1",  # This should override parent and default
-    }
 
     step = SubPlanStep.model_construct(
         step_name="sub_plan_step",
         plan=mock_plan,
-        input_values=input_values,
     )
 
     mock_run_data = Mock()
     mock_run_data.plan_run = Mock()
-    mock_run_data.plan_run.plan_run_inputs = {
-        "param1": LocalDataValue(value="parent_value1"),  # Should be overridden by step value
-        "param2": LocalDataValue(value="parent_value2"),  # Should be used
-    }
+    mock_run_data.plan_run.plan_run_inputs = {"param1": "parent_value1"}
 
     mock_plan_run = Mock()
     mock_final_output = Mock()
@@ -201,19 +187,15 @@ async def test_sub_plan_step_run_input_priority() -> None:
         # Verify input priority
         call_args = mock_portia.arun_plan.call_args
         plan_run_inputs = call_args[1]["plan_run_inputs"]
-        assert len(plan_run_inputs) == 3
+        assert len(plan_run_inputs) == 2
 
-        # param1: step value should win
+        # param1: plan run value should win
         param1 = next(inp for inp in plan_run_inputs if inp.name == "param1")
-        assert param1.value == "step_value1"
+        assert param1.value == "parent_value1"
 
-        # param2: parent value should be used
+        # param2: default value should be used
         param2 = next(inp for inp in plan_run_inputs if inp.name == "param2")
-        assert param2.value == LocalDataValue(value="parent_value2")
-
-        # param3: default value should be used
-        param3 = next(inp for inp in plan_run_inputs if inp.name == "param3")
-        assert param3.value == "default3"
+        assert param2.value == "default2"
 
 
 @pytest.mark.asyncio
@@ -248,13 +230,17 @@ async def test_sub_plan_step_run_no_final_output() -> None:
 async def test_sub_plan_step_run_with_string_template_input_values() -> None:
     """Test SubPlanStep run with string template input values containing references."""
     mock_plan = Mock()
-    mock_plan.plan_inputs = [PlanInput(name="message", description="Templated message")]
-    input_values = {"message": f"User {Input('username')} says: {StepOutput(0)}"}
+    mock_plan.plan_inputs = [
+        PlanInput(
+            name="message",
+            description="Templated message",
+            value=f"User {Input('username')} says: {StepOutput(0)}",
+        )
+    ]
 
     step = SubPlanStep.model_construct(
         step_name="sub_plan_step",
         plan=mock_plan,
-        input_values=input_values,
     )
 
     mock_run_data = Mock()
@@ -301,6 +287,7 @@ def test_sub_plan_step_to_legacy_step() -> None:
     mock_sub_plan.id = "sub_plan_id"
     mock_sub_plan.label = "Sub Plan"
     mock_sub_plan.steps = []
+    mock_sub_plan.plan_inputs = [PlanInput(name="user_input")]
 
     mock_step1 = Mock()
     mock_legacy_step1 = Mock()
@@ -319,12 +306,9 @@ def test_sub_plan_step_to_legacy_step() -> None:
 
     mock_sub_plan.steps = [mock_step1, mock_step2, mock_step3]
 
-    input_values = {"param1": Input("user_input"), "param2": "literal_value"}
-
     step = SubPlanStep.model_construct(
         step_name="sub_plan_step",
         plan=mock_sub_plan,
-        input_values=input_values,
     )
 
     mock_plan = Mock()
@@ -349,6 +333,7 @@ def test_sub_plan_step_to_legacy_step_no_tools() -> None:
     mock_sub_plan.id = "sub_plan_id"
     mock_sub_plan.label = "Sub Plan No Tools"
     mock_sub_plan.steps = []
+    mock_sub_plan.plan_inputs = []
 
     # Create mock steps with no tool_ids
     mock_step1 = Mock()
