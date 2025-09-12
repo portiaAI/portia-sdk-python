@@ -769,7 +769,7 @@ class PlanBuilderV2:
 
         return self
 
-    def on_error(self, handler: "Callable[[Exception], Any]") -> PlanBuilderV2:  # noqa: D401
+    def on_error(self, handler: Callable[[Exception], Any]) -> PlanBuilderV2:
         """Attach an error handler to the previously added step.
 
         The handler is called with the Exception if the step raises. If the handler returns a

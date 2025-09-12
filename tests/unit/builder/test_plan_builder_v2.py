@@ -854,10 +854,10 @@ def test_on_error_attaches_handler_and_ignore_errors_sets_none() -> None:
         .function_step(function=lambda: "ok", step_name="will_be_overridden")
         .on_error(lambda e: "handled")
     )
-    assert callable(getattr(builder.plan.steps[-1], "on_error"))
+    assert callable(builder.plan.steps[-1].on_error)
 
     builder.ignore_errors()
-    assert callable(getattr(builder.plan.steps[-1], "on_error"))
+    assert callable(builder.plan.steps[-1].on_error)
     # Call to verify lambda signature works
     assert builder.plan.steps[-1].on_error(Exception("x")) is None  # type: ignore[union-attr]
 
