@@ -319,8 +319,8 @@ async def test_llm_step_run_with_model() -> None:
     mock_run_data.storage = Mock()
 
     with (
-        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
-        patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+        patch("portia.builder.llm_step.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch("portia.builder.llm_step.LLMTool") as mock_llm_tool_class,
         patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
     ):
         mock_get_tool_run_ctx.return_value = Mock()

@@ -183,13 +183,15 @@ def test_react_agent_step_to_legacy_step() -> None:
 async def test_react_agent_step_run() -> None:
     """Test ReActAgentStep run method."""
     tools = ["search_tool", "calculator_tool"]
-    step = ReActAgentStep(
+    mock_model = Mock()
+    step = ReActAgentStep.model_construct(
         task="Research and calculate",
         tools=tools,
         step_name="react_agent",
         inputs=["context"],
         tool_call_limit=30,
         allow_agent_clarifications=True,
+        model=mock_model,
     )
 
     mock_run_data = Mock()
@@ -235,6 +237,7 @@ async def test_react_agent_step_run() -> None:
             tool_call_limit=30,
             allow_agent_clarifications=True,
             output_schema=None,
+            model=mock_model,
         )
 
         mock_agent.execute.assert_called_once()
@@ -251,8 +254,8 @@ async def test_react_agent_step_run_with_model() -> None:
     mock_output = LocalDataValue(value="result")
 
     with (
-        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
-        patch("portia.builder.step_v2.ReActAgent") as mock_react_agent_class,
+        patch("portia.builder.react_agent_step.ToolCallWrapper.from_tool_id") as mock_get_tool,
+        patch("portia.builder.react_agent_step.ReActAgent") as mock_react_agent_class,
     ):
         mock_get_tool.return_value = mock_tool
         mock_agent = Mock()

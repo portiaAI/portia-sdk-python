@@ -19,6 +19,7 @@ from portia.config import ExecutionAgentType
 from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.logger import logger
+from portia.model import GenerativeModel  # noqa: TC001
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step
 from portia.tool import Tool  # noqa: TC001
@@ -27,7 +28,6 @@ from portia.tool_wrapper import ToolCallWrapper
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-    from portia.model import GenerativeModel
     from portia.run_context import RunContext
 
 

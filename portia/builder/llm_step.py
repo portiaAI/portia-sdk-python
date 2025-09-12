@@ -15,13 +15,13 @@ else:
 from langsmith import traceable
 from pydantic import BaseModel, Field
 
+from portia.model import GenerativeModel  # noqa: TC001
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Step
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.model import GenerativeModel
     from portia.run_context import RunContext
 
 

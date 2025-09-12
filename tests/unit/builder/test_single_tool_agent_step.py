@@ -206,8 +206,11 @@ def test_single_tool_agent_step_passes_model_to_agent() -> None:
 
     mock_tool = Mock()
     with (
-        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id", return_value=mock_tool),
-        patch("portia.builder.step_v2.DefaultExecutionAgent") as mock_agent_class,
+        patch(
+            "portia.builder.single_tool_agent_step.ToolCallWrapper.from_tool_id",
+            return_value=mock_tool,
+        ),
+        patch("portia.builder.single_tool_agent_step.DefaultExecutionAgent") as mock_agent_class,
     ):
         mock_agent = Mock()
         mock_agent_class.return_value = mock_agent
