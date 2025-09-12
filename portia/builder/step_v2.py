@@ -41,7 +41,7 @@ from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.react_agent import ReActAgent
 from portia.logger import logger
-from portia.model import Message
+from portia.model import GenerativeModel, Message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import PlanInput, Step, Variable
 from portia.tool import Tool
@@ -317,6 +317,13 @@ class LLMStep(StepV2):
             "the default LLMTool system prompt will be used."
         ),
     )
+    model: GenerativeModel | str | None = Field(
+        default=None,
+        description=(
+            "The model to use for this step. If not provided, the default model from the config "
+            "will be used."
+        ),
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -329,10 +336,15 @@ class LLMStep(StepV2):
         """Execute the LLM task and return its response."""
         if self.system_prompt:
             llm_tool = LLMTool(
-                structured_output_schema=self.output_schema, prompt=self.system_prompt
+                structured_output_schema=self.output_schema,
+                prompt=self.system_prompt,
+                model=self.model,
             )
         else:
-            llm_tool = LLMTool(structured_output_schema=self.output_schema)
+            llm_tool = LLMTool(
+                structured_output_schema=self.output_schema,
+                model=self.model,
+            )
         wrapped_tool = ToolCallWrapper(
             child_tool=llm_tool,
             storage=run_data.storage,
@@ -487,6 +499,13 @@ class SingleToolAgentStep(StepV2):
             "If provided, the output from the agent will be coerced to match this schema."
         ),
     )
+    model: GenerativeModel | str | None = Field(
+        default=None,
+        description=(
+            "The model to use for this agent. If not provided, the execution model from the config"
+            " will be used."
+        ),
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -541,6 +560,7 @@ class SingleToolAgentStep(StepV2):
             run_data.end_user,
             tool,
             execution_hooks=run_data.execution_hooks,
+            model=self.model,
         )
 
     @override
@@ -599,6 +619,13 @@ class ReActAgentStep(StepV2):
             "clarification handler set up that is capable of handling InputClarifications."
         ),
     )
+    model: GenerativeModel | str | None = Field(
+        default=None,
+        description=(
+            "The model to use for this agent. If not provided, the planning model from the config "
+            "will be used."
+        ),
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -645,6 +672,7 @@ class ReActAgentStep(StepV2):
             tool_call_limit=self.tool_call_limit,
             allow_agent_clarifications=self.allow_agent_clarifications,
             output_schema=self.output_schema,
+            model=self.model,
         )
 
     @override

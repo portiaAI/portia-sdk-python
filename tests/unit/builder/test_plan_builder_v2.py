@@ -213,6 +213,15 @@ def test_llm_step_method_with_all_parameters() -> None:
     assert step.step_name == "custom_step"
 
 
+def test_llm_step_method_with_model() -> None:
+    """Test llm_step accepts a model parameter."""
+    builder = PlanBuilderV2()
+    builder.llm_step(task="Analyze", model="openai/gpt-4o")
+    step = builder.plan.steps[0]
+    assert isinstance(step, LLMStep)
+    assert step.model == "openai/gpt-4o"
+
+
 def test_llm_step_method_auto_generated_step_name() -> None:
     """Test that step names are auto-generated correctly."""
     builder = PlanBuilderV2()
@@ -359,6 +368,15 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
     assert step.step_name == "agent_step"
 
 
+def test_single_tool_agent_step_method_with_model() -> None:
+    """Test single_tool_agent_step accepts a model parameter."""
+    builder = PlanBuilderV2()
+    builder.single_tool_agent_step(tool="search_tool", task="Find", model="openai/gpt-4o")
+    step = builder.plan.steps[0]
+    assert isinstance(step, SingleToolAgentStep)
+    assert step.model == "openai/gpt-4o"
+
+
 def test_single_tool_agent_step_accepts_tool_object() -> None:
     """Test single_tool_agent_step accepts a Tool instance."""
     builder = PlanBuilderV2()
@@ -427,6 +445,15 @@ def test_react_agent_step_method_with_all_parameters() -> None:
     assert step.step_name == "react_analysis"
     assert step.allow_agent_clarifications is True
     assert step.tool_call_limit == 50
+
+
+def test_react_agent_step_method_with_model() -> None:
+    """Test react_agent_step accepts a model parameter."""
+    builder = PlanBuilderV2()
+    builder.react_agent_step(task="Research", model="openai/gpt-4o")
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.model == "openai/gpt-4o"
 
 
 def test_react_agent_step_method_single_tool() -> None:

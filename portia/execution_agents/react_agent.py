@@ -21,7 +21,7 @@ from portia.execution_agents.execution_utils import AgentNode, is_clarification
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.react_clarification_tool import ReActClarificationTool
 from portia.logger import logger, truncate_message
-from portia.model import Message
+from portia.model import GenerativeModel, Message
 from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
@@ -282,6 +282,7 @@ class ReActAgent:
         tool_call_limit: int = 25,
         allow_agent_clarifications: bool = False,
         output_schema: type[BaseModel] | None = None,
+        model: GenerativeModel | str | None = None,
     ) -> None:
         """Initialize the ReActAgent."""
         self.task = task
@@ -291,13 +292,17 @@ class ReActAgent:
         self.tool_call_limit = tool_call_limit
         self.allow_agent_clarifications = allow_agent_clarifications
         self.output_schema = output_schema
+        self.model = model
 
     async def execute(self) -> Output:
         """Run the ReAct agent."""
         self.run_data.telemetry.capture(
             ExecutionAgentUsageTelemetryEvent(
                 agent_type="react",
-                model=str(self.run_data.config.get_execution_model()),
+                model=str(
+                    self.run_data.config.get_generative_model(self.model)
+                    or self.run_data.config.get_planning_model()
+                ),
                 sync=False,
                 tool_id=",".join([tool.id for tool in self.tools]),
             )
@@ -307,7 +312,10 @@ class ReActAgent:
         # We use the planning model rather than the execution model here as
         # ReAct agents have to both plan and execute, but the planning model
         # is generally more powerful.
-        model = self.run_data.config.get_planning_model()
+        model = (
+            self.run_data.config.get_generative_model(self.model)
+            or self.run_data.config.get_planning_model()
+        )
         self.tools.append(FinalResultTool())
         if self.allow_agent_clarifications:
             self.tools.append(ReActClarificationTool())
