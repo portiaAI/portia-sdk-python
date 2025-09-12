@@ -1005,7 +1005,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
             step_name="second_number",
         )
         # Add sub-plan steps with input values for 2 of the 4 sub-plan inputs
-        .add_steps(
+        .add_sub_plan(
             sub_plan,
             input_values={
                 "sub_input_no_default_1": (
