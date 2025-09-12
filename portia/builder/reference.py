@@ -239,7 +239,9 @@ class StepOutput(Reference):
     previous operations. The reference is resolved at runtime during plan execution.
 
     You can reference a step either by its name (string) or by its position (integer index).
-    Step indices are zero-based, so the first step is index 0.
+    Step indices are zero-based, so the first step is index 0. Negative indices are
+    also supported, with -1 referring to the last step in the plan, -2 the second to
+    last, and so on.
 
     Example:
         ```python
@@ -334,15 +336,16 @@ class StepOutput(Reference):
         """
         # Get the base step output value
         to_parse = None
+        total_steps = len(run_data.plan.steps)
         if self.full:
             to_parse = [
                 step_output.value
                 for step_output in run_data.step_output_values
-                if self._match_output(step_output)
+                if self._match_output(step_output, total_steps)
             ]
         else:
             for step_output in run_data.step_output_values[::-1]:
-                if self._match_output(step_output):
+                if self._match_output(step_output, total_steps):
                     to_parse = [step_output.value]
                     break
         if to_parse is None:
@@ -354,18 +357,25 @@ class StepOutput(Reference):
             parsed = to_parse
         return parsed if self.full else parsed[0]
 
-    def _match_output(self, step_output: StepOutputValue) -> bool:
-        """Match the step output to the step stored in the reference."""
-        return (isinstance(self.step, int) and step_output.step_num == self.step) or (
-            isinstance(self.step, str) and step_output.step_name == self.step
-        )
+    def _match_output(self, step_output: StepOutputValue, total_steps: int) -> bool:
+        """Match the step output to the step stored in the reference.
+
+        Args:
+            step_output: The step output to compare against.
+            total_steps: Total number of step outputs available, used for resolving
+                negative indices.
+
+        """
+        if isinstance(self.step, int):
+            index = self.step if self.step >= 0 else total_steps + self.step
+            return step_output.step_num == index
+        return step_output.step_name == self.step
 
     def get_description(self, run_data: RunContext) -> str:
         """Get the description of the step output."""
+        total_steps = len(run_data.plan.steps)
         for step_output in run_data.step_output_values:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
-                return step_output.description
-            if isinstance(self.step, str) and step_output.step_name == self.step:
+            if self._match_output(step_output, total_steps):
                 return step_output.description
         return ""
 

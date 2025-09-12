@@ -729,6 +729,49 @@ async def test_llm_step_run_with_string_template_input() -> None:
         assert call_args[1]["task_data"] == ["Use step0 and Alice"]
 
 
+@pytest.mark.asyncio
+async def test_llm_step_run_with_negative_stepoutput_in_string_template() -> None:
+    """Test string templating with StepOutput using a negative index."""
+    step = LLMStep(
+        task="Summarize",
+        step_name="summary",
+        inputs=[f"Last result: {StepOutput(-1)}"],
+    )
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            value="first",
+            description="d0",
+            step_name="first",
+            step_num=0,
+        ),
+        StepOutputValue(
+            value="second",
+            description="d1",
+            step_name="second",
+            step_num=1,
+        ),
+    ]
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = [Mock(), Mock()]
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="done")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        mock_wrapper_instance.arun.assert_called_once()
+        assert result == "done"
+        call_args = mock_wrapper_instance.arun.call_args
+        assert call_args[1]["task_data"] == ["Last result: second"]
+
+
 def test_llm_step_to_legacy_step() -> None:
     """Test LLMStep to_legacy_step method."""
     inputs = [Input("user_query"), StepOutput(0)]

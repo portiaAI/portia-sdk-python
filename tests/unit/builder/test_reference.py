@@ -99,6 +99,19 @@ def test_get_legacy_name_with_string_step() -> None:
     mock_plan.step_output_name.assert_called_once_with("named_step")
 
 
+def test_get_legacy_name_with_negative_step() -> None:
+    """Test get_legacy_name with negative step index."""
+    step_output = StepOutput(-1)
+
+    mock_plan = Mock(spec=PlanV2)
+    mock_plan.step_output_name.return_value = "$step_2_output"
+
+    result = step_output.get_legacy_name(mock_plan)
+
+    assert result == "$step_2_output"
+    mock_plan.step_output_name.assert_called_once_with(-1)
+
+
 def test_get_value_with_int_step_success() -> None:
     """Test get_value method with integer step - successful case."""
     step_output = StepOutput(1)
@@ -113,6 +126,24 @@ def test_get_value_with_int_step_success() -> None:
     result = step_output.get_value(mock_run_data)
 
     assert result == "test result"
+
+
+def test_get_value_with_negative_step_success() -> None:
+    """Test get_value method with negative step index."""
+    step_output = StepOutput(-1)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(step_num=0, step_name="step_0", value="first", description=""),
+        StepOutputValue(step_num=1, step_name="step_1", value="second", description=""),
+        StepOutputValue(step_num=2, step_name="step_2", value="third", description=""),
+    ]
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = [Mock(), Mock(), Mock()]
+
+    result = step_output.get_value(mock_run_data)
+
+    assert result == "third"
 
 
 def test_get_value_with_string_step_success() -> None:
@@ -354,6 +385,27 @@ def test_get_description_with_int_step() -> None:
     result = step_output.get_description(mock_run_data)
 
     assert result == "First step output"
+
+
+def test_get_description_with_negative_step() -> None:
+    """Test get_description method with negative step index."""
+    step_output = StepOutput(-1)
+
+    mock_run_data = Mock()
+    mock_run_data.step_output_values = [
+        StepOutputValue(
+            step_num=0, step_name="step_0", value="test", description="First step output"
+        ),
+        StepOutputValue(
+            step_num=1, step_name="step_1", value="test", description="Second step output"
+        ),
+    ]
+    mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = [Mock(), Mock()]
+
+    result = step_output.get_description(mock_run_data)
+
+    assert result == "Second step output"
 
 
 def test_get_description_with_string_step() -> None:
