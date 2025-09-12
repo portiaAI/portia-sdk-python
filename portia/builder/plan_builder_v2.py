@@ -7,21 +7,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
+from portia.builder.conditional_step import ConditionalStep
+from portia.builder.conditionals import (
+    ConditionalBlock,
+    ConditionalBlockClauseType,
+)
+from portia.builder.invoke_tool_step import InvokeToolStep
+from portia.builder.llm_step import LLMStep
+from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopBlock, LoopStepType, LoopType
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Reference, default_step_name
-from portia.builder.step_v2 import (
-    ConditionalStep,
-    InvokeToolStep,
-    LLMStep,
-    LoopStep,
-    ReActAgentStep,
-    SingleToolAgentStep,
-    StepV2,
-    UserInputStep,
-    UserVerifyStep,
-)
+from portia.builder.single_tool_agent_step import SingleToolAgentStep
+from portia.builder.user_input import UserInputStep
+from portia.builder.user_verify import UserVerifyStep
 from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
 from portia.telemetry.views import PlanV2BuildTelemetryEvent
@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from portia.builder.step_v2 import StepV2
     from portia.common import Serializable
     from portia.model import GenerativeModel
     from portia.tool import Tool

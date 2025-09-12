@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import Mock, patch
 
 import pytest
 from pydantic import BaseModel
 
+from portia.builder.llm_step import LLMStep
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, Reference, StepOutput, default_step_name
-from portia.builder.step_v2 import LLMStep, StepV2
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
 from portia.run_context import RunContext, StepOutputValue
+
+if TYPE_CHECKING:
+    from portia.builder.step_v2 import StepV2
+
 
 # Test cases for the default_step_name function
 

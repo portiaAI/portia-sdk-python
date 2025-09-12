@@ -8,8 +8,10 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel
 
+from portia.builder.invoke_tool_step import InvokeToolStep
+from portia.builder.llm_step import LLMStep
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import InvokeToolStep, LLMStep, StepV2
+from portia.builder.step_v2 import StepV2
 from portia.plan import Plan, PlanContext, PlanInput, Step
 
 
