@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from portia.builder.conditional_step import ConditionalStep
+from portia.builder.invoke_tool_step import InvokeToolStep
+from portia.builder.llm_step import LLMStep
+from portia.builder.loop_step import LoopStep
 from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import InvokeToolStep, LLMStep, SingleToolAgentStep
+from portia.builder.single_tool_agent_step import SingleToolAgentStep
+from portia.builder.step_v2 import StepV2
+from portia.builder.user_input import UserInputStep
+from portia.builder.user_verify import UserVerifyStep
 
 # Clarification related classes
 from portia.clarification import (
@@ -110,6 +118,7 @@ __all__ = [
     "ClarificationHandler",
     "ClarificationListType",
     "ClarificationType",
+    "ConditionalStep",
     "Config",
     "ConfigNotFoundError",
     "CrawlTool",
@@ -138,6 +147,7 @@ __all__ = [
     "LLMTool",
     "LocalDataValue",
     "LogLevel",
+    "LoopStep",
     "MapTool",
     "McpToolRegistry",
     "Message",
@@ -159,12 +169,14 @@ __all__ = [
     "Portia",
     "PortiaBaseError",
     "PortiaToolRegistry",
+    "ReActAgentStep",
     "SearchTool",
     "SingleToolAgentStep",
     "SseMcpClientConfig",
     "StdioMcpClientConfig",
     "Step",
     "StepOutput",
+    "StepV2",
     "StorageClass",
     "StorageError",
     "Tool",
@@ -174,7 +186,9 @@ __all__ = [
     "ToolRegistry",
     "ToolRetryError",
     "ToolRunContext",
+    "UserInputStep",
     "UserVerificationClarification",
+    "UserVerifyStep",
     "ValueConfirmationClarification",
     "Variable",
     "WeatherTool",
