@@ -21,6 +21,7 @@ from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
+    from portia.model import GenerativeModel
     from portia.run_context import RunContext
 
 
@@ -54,6 +55,13 @@ class LLMStep(StepV2):
             "the default LLMTool system prompt will be used."
         ),
     )
+    model: GenerativeModel | str | None = Field(
+        default=None,
+        description=(
+            "The model to use for this step. If not provided, the default model from the config "
+            "will be used."
+        ),
+    )
 
     def __str__(self) -> str:
         """Return a description of this step for logging purposes."""
@@ -66,10 +74,12 @@ class LLMStep(StepV2):
         """Execute the LLM task and return its response."""
         if self.system_prompt:
             llm_tool = LLMTool(
-                structured_output_schema=self.output_schema, prompt=self.system_prompt
+                structured_output_schema=self.output_schema,
+                prompt=self.system_prompt,
+                model=self.model,
             )
         else:
-            llm_tool = LLMTool(structured_output_schema=self.output_schema)
+            llm_tool = LLMTool(structured_output_schema=self.output_schema, model=self.model)
         wrapped_tool = ToolCallWrapper(
             child_tool=llm_tool,
             storage=run_data.storage,

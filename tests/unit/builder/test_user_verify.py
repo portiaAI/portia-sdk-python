@@ -58,6 +58,7 @@ async def test_user_verify_step_requests_clarification() -> None:
     mock_run_data.step_output_values = [
         StepOutputValue(step_num=0, step_name="step_0", value="result", description="")
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 
@@ -127,6 +128,7 @@ async def test_user_verify_step_with_string_template_message() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 

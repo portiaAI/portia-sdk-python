@@ -125,6 +125,7 @@ async def test_llm_step_run_one_reference_input() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     with (
         patch("portia.builder.llm_step.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -166,6 +167,7 @@ async def test_llm_step_run_interpolated_reference_in_task() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     with (
         patch("portia.builder.llm_step.ToolCallWrapper") as mock_tool_wrapper_class,
@@ -211,6 +213,7 @@ async def test_llm_step_run_mixed_inputs() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [
         PlanInput(name="user_name", description="The name of the user")
     ]
@@ -309,6 +312,34 @@ async def test_llm_step_run_without_prompt() -> None:
 
 
 @pytest.mark.asyncio
+async def test_llm_step_run_with_model() -> None:
+    """Test LLMStep run with a specified model."""
+    step = LLMStep(task="Analyze data", step_name="analysis", model="openai/gpt-4o")
+    mock_run_data = Mock()
+    mock_run_data.storage = Mock()
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper") as mock_tool_wrapper_class,
+        patch("portia.builder.step_v2.LLMTool") as mock_llm_tool_class,
+        patch.object(mock_run_data, "get_tool_run_ctx") as mock_get_tool_run_ctx,
+    ):
+        mock_get_tool_run_ctx.return_value = Mock()
+        mock_llm_tool_instance = Mock()
+        mock_llm_tool_class.return_value = mock_llm_tool_instance
+        mock_wrapper_instance = Mock()
+        mock_wrapper_instance.arun = AsyncMock(return_value="Analysis complete")
+        mock_tool_wrapper_class.return_value = mock_wrapper_instance
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == "Analysis complete"
+        mock_llm_tool_class.assert_called_once_with(
+            structured_output_schema=None, model="openai/gpt-4o"
+        )
+        mock_wrapper_instance.arun.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_llm_step_run_with_string_template_input() -> None:
     """Test LLMStep run with an input string containing reference templates."""
     step = LLMStep(
@@ -326,6 +357,7 @@ async def test_llm_step_run_with_string_template_input() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
     mock_run_data.plan_run = Mock()
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
@@ -410,6 +442,7 @@ async def test_llm_step_run_linked_inputs() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     # A plan input being the output value from another step can happen with linked plans using
     # .add_steps().
     mock_run_data.plan.plan_inputs = [

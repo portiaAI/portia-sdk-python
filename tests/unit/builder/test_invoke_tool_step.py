@@ -468,6 +468,7 @@ async def test_invoke_tool_step_with_string_arg_templates() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
     mock_run_data.plan_run = Mock()
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}

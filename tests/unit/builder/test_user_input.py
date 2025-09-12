@@ -219,6 +219,7 @@ async def test_user_input_step_message_with_templates() -> None:
             step_num=1,
         ),
     ]
+    mock_run_data.plan.steps = []
     mock_run_data.storage = Mock()
 
     result = await step.run(run_data=mock_run_data)

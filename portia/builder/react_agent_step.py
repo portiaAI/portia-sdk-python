@@ -7,6 +7,7 @@ from collections.abc import Sequence  # noqa: TC003
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.step_v2 import StepV2
+from portia.model import GenerativeModel
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -23,6 +24,7 @@ from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
+    from portia.model import GenerativeModel
     from portia.run_context import RunContext
 
 
@@ -67,6 +69,13 @@ class ReActAgentStep(StepV2):
             "if it is unable to proceed. When set to true, the agent can output clarifications "
             "that can be resolved by the user to get input. In order to use this, make sure you "
             "clarification handler set up that is capable of handling InputClarifications."
+        ),
+    )
+    model: GenerativeModel | str | None = Field(
+        default=None,
+        description=(
+            "The model to use for this agent. If not provided, the planning model from the config "
+            "will be used."
         ),
     )
 
@@ -115,6 +124,7 @@ class ReActAgentStep(StepV2):
             tool_call_limit=self.tool_call_limit,
             allow_agent_clarifications=self.allow_agent_clarifications,
             output_schema=self.output_schema,
+            model=self.model,
         )
 
     @override

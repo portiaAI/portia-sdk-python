@@ -241,6 +241,41 @@ async def test_react_agent_step_run() -> None:
 
 
 @pytest.mark.asyncio
+async def test_react_agent_step_run_with_model() -> None:
+    """Test ReActAgentStep run method with a specified model."""
+    step = ReActAgentStep(
+        task="Research", tools=["search_tool"], model="openai/gpt-4o", step_name="react_research"
+    )
+    mock_run_data = Mock()
+    mock_tool = Mock()
+    mock_output = LocalDataValue(value="result")
+
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id") as mock_get_tool,
+        patch("portia.builder.step_v2.ReActAgent") as mock_react_agent_class,
+    ):
+        mock_get_tool.return_value = mock_tool
+        mock_agent = Mock()
+        mock_agent.execute = AsyncMock(return_value=mock_output)
+        mock_react_agent_class.return_value = mock_agent
+
+        result = await step.run(run_data=mock_run_data)
+
+        assert result == mock_output
+        mock_react_agent_class.assert_called_once_with(
+            task="Research",
+            task_data=[],
+            tools=[mock_tool],
+            run_data=mock_run_data,
+            tool_call_limit=25,
+            allow_agent_clarifications=False,
+            output_schema=None,
+            model="openai/gpt-4o",
+        )
+        mock_agent.execute.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_react_agent_step_run_with_reference_resolution() -> None:
     """Test ReActAgentStep run method with reference resolution in task and task_data."""
     ref1 = Input("user_query")
@@ -272,6 +307,7 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
             step_num=1,
         )
     ]
+    mock_run_data.plan.steps = []
 
     mock_output = LocalDataValue(value="ReAct execution with string interpolation")
 
@@ -298,6 +334,7 @@ async def test_react_agent_step_run_with_reference_resolution() -> None:
         assert resolved_task == "Research and analyze sentiment analysis using analysis result"
         task_data = call_kwargs["task_data"]
         assert len(task_data) == 3
+        assert call_kwargs["model"] is None
         assert task_data[0] == "Static context"
         assert isinstance(task_data[1], LocalDataValue)
         assert task_data[1].value == "search query"

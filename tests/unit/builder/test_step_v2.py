@@ -82,6 +82,7 @@ def test_resolve_input_reference_with_string_template_step_output() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     template = f"The result was {StepOutput(0)}"
     result = step._resolve_references(template, mock_run_data)
@@ -120,6 +121,7 @@ def test_resolve_input_reference_with_string_template_step_both() -> None:
         )
     ]
     mock_run_data.plan = Mock()
+    mock_run_data.plan.steps = []
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
     mock_run_data.plan_run = Mock()
     mock_run_data.plan_run.plan_run_inputs = {"username": LocalDataValue(value="Alice")}
@@ -176,6 +178,7 @@ def test_string_templating_with_path_comprehensive() -> None:
             description="Analysis results",
         ),
     ]
+    mock_run_data.plan.steps = []
 
     # Test 1: StepOutput with simple path
     result = step._template_references(

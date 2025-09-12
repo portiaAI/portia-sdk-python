@@ -115,6 +115,7 @@ def test_current_loop_variable_with_over() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = step._current_loop_variable(mock_run_data)
     assert result == "b"
@@ -155,6 +156,7 @@ def test_current_loop_variable_with_non_sequence() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     with pytest.raises(TypeError, match="Loop variable is not indexable"):
         step._current_loop_variable(mock_run_data)
@@ -181,6 +183,7 @@ def test_current_loop_variable_index_out_of_range() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = step._current_loop_variable(mock_run_data)
     assert result is None
@@ -268,6 +271,7 @@ async def test_loop_step_run_for_each_start() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 
@@ -318,6 +322,7 @@ async def test_loop_step_run_for_each_start_no_value() -> None:
             step_num=0,
         )
     ]
+    mock_run_data.plan.steps = []
 
     result = await step.run(run_data=mock_run_data)
 

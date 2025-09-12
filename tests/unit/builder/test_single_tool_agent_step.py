@@ -188,6 +188,43 @@ async def test_single_tool_agent_step_with_execution_agent_types(
             mock_oneshot_execute.assert_not_called()
 
 
+def test_single_tool_agent_step_passes_model_to_agent() -> None:
+    """Ensure SingleToolAgentStep passes model to the execution agent."""
+    step = SingleToolAgentStep(
+        tool="mock_tool",
+        task="test task",
+        step_name="agent_step",
+        model="openai/gpt-4o",
+    )
+    mock_run_data = Mock()
+    mock_run_data.config.execution_agent_type = ExecutionAgentType.DEFAULT
+    mock_run_data.tool_registry = Mock()
+    mock_run_data.storage = Mock()
+    mock_run_data.plan_run = Mock()
+    mock_run_data.legacy_plan = Mock()
+    mock_run_data.plan = Mock(id="plan")
+
+    mock_tool = Mock()
+    with (
+        patch("portia.builder.step_v2.ToolCallWrapper.from_tool_id", return_value=mock_tool),
+        patch("portia.builder.step_v2.DefaultExecutionAgent") as mock_agent_class,
+    ):
+        mock_agent = Mock()
+        mock_agent_class.return_value = mock_agent
+        agent = step._get_agent_for_step(mock_run_data)
+        mock_agent_class.assert_called_once_with(
+            mock_run_data.legacy_plan,
+            mock_run_data.plan_run,
+            mock_run_data.config,
+            mock_run_data.storage,
+            mock_run_data.end_user,
+            mock_tool,
+            execution_hooks=mock_run_data.execution_hooks,
+            model="openai/gpt-4o",
+        )
+        assert agent == mock_agent
+
+
 def test_single_tool_agent_to_legacy_step() -> None:
     """Test SingleToolAgent to_legacy_step method."""
     inputs = [Input("query"), StepOutput(0)]

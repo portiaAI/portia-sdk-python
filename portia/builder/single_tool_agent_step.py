@@ -27,6 +27,7 @@ from portia.tool_wrapper import ToolCallWrapper
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
+    from portia.model import GenerativeModel
     from portia.run_context import RunContext
 
 
@@ -57,6 +58,13 @@ class SingleToolAgentStep(StepV2):
         description=(
             "Pydantic model class defining the expected structure of the agent's output. "
             "If provided, the output from the agent will be coerced to match this schema."
+        ),
+    )
+    model: GenerativeModel | str | None = Field(
+        default=None,
+        description=(
+            "The model to use for this agent. If not provided, the execution model from the config"
+            " will be used."
         ),
     )
 
@@ -113,6 +121,7 @@ class SingleToolAgentStep(StepV2):
             run_data.end_user,
             tool,
             execution_hooks=run_data.execution_hooks,
+            model=self.model,
         )
 
     @override
