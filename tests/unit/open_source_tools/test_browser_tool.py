@@ -76,7 +76,7 @@ def mock_browserbase_provider(
 class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     """Mock browser infrastructure provider."""
 
-    def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
+    def setup_browser(self, _: ToolRunContext, allowed_domains: list[str] | None = None) -> Browser:  # type: ignore reportIncompatibleMethodOverride
         """Create the browser with a mock for testing."""
         return MagicMock()
 
@@ -315,22 +315,36 @@ def test_browser_infra_local_get_extra_chromium_args_default(
 def test_browser_infra_local_setup_browser(
     local_browser_provider: BrowserInfrastructureProviderLocal,
 ) -> None:
-    """Test browser setup."""
+    """Test browser setup with allowed_domains passed through."""
     context = get_test_tool_context()
     context.end_user = EndUser(external_id="test_user")
+    
+    # Test with allowed_domains parameter
+    allowed_domains = ["example.com"]
 
     mock_logger_instance = MagicMock()
     mock_logger = MagicMock(return_value=mock_logger_instance)
-    with patch("portia.open_source_tools.browser_tool.logger", mock_logger):
-        browser = local_browser_provider.setup_browser(context)
+    with (
+        patch("portia.open_source_tools.browser_tool.logger", mock_logger),
+        patch("portia.open_source_tools.browser_tool.Browser") as mock_browser,
+    ):
+        mock_browser_instance = MagicMock()
+        mock_browser.return_value = mock_browser_instance
+        
+        browser = local_browser_provider.setup_browser(context, allowed_domains)
 
         # Verify warning was logged for end_user
         mock_logger.assert_called_once()
         mock_logger_instance.warning.assert_called_once()
         assert "does not support end users" in mock_logger_instance.warning.call_args[0][0]
 
-        # Verify browser instance
-        assert isinstance(browser, Browser)
+        # Verify browser instance was created with allowed_domains
+        mock_browser.assert_called_once()
+        call_args = mock_browser.call_args[1]  # kwargs
+        assert "config" in call_args
+        config = call_args["config"]
+        assert config.new_context_config.allowed_domains == allowed_domains
+        assert browser == mock_browser_instance
 
 
 def test_browser_infra_local_construct_auth_clarification_url(
@@ -491,8 +505,11 @@ def test_browserbase_provider_construct_auth_clarification_url_no_session(
 def test_browserbase_provider_setup_browser(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
-    """Test setting up browser."""
+    """Test setting up browser with allowed_domains passed through."""
     context = get_test_tool_context()
+    
+    # Test with allowed_domains parameter
+    allowed_domains = ["example.com"]
 
     mock_session = MagicMock()
     mock_session.id = "test_session_id"
@@ -503,10 +520,20 @@ def test_browserbase_provider_setup_browser(
     mock_browserbase_provider.bb.contexts.create.return_value = mock_context  # type: ignore reportFunctionMemberAccess
     mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore reportFunctionMemberAccess
 
-    browser = mock_browserbase_provider.setup_browser(context)
+    with patch("portia.open_source_tools.browser_tool.Browser") as mock_browser:
+        mock_browser_instance = MagicMock()
+        mock_browser_instance.config.cdp_url = "test_connect_url"
+        mock_browser.return_value = mock_browser_instance
+        
+        browser = mock_browserbase_provider.setup_browser(context, allowed_domains)
 
-    assert isinstance(browser, Browser)
-    assert browser.config.cdp_url == "test_connect_url"
+        # Verify browser was created with allowed_domains
+        mock_browser.assert_called_once()
+        call_args = mock_browser.call_args[1]  # kwargs
+        assert "config" in call_args
+        config = call_args["config"]
+        assert config.new_context_config.allowed_domains == allowed_domains
+        assert browser == mock_browser_instance
 
 
 def test_browser_tool_for_url_init_default_parameters() -> None:
@@ -516,9 +543,11 @@ def test_browser_tool_for_url_init_default_parameters() -> None:
 
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_example_com"
-    assert tool.name == "Browser Tool for example_com"
+    assert tool.name == "Browser Tool for example.com"
     assert tool.description == (
-        f"Browser tool for the URL {url}. Can be used to navigate to the URL and complete tasks."
+        f"Browser tool specifically configured for {url}. Can be used to navigate to this URL and complete tasks. "
+        "This tool handles a full end to end task. It is capable of doing multiple things "
+        "across different URLs within the same root domain as part of the end to end task."
     )
     assert tool.args_schema == BrowserToolForUrlSchema
 
@@ -551,7 +580,7 @@ def test_browser_tool_for_url_init_subdomain_handling() -> None:
 
     assert tool.url == url
     assert tool.id == "browser_tool_for_url_sub_example_com"
-    assert tool.name == "Browser Tool for sub_example_com"
+    assert tool.name == "Browser Tool for sub.example.com"
 
 
 class TestStructuredOutputSchema(BaseModel):
