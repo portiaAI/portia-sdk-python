@@ -111,6 +111,7 @@ class LLMProvider(Enum):
     OPENROUTER = "openrouter"
     GROK = "grok"
     GROQ = "groq"
+    META = "meta"
     GOOGLE_GENERATIVE_AI = "google"  # noqa: PIE796 - Alias for GOOGLE member
 
 
@@ -543,10 +544,74 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
         )
 
 
-class OpenRouterGenerativeModel(OpenAIGenerativeModel):
+class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
+    """Generic OpenAI-compatible model implementation using a configurable base_url.
+
+    Subclasses should set the `provider` enum and `base_url` class variables.
+    For dynamic base_url (like Meta), pass it via constructor.
+    """
+
+    # Use empty string to represent unset to avoid Optional override issues in subclasses
+    base_url: str = ""  # Override in subclasses for fixed endpoints
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        base_url: str | None = None,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize an OpenAI-compatible client with the provided base_url."""
+        # Use provided base_url or fall back to class variable
+        effective_base_url = base_url or self.base_url
+        if not effective_base_url:
+            class_name = self.__class__.__name__
+            raise ValueError(
+                f"base_url must be provided either in constructor "
+                f"or as class variable for {class_name}"
+            )
+
+        self._model_kwargs = kwargs.copy()
+        if "disabled_params" not in kwargs:
+            # Some OpenAI-compatible endpoints do not support parallel tool calls
+            kwargs["disabled_params"] = {"parallel_tool_calls": None}
+
+        client = ChatOpenAI(
+            name=model_name,
+            model=model_name,
+            seed=seed,
+            api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature,
+            base_url=effective_base_url,
+            **kwargs,
+        )
+        # Initialize the grandparent class directly to attach the prepared LangChain client
+        LangChainGenerativeModel.__init__(self, client, model_name)
+        self._instructor_client = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                OpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._instructor_client_async = instructor.from_openai(
+            client=wrappers.wrap_openai(
+                AsyncOpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
+            ),
+            mode=instructor.Mode.JSON,
+        )
+        self._seed = seed
+
+
+class OpenRouterGenerativeModel(OpenAICompatibleGenerativeModel):
     """OpenRouter model implementation."""
 
     provider: LLMProvider = LLMProvider.OPENROUTER
+    base_url: str = "https://openrouter.ai/api/v1"
 
     def __init__(
         self,
@@ -558,60 +623,24 @@ class OpenRouterGenerativeModel(OpenAIGenerativeModel):
         temperature: float = 0,
         **kwargs: Any,
     ) -> None:
-        """Initialize with OpenRouter client.
-
-        Args:
-            model_name: OpenRouter model to use
-            api_key: API key for OpenRouter
-            seed: Random seed for model generation
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter
-            **kwargs: Additional keyword arguments to pass to ChatOpenAI
-
-        """
-        self._model_kwargs = kwargs.copy()
-        if "disabled_params" not in kwargs:
-            # This is a workaround for o3 mini to avoid parallel tool calls.
-            # See https://github.com/langchain-ai/langchain/issues/25357
-            kwargs["disabled_params"] = {"parallel_tool_calls": None}
-        # Unfortunately you get errors from o3 mini with Langchain unless you set
-        # temperature to 1. See https://github.com/ai-christianson/RA.Aid/issues/70
+        """Initialize with OpenRouter client."""
+        # OpenRouter specific temperature quirk for o3/o4/gpt-5
         temperature = 1 if model_name.lower() in ("o3-mini", "o4-mini", "gpt-5") else temperature
-
-        # OpenRouter is compatible with the ChatOpenAI client, so we use this client
-        # with the openrouter URL
-        client = ChatOpenAI(
-            name=model_name,
-            model=model_name,
-            seed=seed,
+        super().__init__(
+            model_name=model_name,
             api_key=api_key,
+            seed=seed,
             max_retries=max_retries,
             temperature=temperature,
-            base_url="https://openrouter.ai/api/v1",
             **kwargs,
         )
-        super(OpenAIGenerativeModel, self).__init__(client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1")
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncOpenAI(
-                    api_key=api_key.get_secret_value(), base_url="https://openrouter.ai/api/v1"
-                )
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._seed = seed
 
 
-class GroqGenerativeModel(OpenAIGenerativeModel):
+class GroqGenerativeModel(OpenAICompatibleGenerativeModel):
     """Groq model implementation."""
 
     provider: LLMProvider = LLMProvider.GROQ
+    base_url: str = "https://api.groq.com/openai/v1"
 
     def __init__(
         self,
@@ -623,53 +652,47 @@ class GroqGenerativeModel(OpenAIGenerativeModel):
         temperature: float = 0,
         **kwargs: Any,
     ) -> None:
-        """Initialize with Groq client.
-
-        Args:
-            model_name: Groq model to use
-            api_key: API key for Groq
-            seed: Random seed for model generation
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter
-            **kwargs: Additional keyword arguments to pass to ChatOpenAI
-
-        """
-        self._model_kwargs = kwargs.copy()
-        if "disabled_params" not in kwargs:
-            # This is a workaround for some models to avoid parallel tool calls.
-            # See https://github.com/langchain-ai/langchain/issues/25357
-            kwargs["disabled_params"] = {"parallel_tool_calls": None}
-
-        # Groq is compatible with the ChatOpenAI client, so we use this client
-        # with the groq URL
-        client = ChatOpenAI(
-            name=model_name,
-            model=model_name,
-            seed=seed,
+        """Initialize with Groq client."""
+        super().__init__(
+            model_name=model_name,
             api_key=api_key,
+            seed=seed,
             max_retries=max_retries,
             temperature=temperature,
-            base_url="https://api.groq.com/openai/v1",
             **kwargs,
         )
-        super(OpenAIGenerativeModel, self).__init__(client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                OpenAI(
-                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
-                )
-            ),
-            mode=instructor.Mode.JSON,
+
+
+class MetaLlamaGenerativeModel(OpenAICompatibleGenerativeModel):
+    """Meta hosted Llama model implementation.
+
+    Uses an OpenAI-compatible endpoint provided by Meta (or a managed Llama Stack distribution)
+    configured via a base URL.
+    """
+
+    provider: LLMProvider = LLMProvider.META
+
+    def __init__(
+        self,
+        *,
+        model_name: str,
+        api_key: SecretStr,
+        base_url: str,
+        seed: int = 343,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Meta hosted Llama client."""
+        super().__init__(
+            model_name=model_name,
+            api_key=api_key,
+            base_url=base_url,
+            seed=seed,
+            max_retries=max_retries,
+            temperature=temperature,
+            **kwargs,
         )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncOpenAI(
-                    api_key=api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
-                )
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._seed = seed
 
 
 class AzureOpenAIGenerativeModel(LangChainGenerativeModel):
@@ -1097,8 +1120,8 @@ class AnthropicGenerativeModel(LangChainGenerativeModel):
 
 
 if validate_extras_dependencies("mistralai", raise_error=False):
-    from langchain_mistralai import ChatMistralAI
-    from mistralai import Mistral
+    from langchain_mistralai import ChatMistralAI  # pyright: ignore[reportMissingImports]
+    from mistralai import Mistral  # pyright: ignore[reportMissingImports]
 
     class MistralAIGenerativeModel(LangChainGenerativeModel):
         """MistralAI model implementation."""
@@ -1237,8 +1260,8 @@ if validate_extras_dependencies("mistralai", raise_error=False):
 if validate_extras_dependencies("amazon", raise_error=False):
     import logging
 
-    import boto3
-    from langchain_aws import ChatBedrock
+    import boto3  # pyright: ignore[reportMissingImports]
+    from langchain_aws import ChatBedrock  # pyright: ignore[reportMissingImports]
 
     def set_amazon_logging_level(level: int) -> None:
         """Set the logging level for boto3 client."""
@@ -1306,56 +1329,64 @@ if validate_extras_dependencies("amazon", raise_error=False):
             self._instructor_client = instructor.from_bedrock(bedrock_client)
 
 
-class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
-    """Google Generative AI (Gemini) model implementation."""
+if validate_extras_dependencies("google", raise_error=False):
+    from google import genai  # pyright: ignore[reportMissingImports,reportAttributeAccessIssue]
+    from langchain_google_genai import (
+        ChatGoogleGenerativeAI,  # pyright: ignore[reportMissingImports]
+    )
 
-    provider: LLMProvider = LLMProvider.GOOGLE
+    from portia.gemini_langsmith_wrapper import wrap_gemini
 
-    def __init__(
-        self,
-        *,
-        model_name: str = "gemini-2.0-flash",
-        api_key: SecretStr,
-        max_retries: int = 3,
-        temperature: float | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize with Google Generative AI client.
+    class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
+        """Google Generative AI (Gemini)model implementation."""
 
-        Args:
-            model_name: Name of the Google Generative AI model
-            api_key: API key for Google Generative AI
-            max_retries: Maximum number of retries
-            temperature: Temperature parameter for model sampling
-            **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
+        provider: LLMProvider = LLMProvider.GOOGLE
 
-        """
-        # Configure genai with the api key
-        genai_client = genai.Client(api_key=api_key.get_secret_value())
+        def __init__(
+            self,
+            *,
+            model_name: str = "gemini-2.0-flash",
+            api_key: SecretStr,
+            max_retries: int = 3,
+            temperature: float | None = None,
+            **kwargs: Any,
+        ) -> None:
+            """Initialize with Google Generative AI client.
 
-        client = ChatGoogleGenerativeAI(
-            model=model_name,
-            api_key=api_key,
-            max_retries=max_retries,
-            temperature=temperature or 0,
-            **kwargs,
-        )
-        super().__init__(client, model_name)
-        wrapped_gemini_client = wrap_gemini(genai_client)
+            Args:
+                model_name: Name of the Google Generative AI model
+                api_key: API key for Google Generative AI
+                max_retries: Maximum number of retries
+                temperature: Temperature parameter for model sampling
+                **kwargs: Additional keyword arguments to pass to ChatGoogleGenerativeAI
 
-        self._instructor_client = instructor.from_genai(
-            client=wrapped_gemini_client,
-            mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
-        )
-        self._instructor_client_async = instructor.from_genai(
-            client=wrapped_gemini_client,
-            mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
-            use_async=True,
-        )
+            """
+            # Configure genai with the api key
+            genai_client = genai.Client(api_key=api_key.get_secret_value())
+
+            client = ChatGoogleGenerativeAI(
+                model=model_name,
+                api_key=api_key,
+                max_retries=max_retries,
+                temperature=temperature or 0,
+                **kwargs,
+            )
+            LangChainGenerativeModel.__init__(self, client, model_name)
+            wrapped_gemini_client = wrap_gemini(genai_client)
+
+            self._instructor_client = instructor.from_genai(
+                client=wrapped_gemini_client,
+                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+            )
+            self._instructor_client_async = instructor.from_genai(
+                client=wrapped_gemini_client,
+                mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
+                use_async=True,
+            )
 
 
 if validate_extras_dependencies("ollama", raise_error=False):
-    from langchain_ollama import ChatOllama
+    from langchain_ollama import ChatOllama  # pyright: ignore[reportMissingImports]
 
     class OllamaGenerativeModel(LangChainGenerativeModel):
         """Wrapper for Ollama models."""

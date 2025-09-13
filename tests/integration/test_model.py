@@ -6,7 +6,10 @@ import os
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
-import ollama
+try:
+    import ollama  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover
+    ollama = None  # type: ignore[assignment]
 import pytest
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
@@ -42,7 +45,8 @@ LOW_CAPABILITY_MODELS = [
 @pytest.fixture(autouse=True)
 def ollama_model() -> None:
     """Ensure Ollama model is available."""
-    ollama.pull("qwen2.5:0.5b")
+    if ollama is not None:
+        ollama.pull("qwen2.5:0.5b")
 
 
 @pytest.fixture(autouse=True)
