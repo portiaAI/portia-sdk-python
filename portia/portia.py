@@ -30,9 +30,10 @@ from langsmith import get_current_run_tree, traceable
 from pydantic import BaseModel
 
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
+from portia.builder.exit import ExitStepResult
+from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopStepResult, LoopStepType
 from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import ExitStepResult, LoopStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,

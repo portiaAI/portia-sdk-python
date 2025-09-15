@@ -28,8 +28,18 @@ Example:
 
 from __future__ import annotations
 
+import re
+import sys
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, override
+from collections.abc import Callable
+from inspect import signature
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override  # pragma: no cover
+
 
 import pydash
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,7 +48,11 @@ from portia.logger import logger
 
 if TYPE_CHECKING:
     from portia.builder.plan_v2 import PlanV2
-    from portia.run_context import RunContext
+    from portia.run_context import RunContext, StepOutputValue
+
+_KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")
+_POSITIONAL_ARG_REGEX = re.compile(r"^\s*(.+)\s*$")
+_PARENTHESIS_STRING_REGEX = re.compile(r"(?:{{ )?(\w+)\((.*)\)(?: }})?")
 
 
 def default_step_name(step_index: int) -> str:
@@ -52,6 +66,43 @@ def default_step_name(step_index: int) -> str:
 
     """
     return f"step_{step_index}"
+
+
+T = TypeVar("T", bound="Reference")
+
+
+def string_to_none(input_str: str) -> None:
+    """Convert a string to None."""
+    if input_str.strip() == "None":
+        return
+    raise ValueError(f"Invalid none string: {input_str}")
+
+
+def string_to_bool(input_str: str) -> bool:
+    """Convert a string to a boolean."""
+    if input_str.strip() == "True":
+        return True
+    if input_str.strip() == "False":
+        return False
+    raise ValueError(f"Invalid boolean string: {input_str}")
+
+
+def parenthesis_string_to_str(input_str: str) -> str:
+    """Convert a parenthesis string to a string."""
+    if (input_str.startswith('"') and input_str.endswith('"')) or (
+        input_str.startswith("'") and input_str.endswith("'")
+    ):
+        return input_str[1:-1]
+    raise ValueError(f"Invalid parenthesis string: {input_str}")
+
+
+_DEFAULT_CONVERTERS: list[Callable[[str], Any]] = [
+    parenthesis_string_to_str,
+    int,
+    float,
+    string_to_none,
+    string_to_bool,
+]
 
 
 class Reference(BaseModel, ABC):
@@ -69,6 +120,10 @@ class Reference(BaseModel, ABC):
     # Allow setting temporary/mock attributes in tests (e.g. patch.object(..., "get_value"))
     # Without this, Pydantic v2 prevents setting non-field attributes on instances.
     model_config = ConfigDict(extra="allow")
+    # Converters are used to convert strings to the appropriate type after string parsing,
+    # in order of precedence. First to convert without raising valueerror is the type that is used
+    # when rebuilding the object. If you need to support a new type or custom type, add a converter
+    _converters: ClassVar[list[Callable[[str], Any]]] = _DEFAULT_CONVERTERS
 
     @abstractmethod
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -97,6 +152,84 @@ class Reference(BaseModel, ABC):
         """
         raise NotImplementedError  # pragma: no cover
 
+    @classmethod
+    def from_str(cls: type[T], input_str: str) -> T:
+        """Create a reference from a string representation.
+
+        Args:
+            input_str: The string representation of the reference.
+
+        Returns:
+            The reference object.
+
+        Examples:
+            ```python
+            StepOutput.from_str("StepOutput(step_name, path='field.name')")
+            StepOutput.from_str("{{ StepOutput(0, path='field.name') }}")
+            Input.from_str("Input(input_name, path='field.name')")
+            ```
+
+        """
+        parsed_args, kwargs = cls._parse_argument(input_str)
+        init_kwargs = list(signature(cls.__init__).parameters.values())[1:]  # exclude self
+        for param, init_kwarg in zip(parsed_args, init_kwargs, strict=False):
+            kwargs[init_kwarg.name] = param
+        kwargs = {k: cls._convert_argument(v) for k, v in kwargs.items()}
+        return cls(**kwargs)
+
+    @classmethod
+    def _parse_argument(cls, input_str: str) -> tuple[list[str], dict[str, Any]]:
+        """Parse the arguments from the input string into positional and keyword arguments."""
+        # Use regex to capture class name and arguments, optionally handling {{ }} wrapper
+        match = re.search(_PARENTHESIS_STRING_REGEX, input_str)
+        if not match:
+            raise ValueError(f"Invalid input string format: {input_str}")
+        class_name = match.group(1)
+        if class_name != cls.__name__:
+            raise ValueError(f"Invalid input string format: {input_str}")
+        raw_args = match.group(2).strip()
+        if raw_args is None or raw_args == "":
+            return [], {}
+        args = raw_args.split(",")
+        must_be_closed = ['"', "'"]
+        must_be_matched = ["{", "}", "[", "]", "(", ")"]
+        counts = {char: input_str.count(char) for char in must_be_closed + must_be_matched}
+        if (
+            counts["{"] != counts["}"]
+            or counts["["] != counts["]"]
+            or counts["("] != counts[")"]
+            or counts["'"] % 2 != 0
+            or counts['"'] % 2 != 0
+        ):
+            raise ValueError(f"Invalid input string format: {input_str}")
+        kwargs = {}
+        parsed_args = []
+        for arg in args:
+            if arg.strip() == "":
+                raise ValueError(f"Invalid input string format: {input_str}")
+            if "=" in arg:
+                matcher = _KWARGS_ARG_REGEX.match(arg)
+                if not matcher:
+                    raise ValueError(f"Invalid input string format: {input_str}")
+                key, value = matcher.groups()
+                kwargs[key.strip()] = value.strip()
+            elif matcher := _POSITIONAL_ARG_REGEX.match(arg):
+                parsed_args.append(matcher.group(1).strip())
+            else:
+                # this shouldn't be reachable
+                raise ValueError(f"Invalid input string format: {input_str}")  # pragma: no cover
+        return parsed_args, kwargs
+
+    @classmethod
+    def _convert_argument(cls, input_str: str) -> Any:  # noqa: ANN401
+        """Parse an argument from a string."""
+        for converter in cls._converters:
+            try:
+                return converter(input_str)
+            except ValueError:
+                continue
+        return input_str
+
 
 class StepOutput(Reference):
     """A reference to the output of a previous step in the plan.
@@ -106,7 +239,9 @@ class StepOutput(Reference):
     previous operations. The reference is resolved at runtime during plan execution.
 
     You can reference a step either by its name (string) or by its position (integer index).
-    Step indices are zero-based, so the first step is index 0.
+    Step indices are zero-based, so the first step is index 0. Negative indices are
+    also supported, with -1 referring to the last step in the plan, -2 the second to
+    last, and so on.
 
     Example:
         ```python
@@ -155,10 +290,17 @@ class StepOutput(Reference):
             "These can be combined: 'results.0.user.address.street'."
         ),
     )
+    full: bool = Field(
+        default=False,
+        description=(
+            "Whether to return the full step output values as a list. "
+            "Used in the case of loop steps."
+        ),
+    )
 
-    def __init__(self, step: str | int, path: str | None = None) -> None:
+    def __init__(self, step: str | int, path: str | None = None, full: bool = False) -> None:
         """Initialize a reference to a step's output."""
-        super().__init__(step=step, path=path)  # type: ignore[call-arg]
+        super().__init__(step=step, path=path, full=full)  # type: ignore[call-arg]
 
     @override
     def get_legacy_name(self, plan: PlanV2) -> str:
@@ -172,9 +314,12 @@ class StepOutput(Reference):
         # The double braces are used when the plan is running to template the StepOutput value so it
         # can be substituted at runtime.
         step_repr = f"'{self.step}'" if isinstance(self.step, str) else str(self.step)
+        base_repr = f"StepOutput({step_repr}"
         if self.path:
-            return f"{{{{ StepOutput({step_repr}, path='{self.path}') }}}}"
-        return f"{{{{ StepOutput({step_repr}) }}}}"
+            base_repr += f", path='{self.path}'"
+        if self.full:
+            base_repr += ", full=True"
+        return f"{{{{ {base_repr}) }}}}"
 
     @override
     def get_value(self, run_data: RunContext) -> Any | None:
@@ -190,28 +335,47 @@ class StepOutput(Reference):
 
         """
         # Get the base step output value
-        base_value = None
-        for step_output in run_data.step_output_values[::-1]:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
-                base_value = step_output.value
-                break
-            if isinstance(self.step, str) and step_output.step_name == self.step:
-                base_value = step_output.value
-                break
-
-        if base_value is None:
+        to_parse = None
+        total_steps = len(run_data.plan.steps)
+        if self.full:
+            to_parse = [
+                step_output.value
+                for step_output in run_data.step_output_values
+                if self._match_output(step_output, total_steps)
+            ]
+        else:
+            for step_output in run_data.step_output_values[::-1]:
+                if self._match_output(step_output, total_steps):
+                    to_parse = [step_output.value]
+                    break
+        if to_parse is None:
             logger().warning(f"Output value for step {self.step} not found")
             return None
+        if self.path:
+            parsed = [pydash.get(step_output, self.path) for step_output in to_parse]
+        else:
+            parsed = to_parse
+        return parsed if self.full else parsed[0]
 
-        # If there is a path, use pydash to traverse the object
-        return pydash.get(base_value, self.path) if self.path else base_value
+    def _match_output(self, step_output: StepOutputValue, total_steps: int) -> bool:
+        """Match the step output to the step stored in the reference.
+
+        Args:
+            step_output: The step output to compare against.
+            total_steps: Total number of step outputs available, used for resolving
+                negative indices.
+
+        """
+        if isinstance(self.step, int):
+            index = self.step if self.step >= 0 else total_steps + self.step
+            return step_output.step_num == index
+        return step_output.step_name == self.step
 
     def get_description(self, run_data: RunContext) -> str:
         """Get the description of the step output."""
+        total_steps = len(run_data.plan.steps)
         for step_output in run_data.step_output_values:
-            if isinstance(self.step, int) and step_output.step_num == self.step:
-                return step_output.description
-            if isinstance(self.step, str) and step_output.step_name == self.step:
+            if self._match_output(step_output, total_steps):
                 return step_output.description
         return ""
 
