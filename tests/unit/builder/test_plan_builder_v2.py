@@ -7,26 +7,22 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from pydantic import BaseModel
 
+from portia.builder.conditional_step import ConditionalStep
 from portia.builder.conditionals import ConditionalBlockClauseType
+from portia.builder.invoke_tool_step import InvokeToolStep
+from portia.builder.llm_step import LLMStep
+from portia.builder.loop_step import LoopStep
+from portia.builder.loops import LoopBlock, LoopStepType, LoopType
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import (
-    ConditionalStep,
-    InvokeToolStep,
-    LLMStep,
-    LoopBlock,
-    LoopStep,
-    LoopStepType,
-    LoopType,
-    ReActAgentStep,
-    SingleToolAgentStep,
-    StepV2,
-    UserInputStep,
-    UserVerifyStep,
-)
-from portia.builder.steps.sub_plan_step import SubPlanStep
-from portia.plan import PlanInput
+from portia.builder.single_tool_agent_step import SingleToolAgentStep
+from portia.builder.step_v2 import StepV2
+from portia.builder.sub_plan_step import SubPlanStep
+from portia.builder.user_input import UserInputStep
+from portia.builder.user_verify import UserVerifyStep
+from portia.plan import PlanInput, Step
 from portia.tool import Tool
 from portia.tool_decorator import tool
 
@@ -215,6 +211,15 @@ def test_llm_step_method_with_all_parameters() -> None:
     assert step.step_name == "custom_step"
 
 
+def test_llm_step_method_with_model() -> None:
+    """Test llm_step accepts a model parameter."""
+    builder = PlanBuilderV2()
+    builder.llm_step(task="Analyze", model="openai/gpt-4o")
+    step = builder.plan.steps[0]
+    assert isinstance(step, LLMStep)
+    assert step.model == "openai/gpt-4o"
+
+
 def test_llm_step_method_auto_generated_step_name() -> None:
     """Test that step names are auto-generated correctly."""
     builder = PlanBuilderV2()
@@ -361,6 +366,15 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
     assert step.step_name == "agent_step"
 
 
+def test_single_tool_agent_step_method_with_model() -> None:
+    """Test single_tool_agent_step accepts a model parameter."""
+    builder = PlanBuilderV2()
+    builder.single_tool_agent_step(tool="search_tool", task="Find", model="openai/gpt-4o")
+    step = builder.plan.steps[0]
+    assert isinstance(step, SingleToolAgentStep)
+    assert step.model == "openai/gpt-4o"
+
+
 def test_single_tool_agent_step_accepts_tool_object() -> None:
     """Test single_tool_agent_step accepts a Tool instance."""
     builder = PlanBuilderV2()
@@ -429,6 +443,15 @@ def test_react_agent_step_method_with_all_parameters() -> None:
     assert step.step_name == "react_analysis"
     assert step.allow_agent_clarifications is True
     assert step.tool_call_limit == 50
+
+
+def test_react_agent_step_method_with_model() -> None:
+    """Test react_agent_step accepts a model parameter."""
+    builder = PlanBuilderV2()
+    builder.react_agent_step(task="Research", model="openai/gpt-4o")
+    step = builder.plan.steps[0]
+    assert isinstance(step, ReActAgentStep)
+    assert step.model == "openai/gpt-4o"
 
 
 def test_react_agent_step_method_single_tool() -> None:
@@ -703,8 +726,8 @@ def test_add_sub_plan_method() -> None:
     assert sub_step_typed.plan is sub_plan
 
 
-def test_add_steps_method_with_iterable() -> None:
-    """Test the add_steps() method with an iterable of steps."""
+def test_add_sub_plan_method_with_iterable() -> None:
+    """Test the add_sub_plan() method with an iterable of steps."""
     builder = PlanBuilderV2()
 
     steps = [
@@ -725,8 +748,8 @@ def test_add_steps_method_with_iterable() -> None:
     assert result.plan.steps[0].plan.steps == steps
 
 
-def test_add_steps_method_with_plan_v2_duplicate_inputs_error() -> None:
-    """Test the add_steps() method raises error for duplicate plan inputs."""
+def test_add_sub_plan_method_with_plan_v2_duplicate_inputs_error() -> None:
+    """Test the add_sub_plan() method raises error for duplicate plan inputs."""
     builder = PlanBuilderV2()
 
     builder.input(name="shared_input", description="Shared input name")
@@ -745,15 +768,15 @@ def test_add_steps_method_with_plan_v2_duplicate_inputs_error() -> None:
         builder.add_sub_plan(other_plan)
 
 
-def test_add_steps_method_with_empty_iterable() -> None:
-    """Test the add_steps() method with an empty iterable."""
+def test_add_sub_plan_method_with_empty_iterable() -> None:
+    """Test the add_sub_plan() method with an empty iterable."""
     builder = PlanBuilderV2().llm_step(task="Initial step").add_sub_plan([])
     # The add_sub_plan still adds a step - it just does nothing
     assert len(builder.plan.steps) == 2
 
 
-def test_add_steps_method_with_empty_plan_v2() -> None:
-    """Test the add_steps() method with an empty PlanV2."""
+def test_add_sub_plan_method_with_empty_plan_v2() -> None:
+    """Test the add_sub_plan() method with an empty PlanV2."""
     builder = PlanBuilderV2().input(name="existing_input").llm_step(task="Initial step")
     empty_plan = PlanBuilderV2().build()
 
@@ -763,8 +786,8 @@ def test_add_steps_method_with_empty_plan_v2() -> None:
     assert len(result.plan.plan_inputs) == 1
 
 
-def test_add_steps_method_chaining_with_different_sources() -> None:
-    """Test chaining add_steps() method with different sources."""
+def test_add_sub_plan_method_chaining_with_different_sources() -> None:
+    """Test chaining add_sub_plan() method with different sources."""
     builder = PlanBuilderV2()
 
     step_list = [LLMStep(task="List step", step_name="list_step")]
@@ -793,8 +816,8 @@ def test_add_sub_plan_with_invalid_input_name_error() -> None:
         builder.add_sub_plan(sub_plan, input_values={"invalid": "value"})
 
 
-def test_add_step_and_add_steps_integration() -> None:
-    """Test integration of add_step and add_steps methods together."""
+def test_add_step_and_add_sub_plan_integration() -> None:
+    """Test integration of add_step and add_sub_plan methods together."""
     step_batch = (
         PlanBuilderV2()
         .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
@@ -1096,8 +1119,8 @@ def test_conditional_method_chaining() -> None:
     assert len(plan.plan_inputs) == 1
 
 
-def test_add_steps_with_input_values_single_value() -> None:
-    """Test add_steps with input_values setting a single input value."""
+def test_add_sub_plan_with_input_values_single_value() -> None:
+    """Test add_sub_plan with input_values setting a single input value."""
     builder = PlanBuilderV2()
 
     sub_plan = (
@@ -1114,8 +1137,8 @@ def test_add_steps_with_input_values_single_value() -> None:
     assert result.plan.plan_inputs[0].value == "provided_value"
 
 
-def test_add_steps_with_input_values_multiple_values_override_default() -> None:
-    """Test add_steps with input_values setting 2 out of 4 values, overriding default."""
+def test_add_sub_plan_with_input_values_multiple_values_override_default() -> None:
+    """Test add_sub_plan with input_values setting 2 out of 4 values, overriding default."""
     builder = PlanBuilderV2()
 
     sub_plan = (
@@ -1153,8 +1176,8 @@ def test_add_steps_with_input_values_multiple_values_override_default() -> None:
     assert inputs["input_unchanged2"].value == "unchanged_default"
 
 
-def test_add_steps_with_input_values_invalid_input_name_error() -> None:
-    """Test add_steps raises error when input_values contains invalid input name."""
+def test_add_sub_plan_with_input_values_invalid_input_name_error() -> None:
+    """Test add_sub_plan raises error when input_values contains invalid input name."""
     builder = PlanBuilderV2()
 
     sub_plan = (

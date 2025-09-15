@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from portia.builder.reference import Input, StepOutput
-from portia.builder.steps.sub_plan_step import SubPlanStep
+from portia.builder.sub_plan_step import SubPlanStep
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput
 from portia.plan import Step as PlanStep
@@ -86,7 +86,7 @@ async def test_sub_plan_step_run_no_inputs() -> None:
     mock_final_output.full_value.return_value = "Sub-plan completed successfully"
     mock_plan_run.outputs.final_output = mock_final_output
 
-    with patch("portia.builder.steps.sub_plan_step.Portia") as mock_portia_class:
+    with patch("portia.builder.sub_plan_step.Portia") as mock_portia_class:
         mock_portia = Mock()
         mock_portia.arun_plan = AsyncMock(return_value=mock_plan_run)
         mock_portia_class.return_value = mock_portia
@@ -110,8 +110,10 @@ async def test_sub_plan_step_run_with_input_values() -> None:
     ]
 
     step = SubPlanStep.model_construct(step_name="sub_plan_step", plan=mock_plan)
+    mock_plan.steps = [step]
 
     mock_run_data = Mock()
+    mock_run_data.plan = mock_plan
     mock_run_data.plan_run.plan_run_inputs = {}
     mock_run_data.step_output_values = [
         StepOutputValue(
@@ -128,7 +130,7 @@ async def test_sub_plan_step_run_with_input_values() -> None:
     mock_plan_run.outputs.final_output = mock_final_output
 
     with (
-        patch("portia.builder.steps.sub_plan_step.Portia") as mock_portia_class,
+        patch("portia.builder.sub_plan_step.Portia") as mock_portia_class,
     ):
         mock_portia = Mock()
         mock_portia.arun_plan = AsyncMock(return_value=mock_plan_run)
@@ -175,7 +177,7 @@ async def test_sub_plan_step_run_input_priority() -> None:
     mock_final_output.full_value.return_value = "Sub-plan with priority completed"
     mock_plan_run.outputs.final_output = mock_final_output
 
-    with patch("portia.builder.steps.sub_plan_step.Portia") as mock_portia_class:
+    with patch("portia.builder.sub_plan_step.Portia") as mock_portia_class:
         mock_portia = Mock()
         mock_portia.arun_plan = AsyncMock(return_value=mock_plan_run)
         mock_portia_class.return_value = mock_portia
@@ -216,7 +218,7 @@ async def test_sub_plan_step_run_no_final_output() -> None:
     mock_plan_run = Mock()
     mock_plan_run.outputs.final_output = None  # No final output
 
-    with patch("portia.builder.steps.sub_plan_step.Portia") as mock_portia_class:
+    with patch("portia.builder.sub_plan_step.Portia") as mock_portia_class:
         mock_portia = Mock()
         mock_portia.arun_plan = AsyncMock(return_value=mock_plan_run)
         mock_portia_class.return_value = mock_portia
@@ -256,13 +258,14 @@ async def test_sub_plan_step_run_with_string_template_input_values() -> None:
     ]
     mock_run_data.plan = Mock()
     mock_run_data.plan.plan_inputs = [PlanInput(name="username")]
+    mock_run_data.plan.steps = [step]
 
     mock_plan_run = Mock()
     mock_final_output = Mock()
     mock_final_output.full_value.return_value = "Sub-plan with templates completed"
     mock_plan_run.outputs.final_output = mock_final_output
 
-    with patch("portia.builder.steps.sub_plan_step.Portia") as mock_portia_class:
+    with patch("portia.builder.sub_plan_step.Portia") as mock_portia_class:
         mock_portia = Mock()
         mock_portia.arun_plan = AsyncMock(return_value=mock_plan_run)
         mock_portia_class.return_value = mock_portia
