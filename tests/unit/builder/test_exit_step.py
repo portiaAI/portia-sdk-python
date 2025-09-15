@@ -95,6 +95,7 @@ async def test_exit_step_run_with_reference_resolution() -> None:
     mock_run_data = Mock()
     mock_run_data.step_output_values = [mock_step_output_value]
     mock_run_data.portia = mock_portia
+    mock_run_data.plan.steps = [step]
 
     result = await step.run(mock_run_data)
 
@@ -121,6 +122,7 @@ async def test_exit_step_run_with_non_string_resolved_message() -> None:
     mock_run_data = Mock()
     mock_run_data.step_output_values = [mock_step_output_value]
     mock_run_data.portia = mock_portia
+    mock_run_data.plan.steps = [step]
 
     result = await step.run(mock_run_data)
 
@@ -147,6 +149,7 @@ async def test_exit_step_run_with_none_resolved_message() -> None:
     mock_run_data = Mock()
     mock_run_data.step_output_values = [mock_step_output_value]
     mock_run_data.portia = mock_portia
+    mock_run_data.plan.steps = [step]
 
     result = await step.run(mock_run_data)
 

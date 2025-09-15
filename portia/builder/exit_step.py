@@ -1,4 +1,4 @@
-"""Types to support exits."""
+"""Exit step implementation for plan termination."""
 
 import sys
 
