@@ -723,7 +723,6 @@ def test_add_sub_plan_method() -> None:
     assert isinstance(sub_step, SubPlanStep)
     sub_step_typed: SubPlanStep = sub_step
     assert sub_step_typed.step_name == "run_sub"
-    assert sub_step_typed.plan is sub_plan
 
 
 def test_add_sub_plan_method_with_iterable() -> None:

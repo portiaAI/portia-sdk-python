@@ -5,6 +5,7 @@ You can view an example of this class in use in example_builder.py.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
 from portia.builder.conditional_step import ConditionalStep
@@ -743,12 +744,14 @@ class PlanBuilderV2:
                 builder.add_step(step)
             plan = builder.build()
 
-        if isinstance(plan, PlanV2):
-            # Ensure there are no duplicate plan inputs
-            existing_input_names = {p.name for p in self.plan.plan_inputs}
-            for _input in plan.plan_inputs:
-                if _input.name in existing_input_names:
-                    raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
+        # Create a copy to avoid modifying the original sub plan
+        plan = copy.deepcopy(plan)
+
+        # Ensure there are no duplicate plan inputs
+        existing_input_names = {p.name for p in self.plan.plan_inputs}
+        for _input in plan.plan_inputs:
+            if _input.name in existing_input_names:
+                raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
 
         if input_values:
             allowed_input_names = {p.name for p in plan.plan_inputs}
