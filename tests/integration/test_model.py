@@ -31,7 +31,7 @@ class Response(BaseModel):
 
 # Only test OpenAI to avoid API key and dependency issues in integration tests
 MODELS = [
-    "openai/gpt-4o-mini",
+    "openai/gpt-4.1",
 ]
 
 # Skip low capability models that require optional dependencies

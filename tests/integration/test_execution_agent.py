@@ -80,7 +80,7 @@ class QuantumEntanglementSimulatorTool(Tool):
 @pytest.mark.parametrize(
     "model",
     [
-        "openai/gpt-4o",  # Only test OpenAI to avoid API key issues
+        "openai/gpt-4.1",  # Only test OpenAI to avoid API key issues
     ],
 )
 def test_execution_agent_with_long_tool_description(model: str) -> None:
@@ -133,7 +133,7 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
 @pytest.mark.parametrize(
     "model",
     [
-        "openai/gpt-4o",  # Only test OpenAI to avoid API key issues
+        "openai/gpt-4.1",  # Only test OpenAI to avoid API key issues
     ],
 )
 @pytest.mark.asyncio

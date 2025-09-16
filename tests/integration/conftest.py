@@ -98,8 +98,9 @@ def integration_portia() -> Portia:
     # Create config with memory storage to avoid cloud dependencies
     config = Config.from_default(
         storage_class=StorageClass.MEMORY,
-        portia_api_key=None,  # Disable cloud features
+        portia_api_key=None,  # Disable cloud features  
         default_log_level="DEBUG",
+        default_model="openai/gpt-4.1",  # Use valid OpenAI model
     )
 
     # Create Portia instance
@@ -126,7 +127,7 @@ def mock_openai_globally() -> Any:  # noqa: ANN401
         def __init__(self, content: str = "Mock response from OpenAI") -> None:
             self.content = content
             self.id = "mock-123"
-            self.model = "gpt-4o-mini"
+            self.model = "gpt-4.1"
             self.object = "chat.completion"
 
         @property

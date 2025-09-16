@@ -39,11 +39,11 @@ if TYPE_CHECKING:
 CORE_PROVIDERS = [
     (
         LLMProvider.OPENAI,
-        "openai/gpt-4o-mini",
+        "openai/gpt-4.1",
     ),
 ]
 
-# Only test OpenAI to avoid API key issues in integration tests
+# Only test OpenAI to avoid API key issues in integration tests  
 PLANNING_PROVIDERS = [
     (
         LLMProvider.OPENAI,
@@ -332,7 +332,7 @@ def test_portia_run_query_with_clarifications_no_handler() -> None:
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=LLMProvider.OPENAI,
-        default_model="openai/gpt-4o-mini",
+        default_model="openai/gpt-4.1",
         execution_agent_type=ExecutionAgentType.DEFAULT,
         storage_class=StorageClass.MEMORY,
     )
@@ -375,7 +375,7 @@ async def test_portia_arun_query_with_clarifications_no_handler() -> None:
     config = Config.from_default(
         default_log_level=LogLevel.DEBUG,
         llm_provider=LLMProvider.OPENAI,
-        default_model="openai/gpt-4o-mini",
+        default_model="openai/gpt-4.1",
         execution_agent_type=ExecutionAgentType.DEFAULT,
         storage_class=StorageClass.MEMORY,
     )
