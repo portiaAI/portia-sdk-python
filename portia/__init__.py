@@ -93,6 +93,10 @@ from portia.open_source_tools.weather import WeatherTool
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
 
+# Import-time deprecation warnings for PlanV1 classes
+from portia.deprecation import warn_on_import
+warn_on_import("portia", ["Plan", "PlanBuilder"], "portia.builder")
+
 # Core classes
 from portia.portia import ExecutionHooks, Portia
 

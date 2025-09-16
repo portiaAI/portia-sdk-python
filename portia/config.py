@@ -266,6 +266,7 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
+FEATURE_FLAG_PLAN_V2_DEFAULT = "plan_v2_default"
 
 
 E = TypeVar("E", bound=Enum)
@@ -521,10 +522,14 @@ class Config(BaseModel):
     @model_validator(mode="after")
     def parse_feature_flags(self) -> Self:
         """Add feature flags if not provided."""
+        # Check environment variable for PLAN_V2_DEFAULT
+        plan_v2_default_env = os.getenv("PLAN_V2_DEFAULT", "false").lower() == "true"
+
         self.feature_flags = {
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
+            FEATURE_FLAG_PLAN_V2_DEFAULT: plan_v2_default_env,
             **self.feature_flags,
         }
         return self

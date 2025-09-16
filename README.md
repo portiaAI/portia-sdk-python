@@ -163,6 +163,51 @@ Here is another example where we use our open browser tool. It uses clarificatio
 - Watch us embarrass ourselves on our <a href="https://www.youtube.com/@PortiaAI" target="_blank">**YouTube channel (↗)**</a>.
 - Follow us on <a href="https://www.producthunt.com/posts/portia-ai" target="_blank">**Product Hunt (↗)**</a>.
 
+## Migration from Plan V1 to V2
+
+**Notice:** The original `Plan` and `PlanBuilder` classes are deprecated and will be removed in a future version. Use `PlanV2` and `PlanBuilderV2` instead.
+
+### PlanV2 Migration Guide
+
+The new `PlanBuilderV2` offers improved functionality and a cleaner API:
+
+```python
+# Old (deprecated) - will show deprecation warnings
+from portia import PlanBuilder
+builder = PlanBuilder(query="My task")
+
+# New (recommended) - no warnings
+from portia import PlanBuilderV2
+builder = PlanBuilderV2(label="My task")
+```
+
+### Feature Flag: PLAN_V2_DEFAULT
+
+Control the default behavior for plan creation with the `PLAN_V2_DEFAULT` environment variable:
+
+```bash
+# Enable PlanV2-first behavior (recommended for new projects)
+export PLAN_V2_DEFAULT=true
+
+# Or run with the flag directly
+PLAN_V2_DEFAULT=true python your_script.py
+```
+
+**Benefits of setting `PLAN_V2_DEFAULT=true`:**
+- Enables PlanV2-first behavior throughout the SDK
+- Helps identify usage of deprecated V1 classes
+- Future-proofs your codebase for upcoming versions
+
+**Migration Timeline:**
+- **Current**: V1 classes work but emit deprecation warnings
+- **Future release**: V1 classes will be removed entirely
+
+To suppress deprecation warnings during migration, use Python's warning filters:
+```python
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="portia")
+```
+
 ## Paid contributions & contribution guidelines
 Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a> for details.
 
