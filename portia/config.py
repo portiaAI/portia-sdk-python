@@ -266,6 +266,7 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
+FEATURE_FLAG_PLAN_V2_DEFAULT = "plan_v2_default"
 
 
 E = TypeVar("E", bound=Enum)
@@ -406,7 +407,9 @@ class Config(BaseModel):
         json_log_serialize: Whether to serialize logs in JSON format.
         planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
-        feature_flags: A dictionary of feature flags for the SDK.
+        feature_flags: A dictionary of feature flags for the SDK. Notable flags include:
+            - FEATURE_FLAG_PLAN_V2_DEFAULT: Controls whether PlanV2 should be prioritized over
+              PlanV1.
         clarifications_enabled: Whether to enable clarifications for the execution agent.
 
     """
@@ -525,6 +528,9 @@ class Config(BaseModel):
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
+            FEATURE_FLAG_PLAN_V2_DEFAULT: (
+                os.getenv("PLAN_V2_DEFAULT", "false").lower() in ("true", "1", "yes")
+            ),
             **self.feature_flags,
         }
         return self

@@ -124,6 +124,17 @@ The example below introduces **some** of the config options available with Porti
   - To enable ultra-verbose tracing of LLM calls across agents and tools, set `default_log_level=LogLevel.TRACE` (or the string "TRACE"). TRACE includes all DEBUG logs plus additional "LLM call" entries showing the model and high-level purpose (planning, introspection, summarization, parsing/verification, tool-calling).
 - The `llm_provider` and `xxx_api_key` (varies depending on model provider chosen) are used to choose the specific LLM provider. In the example below we're using GPT 4o, but you can use Anthropic, Gemini, Grok and others!
 
+### Migration from Plan/PlanBuilder V1 to V2
+
+**Note:** The legacy `Plan` and `PlanBuilder` classes are deprecated in favor of their V2 counterparts (`PlanV2` and `PlanBuilderV2`). While V1 classes will continue to work, they will emit deprecation warnings and will be removed in a future version.
+
+To migrate to V2 components:
+- Replace `PlanBuilder` with `PlanBuilderV2` from `portia.builder.plan_builder_v2`
+- Replace `Plan` with `PlanV2` from `portia.builder.plan_v2`
+- See our V2 [migration guide](https://docs.portialabs.ai/migrate-to-v2) for detailed instructions
+
+You can also set the environment variable `PLAN_V2_DEFAULT=true` to enable enhanced deprecation warnings that provide additional guidance during the migration process.
+
 Finally we also introduce the concept of a `tool_registry`, which is a flexible grouping of tools.
 
 ```python

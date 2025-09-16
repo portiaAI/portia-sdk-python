@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_valid
 from typing_extensions import deprecated
 
 from portia.common import Serializable
+from portia.deprecation import warn_planv1_usage
 from portia.prefixed_uuid import PlanUUID
 
 
@@ -63,6 +64,13 @@ class PlanBuilder:
                 for the query.
 
         """
+        # Emit deprecation warning on initialization
+        warn_planv1_usage(
+            component_name="PlanBuilder",
+            recommended_alternative="PlanBuilderV2",
+            additional_context="See portia.builder.plan_builder_v2 for the V2 implementation.",
+        )
+
         self.query = query if query is not None else ""
         self.steps = []
         self.plan_inputs = []
@@ -414,6 +422,8 @@ class Plan(BaseModel):
     A plan defines the entire sequence of steps required to process a query and generate a result.
     It also includes the context in which the plan was created.
 
+    **DEPRECATED**: This class is deprecated. Use PlanV2 from portia.builder.plan_v2 instead.
+
     Args:
         id (PlanUUID): A unique ID for the plan.
         plan_context (PlanContext): The context for when the plan was created.
@@ -520,6 +530,13 @@ class Plan(BaseModel):
             Plan: The validated plan.
 
         """
+        # Emit deprecation warning when Plan is instantiated
+        warn_planv1_usage(
+            component_name="Plan",
+            recommended_alternative="PlanV2",
+            additional_context="See portia.builder.plan_v2 for the V2 implementation.",
+        )
+
         outputs = [step.output + (step.condition or "") for step in self.steps]
         if len(outputs) != len(set(outputs)):
             raise ValueError("Outputs + conditions must be unique")
