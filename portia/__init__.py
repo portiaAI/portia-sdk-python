@@ -30,6 +30,7 @@ from portia.clarification import (
 )
 from portia.clarification_handler import ClarificationHandler
 from portia.config import (
+    FEATURE_FLAG_PLAN_V2_DEFAULT,
     SUPPORTED_ANTHROPIC_MODELS,
     SUPPORTED_MISTRALAI_MODELS,
     SUPPORTED_OPENAI_MODELS,
@@ -89,6 +90,9 @@ from portia.open_source_tools.registry import (
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
+# Import deprecation module to trigger any import-time warnings
+from portia import deprecation as _  # noqa: F401
+
 # Plan and execution related classes
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
@@ -109,6 +113,7 @@ from portia.tool_registry import (
 
 # Define explicitly what should be available when using "from portia import *"
 __all__ = [
+    "FEATURE_FLAG_PLAN_V2_DEFAULT",
     "SUPPORTED_ANTHROPIC_MODELS",
     "SUPPORTED_MISTRALAI_MODELS",
     "SUPPORTED_OPENAI_MODELS",

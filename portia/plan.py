@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_valid
 from typing_extensions import deprecated
 
 from portia.common import Serializable
+from portia.deprecation import warn_plan_v1_usage
 from portia.prefixed_uuid import PlanUUID
 
 
@@ -63,6 +64,9 @@ class PlanBuilder:
                 for the query.
 
         """
+        # Warn about PlanBuilder deprecation
+        warn_plan_v1_usage("PlanBuilder", stacklevel=2)
+
         self.query = query if query is not None else ""
         self.steps = []
         self.plan_inputs = []

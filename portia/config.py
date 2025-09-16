@@ -266,6 +266,7 @@ class LogLevel(Enum):
 
 
 FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
+FEATURE_FLAG_PLAN_V2_DEFAULT = "plan_v2_default"
 
 
 E = TypeVar("E", bound=Enum)
@@ -508,7 +509,13 @@ class Config(BaseModel):
 
     feature_flags: dict[str, bool] = Field(
         default={},
-        description="A dictionary of feature flags for the SDK.",
+        description=(
+            "A dictionary of feature flags for the SDK. Available flags include:\n"
+            "- plan_v2_default: When True, PlanBuilderV2/PlanV2 are used by default in contexts "
+            "where both V1 and V2 are available. When False, maintains legacy V1 behavior. "
+            "Defaults to False for backward compatibility. Set PLAN_V2_DEFAULT=true environment "
+            "variable to enable."
+        ),
     )
     argument_clarifications_enabled: bool = Field(
         default=False,
@@ -521,10 +528,15 @@ class Config(BaseModel):
     @model_validator(mode="after")
     def parse_feature_flags(self) -> Self:
         """Add feature flags if not provided."""
+        # Parse PLAN_V2_DEFAULT from environment variable
+        plan_v2_default_env = os.getenv("PLAN_V2_DEFAULT", "false").lower()
+        plan_v2_default = plan_v2_default_env in ("true", "1", "yes", "on")
+
         self.feature_flags = {
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
             FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
+            FEATURE_FLAG_PLAN_V2_DEFAULT: plan_v2_default,
             **self.feature_flags,
         }
         return self
