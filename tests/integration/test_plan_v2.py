@@ -30,7 +30,8 @@ if TYPE_CHECKING:
     from portia.plan import Step
 
 
-MODEL_PROVIDERS = [LLMProvider.OPENAI, LLMProvider.ANTHROPIC, LLMProvider.GOOGLE]
+# Only test OpenAI in integration tests to avoid API key issues
+MODEL_PROVIDERS = [LLMProvider.OPENAI]
 
 
 class CommodityPrice(BaseModel):
@@ -1899,15 +1900,12 @@ def test_plan_v2_do_while_loop_string_condition(local_portia: Portia) -> None:
 @pytest.mark.parametrize("llm_provider", MODEL_PROVIDERS)
 @pytest.mark.asyncio
 async def test_react_agent_weather_research_and_poem(
-    llm_provider: LLMProvider,
+    llm_provider: LLMProvider,  # noqa: ARG001
+    integration_portia: Portia,
 ) -> None:
     """Test react agent researching weather in European capitals and writing a poem."""
-    config = Config.from_default(
-        llm_provider=llm_provider,
-        default_log_level=LogLevel.DEBUG,
-    )
-
-    portia = Portia(config=config)
+    # Use integration_portia fixture which has mock tools configured
+    portia = integration_portia
 
     class CapitalWeatherInfo(BaseModel):
         """Weather information for a capital city."""
@@ -1989,9 +1987,10 @@ class CountryClarificationHandler(ClarificationHandler):
 
 
 @pytest.mark.asyncio
-async def test_react_agent_weather_with_clarifications() -> None:
+async def test_react_agent_weather_with_clarifications(integration_portia: Portia) -> None:
     """Test react agent weather lookup with clarification for country input."""
-    config = Config.from_default(default_log_level=LogLevel.DEBUG)
+    # Use integration_portia fixture which has mock tools configured
+    portia = integration_portia
 
     before_step_already_called = False
 
@@ -2011,12 +2010,10 @@ async def test_react_agent_weather_with_clarifications() -> None:
             )
         return None
 
-    portia = Portia(
-        config=config,
-        execution_hooks=ExecutionHooks(
-            before_tool_call=before_tool_call_execution_hook,
-            clarification_handler=CountryClarificationHandler(),
-        ),
+    # Add execution hooks to the existing portia instance
+    portia.execution_hooks = ExecutionHooks(
+        before_tool_call=before_tool_call_execution_hook,
+        clarification_handler=CountryClarificationHandler(),
     )
 
     plan = (

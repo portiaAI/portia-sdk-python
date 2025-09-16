@@ -1575,9 +1575,7 @@ class PortiaCloudStorage(Storage):
                 return  # Don't raise, just log and continue
         # Check response only if we got one (didn't timeout on all attempts)
         if response is not None and not response.is_success:
-            logger().error(
-                f"Error from Portia Cloud when saving tool call: {response.content!s}"
-            )
+            logger().error(f"Error from Portia Cloud when saving tool call: {response.content!s}")
         log_tool_call(tool_call)
 
     def save_plan_run_output(
