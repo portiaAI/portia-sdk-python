@@ -1,7 +1,12 @@
 """Types to support Loops."""
 
 from collections.abc import Callable, Sequence
-from typing import Any, Self, override
+from typing import Any, Self
+
+try:
+    from typing import override
+except ImportError:
+    from typing_extensions import override
 
 from langsmith import traceable
 from pydantic import Field, model_validator
