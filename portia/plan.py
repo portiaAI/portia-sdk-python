@@ -26,10 +26,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_valid
 from typing_extensions import deprecated
 
 from portia.common import Serializable
+from portia.deprecation import deprecated_class
 from portia.prefixed_uuid import PlanUUID
 
 
 @deprecated("Use PlanBuilderV2 instead")
+@deprecated_class("PlanBuilderV2", "0.8.0")
 class PlanBuilder:
     """A builder for creating plans.
 
@@ -408,6 +410,7 @@ class PlanContext(BaseModel):
         return sorted(tool_ids)
 
 
+@deprecated_class("PlanV2", "0.8.0")
 class Plan(BaseModel):
     """A plan represents a series of steps that an agent should follow to execute the query.
 

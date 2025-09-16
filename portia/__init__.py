@@ -43,6 +43,9 @@ from portia.config import (
     default_config,
 )
 
+# Plan and execution related classes
+from portia.deprecation import deprecated_import
+
 # Error classes
 from portia.errors import (
     ConfigNotFoundError,
@@ -88,8 +91,6 @@ from portia.open_source_tools.registry import (
 )
 from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
-
-# Plan and execution related classes
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
 
@@ -198,3 +199,7 @@ __all__ = [
     "open_source_tool_registry",
     "tool",
 ]
+
+# Emit deprecation warnings for V1 plan classes after all imports
+deprecated_import("portia", "Plan", "PlanV2", "0.8.0")
+deprecated_import("portia", "PlanBuilder", "PlanBuilderV2", "0.8.0")
