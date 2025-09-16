@@ -18,7 +18,7 @@ from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput, Step, Variable
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import PlanV2
     from portia.run_context import RunContext
 
 

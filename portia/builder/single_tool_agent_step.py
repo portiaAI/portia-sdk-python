@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import StepV2
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -26,7 +26,7 @@ from portia.tool import Tool  # noqa: TC001
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import PlanV2
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.run_context import RunContext
 

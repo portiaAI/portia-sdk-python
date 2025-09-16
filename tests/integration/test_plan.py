@@ -9,7 +9,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from portia import Config, LogLevel, Portia
-from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
+from portia.builder.plan_builder import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
 from portia.clarification import UserVerificationClarification
 from portia.clarification_handler import ClarificationHandler

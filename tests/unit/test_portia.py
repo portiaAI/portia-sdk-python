@@ -16,8 +16,8 @@ import httpx
 import pytest
 from pydantic import BaseModel, HttpUrl, SecretStr
 
-from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import StepV2
+from portia.builder.plan import PlanV2
+from portia.builder.step import StepV2
 from portia.clarification import (
     ActionClarification,
     Clarification,

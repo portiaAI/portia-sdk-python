@@ -1,15 +1,21 @@
 """Types to support Loops."""
 
 from collections.abc import Callable, Sequence
-from typing import Any, Self, override
+import sys
+from typing import Any, Self
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override  # pragma: no cover
 
 from langsmith import traceable
 from pydantic import Field, model_validator
 
 from portia.builder.loops import LoopStepResult, LoopStepType, LoopType
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import PlanV2
 from portia.builder.reference import Reference
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import StepV2
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
 from portia.plan import Step
 from portia.run_context import RunContext

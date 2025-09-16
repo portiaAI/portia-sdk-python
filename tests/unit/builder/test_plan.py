@@ -10,8 +10,8 @@ from pydantic import BaseModel
 
 from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.llm_step import LLMStep
-from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import StepV2
+from portia.builder.plan import PlanV2
+from portia.builder.step import StepV2
 from portia.plan import Plan, PlanContext, PlanInput, Step
 
 
@@ -169,7 +169,7 @@ def test_step_output_name_invalid_step_name() -> None:
     """Test step_output_name() method with invalid step name."""
     plan = PlanV2(steps=[MockStepV2("valid_step")])
 
-    with patch("portia.builder.plan_v2.logger") as mock_logger:
+    with patch("portia.builder.plan.logger") as mock_logger:
         result = plan.step_output_name("nonexistent_step")
 
         # Should return a UUID-based fallback name
@@ -182,7 +182,7 @@ def test_step_output_name_step_not_in_plan() -> None:
     plan = PlanV2(steps=[MockStepV2("in_plan")])
     external_step = MockStepV2("not_in_plan")
 
-    with patch("portia.builder.plan_v2.logger") as mock_logger:
+    with patch("portia.builder.plan.logger") as mock_logger:
         result = plan.step_output_name(external_step)
 
         # Should return a UUID-based fallback name

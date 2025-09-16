@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
 
-from portia.builder.plan_builder_v2 import PlanBuilderV2
+from portia.builder.plan_builder import PlanBuilderV2
 from portia.builder.reference import Input
 from portia.clarification import ActionClarification, ClarificationCategory
 from portia.clarification_handler import ClarificationHandler
@@ -29,7 +29,7 @@ from tests.utils import AdditionTool, ClarificationTool
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import PlanV2
     from portia.clarification import Clarification
     from portia.execution_agents.output import Output
 

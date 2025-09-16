@@ -47,7 +47,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.logger import logger
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import PlanV2
     from portia.run_context import RunContext, StepOutputValue
 
 _KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")

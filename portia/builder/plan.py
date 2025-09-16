@@ -8,7 +8,7 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from portia.builder.reference import default_step_name
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import StepV2
 from portia.logger import logger
 from portia.plan import Plan, PlanContext, PlanInput
 from portia.prefixed_uuid import PlanUUID

@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import PlanV2
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_hooks import ExecutionHooks

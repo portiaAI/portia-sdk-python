@@ -10,7 +10,7 @@ import pytest
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel, Field
 
-from portia.builder.plan_builder_v2 import PlanBuilderV2
+from portia.builder.plan_builder import PlanBuilderV2
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentError
 from portia.execution_agents.output import LocalDataValue
