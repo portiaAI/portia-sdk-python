@@ -1,9 +1,9 @@
-"""Portia telemetry views."""
+"""No-op telemetry views (telemetry removed)."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -27,14 +27,13 @@ class BaseTelemetryEvent(ABC):
 
     @property
     def properties(self) -> dict[str, Any]:
-        """Get the properties of the telemetry event.
+        """Get the properties of the telemetry event (no-op).
 
         Returns:
-            dict[str, Any]: A dictionary containing all properties of the event,
-                           excluding the 'name' property.
+            dict[str, Any]: Empty dictionary (telemetry removed).
 
         """
-        return {k: v for k, v in asdict(self).items() if k != "name"}  # pragma: no cover
+        return {}
 
 
 @dataclass
