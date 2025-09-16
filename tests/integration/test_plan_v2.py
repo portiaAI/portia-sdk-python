@@ -94,24 +94,63 @@ class FinalOutput(BaseModel):
     example_similar_poem: str
 
 
+class MockSearchToolSchema(BaseModel):
+    """Schema for mock search tool arguments."""
+
+    search_query: str = Field(description="The search query")
+
+
+class MockSearchTool(Tool[str]):
+    """Mock search tool for testing."""
+
+    id: str = "search_tool"
+    name: str = "Mock Search Tool"
+    description: str = "Mock search tool for testing"
+    args_schema: type[BaseModel] = MockSearchToolSchema
+    output_schema: tuple[str, str] = ("str", "Search results")
+    should_summarize: bool = True
+
+    def run(self, context: ToolRunContext, search_query: str) -> str:  # noqa: ARG002
+        """Mock search returning gold price data."""
+        return (
+            "Current gold price is approximately $65.00 per gram in USD. "
+            "This translates to about $65,000 per kilogram."
+        )
+
+    async def arun(self, context: ToolRunContext, search_query: str) -> str:  # noqa: ARG002
+        """Async mock search returning gold price data."""
+        return (
+            "Current gold price is approximately $65.00 per gram in USD. "
+            "This translates to about $65,000 per kilogram."
+        )
+
+
 @pytest.fixture
 def local_portia() -> Portia:
     """Create a local Portia instance."""
-    return Portia(
-        config=Config.from_default(
-            storage_class=StorageClass.MEMORY, default_log_level=LogLevel.DEBUG, portia_api_key=None
-        )
+    config = Config.from_default(
+        storage_class=StorageClass.MEMORY,
+        default_log_level=LogLevel.DEBUG,
+        portia_api_key=None,
+        default_model="openai/gpt-4o-mini",  # Set a default model to avoid LLM provider validation
     )
+
+    # Create Portia instance and replace the search tool with our mock
+    portia = Portia(config=config)
+    mock_search_tool = MockSearchTool()
+    portia.tool_registry.replace_tool(mock_search_tool)
+
+    return portia
 
 
 @pytest.mark.parametrize("is_async", [False, True])
-def test_simple_builder(is_async: bool) -> None:
+def test_simple_builder(is_async: bool, local_portia: Portia) -> None:
     """Test the example from example_builder.py."""
-    config = Config.from_default(
-        default_log_level=LogLevel.DEBUG,
-    )
+    # Skip if OpenAI API key is not properly configured for integration testing
+    import os
 
-    portia = Portia(config=config)
+    if not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", "").startswith("sk-test-"):
+        pytest.skip("Requires valid OpenAI API key for integration testing")
 
     plan = (
         PlanBuilderV2("Calculate gold purchase cost and write a poem")
@@ -149,9 +188,11 @@ def test_simple_builder(is_async: bool) -> None:
     )
 
     if is_async:
-        plan_run = asyncio.run(portia.arun_plan(plan, plan_run_inputs={"purchase_quantity": 100}))
+        plan_run = asyncio.run(
+            local_portia.arun_plan(plan, plan_run_inputs={"purchase_quantity": 100})
+        )
     else:
-        plan_run = portia.run_plan(plan, plan_run_inputs={"purchase_quantity": 100})
+        plan_run = local_portia.run_plan(plan, plan_run_inputs={"purchase_quantity": 100})
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output is not None
