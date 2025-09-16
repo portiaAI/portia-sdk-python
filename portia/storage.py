@@ -1539,31 +1539,46 @@ class PortiaCloudStorage(Storage):
             tool_call (ToolCallRecord): The ToolCallRecord object to save to the cloud.
 
         """
-        try:
-            _check_size(f"{tool_call.tool_name} output", tool_call.output)
-            async with self.client_builder.async_client() as client:
-                response = await client.post(
-                    url="/api/v0/tool-calls/",
-                    json={
-                        "plan_run_id": str(tool_call.plan_run_id),
-                        "tool_name": tool_call.tool_name,
-                        "step": tool_call.step,
-                        "end_user_id": tool_call.end_user_id or "",
-                        "input": tool_call.serialize_input(),
-                        "output": tool_call.serialize_output(),
-                        "status": tool_call.status,
-                        "latency_seconds": tool_call.latency_seconds,
-                    },
+        # Retry logic for network timeouts
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                _check_size(f"{tool_call.tool_name} output", tool_call.output)
+                async with self.client_builder.async_client() as client:
+                    response = await client.post(
+                        url="/api/v0/tool-calls/",
+                        json={
+                            "plan_run_id": str(tool_call.plan_run_id),
+                            "tool_name": tool_call.tool_name,
+                            "step": tool_call.step,
+                            "end_user_id": tool_call.end_user_id or "",
+                            "input": tool_call.serialize_input(),
+                            "output": tool_call.serialize_output(),
+                            "status": tool_call.status,
+                            "latency_seconds": tool_call.latency_seconds,
+                        },
+                    )
+                break  # Success, exit retry loop
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.TimeoutException) as e:
+                if attempt == max_retries - 1:  # Last attempt
+                    logger().error(
+                        f"Error saving tool call to Portia Cloud after {max_retries} attempts: {e}"
+                    )
+                    return  # Don't raise, just log and continue
+                logger().warning(
+                    f"Retry {attempt + 1}/{max_retries} for tool call save after timeout: {e}"
                 )
-        except Exception as e:  # noqa: BLE001
-            logger().error(f"Error saving tool call to Portia Cloud: {e}")
-        else:
-            # Don't raise an error if the response is not successful, just log it
-            if not response.is_success:
-                logger().error(
-                    f"Error from Portia Cloud when saving tool call: {response.content!s}"
-                )
-            log_tool_call(tool_call)
+                await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+            except Exception as e:  # noqa: BLE001
+                logger().error(f"Error saving tool call to Portia Cloud: {e}")
+                return  # Don't raise, just log and continue
+        # Check response only if we got one (didn't timeout on all attempts)
+        if response is not None and not response.is_success:
+            logger().error(
+                f"Error from Portia Cloud when saving tool call: {response.content!s}"
+            )
+        log_tool_call(tool_call)
 
     def save_plan_run_output(
         self,
@@ -1866,24 +1881,41 @@ class PortiaCloudStorage(Storage):
             StorageError: If the request to Portia Cloud fails.
 
         """
-        try:
-            async with self.client_builder.async_client() as client:
-                response = await client.put(
-                    url=f"/api/v0/end-user/{end_user.external_id}/",
-                    json=end_user.model_dump(mode="json"),
+        # Retry logic for network timeouts
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                async with self.client_builder.async_client() as client:
+                    response = await client.put(
+                        url=f"/api/v0/end-user/{end_user.external_id}/",
+                        json=end_user.model_dump(mode="json"),
+                    )
+                break  # Success, exit retry loop
+            except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.TimeoutException) as e:
+                if attempt == max_retries - 1:  # Last attempt
+                    raise StorageError(
+                        f"Timeout saving end user after {max_retries} attempts: {e}"
+                    ) from e
+                logger().warning(
+                    f"Retry {attempt + 1}/{max_retries} for end user save after timeout: {e}"
                 )
-        except Exception as e:
-            raise StorageError(e) from e
-        else:
-            self.check_response(response)
-            response_json = response.json()
-            return EndUser(
-                external_id=response_json["external_id"],
-                name=response_json["name"],
-                email=response_json["email"],
-                phone_number=response_json["phone_number"],
-                additional_data=response_json["additional_data"],
-            )
+                await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+            except Exception as e:
+                raise StorageError(e) from e
+
+        if response is None:
+            raise StorageError("Failed to get response after all retry attempts")
+
+        self.check_response(response)
+        response_json = response.json()
+        return EndUser(
+            external_id=response_json["external_id"],
+            name=response_json["name"],
+            email=response_json["email"],
+            phone_number=response_json["phone_number"],
+            additional_data=response_json["additional_data"],
+        )
 
     def get_end_user(self, external_id: str) -> EndUser:
         """Retrieve an end user from Portia Cloud.
