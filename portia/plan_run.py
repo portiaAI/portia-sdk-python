@@ -80,52 +80,76 @@ class PlanRunOutputs(BaseModel):
 
 
 class PlanRun(BaseModel):
-    """A plan run represents a running instance of a Plan.
+    """A running execution instance of a Plan with associated state and outputs.
+
+    PlanRun represents the runtime execution context for a Plan, tracking its
+    current progress, state, outputs, and any clarifications needed during execution.
+    It serves as the primary interface for monitoring and controlling plan execution.
+
+    The plan run maintains execution state through its lifecycle from NOT_STARTED
+    through various states like IN_PROGRESS, NEED_CLARIFICATION, and finally
+    COMPLETE or FAILED.
 
     Attributes:
-        id (PlanRunUUID): A unique ID for this plan_run.
-        plan_id (PlanUUID): The ID of the Plan this run uses.
-        current_step_index (int): The current step that is being executed.
-        state (PlanRunState): The current state of the PlanRun.
-        outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
-        plan_run_inputs (dict[str, LocalDataValue]): Dict mapping plan input names to their values.
+        id: Unique identifier for this specific plan run instance.
+        plan_id: Reference to the Plan definition being executed.
+        current_step_index: Zero-based index of the currently executing step.
+        state: Current execution state (NOT_STARTED, IN_PROGRESS, etc.).
+        end_user_id: Identifier of the user who initiated this plan execution.
+        outputs: Container for step outputs, final output, and clarifications.
+        plan_run_inputs: Input values provided when the plan was started.
+        structured_output_schema: Optional Pydantic model for structured output.
 
+    Example:
+        >>> plan_run = PlanRun(plan_id=plan.id, end_user_id="user123")
+        >>> plan_run.state
+        <PlanRunState.NOT_STARTED: 'NOT_STARTED'>
+        >>> # After execution begins...
+        >>> plan_run.current_step_index
+        2
     """
 
     model_config = ConfigDict(extra="forbid")
 
     id: PlanRunUUID = Field(
         default_factory=PlanRunUUID,
-        description="A unique ID for this plan_run.",
+        description="Unique identifier for this plan run instance, automatically generated if not provided.",
     )
     plan_id: PlanUUID = Field(
-        description="The ID of the Plan this run uses.",
+        description="UUID of the Plan definition that this run is executing. "
+        "References the plan structure and steps to be performed.",
     )
     current_step_index: int = Field(
         default=0,
-        description="The current step that is being executed",
+        description="Zero-based index of the step currently being executed or next to execute. "
+        "Advances as the plan progresses through its steps.",
     )
     state: PlanRunState = Field(
         default=PlanRunState.NOT_STARTED,
-        description="The current state of the PlanRun.",
+        description="Current execution state indicating the plan run's lifecycle phase. "
+        "Controls whether execution can proceed, needs clarification, or has completed.",
     )
     end_user_id: str = Field(
         ...,
-        description="The id of the end user this plan was run for",
+        description="Identifier of the end user who initiated this plan execution. "
+        "Used for authentication, authorization, and audit purposes.",
     )
     outputs: PlanRunOutputs = Field(
         default=PlanRunOutputs(),
-        description="Outputs of the run including clarifications.",
+        description="Container for all execution outputs including step results, final output, "
+        "and any clarifications requested during execution.",
     )
     plan_run_inputs: dict[str, LocalDataValue] = Field(
         default_factory=dict,
-        description="Dict mapping plan input names to their values.",
+        description="Mapping of plan input names to their actual values provided at execution time. "
+        "These values are resolved and made available to steps that reference plan inputs.",
     )
 
     structured_output_schema: type[BaseModel] | None = Field(
         default=None,
         exclude=True,
-        description="The optional structured output schema for the plan run.",
+        description="Optional Pydantic model class defining the expected structure of the final output. "
+        "When provided, the final output will be validated and structured according to this schema.",
     )
 
     def get_outstanding_clarifications(self) -> ClarificationListType:
