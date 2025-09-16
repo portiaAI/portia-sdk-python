@@ -5,6 +5,10 @@ The `Plan` class is the main structure that holds a series of steps (`Step`) to 
 agent in response to a query. Each step can have inputs, an associated tool, and an output.
 Variables can be used within steps to reference other parts of the plan or constants.
 
+**DEPRECATION NOTICE**: The classes in this module (Plan, PlanBuilder) are deprecated in favor of
+their V2 counterparts (PlanV2, PlanBuilderV2). Set the environment variable `PLAN_V2_DEFAULT=true`
+to enable additional deprecation warnings when importing these classes.
+
 Classes in this file include:
 
 - `Variable`: A variable used in the plan, referencing outputs of previous steps or constants.
@@ -12,9 +16,14 @@ Classes in this file include:
 - `ReadOnlyStep`: A read-only version of a `Step` used for passing steps to agents.
 - `PlanContext`: Provides context about the plan, including the original query and available tools.
 - `Plan`: Represents the entire series of steps required to execute a query.
+- `PlanBuilder`: Deprecated builder for creating Plan instances.
 
 These classes facilitate the definition of runs that can be dynamically adjusted based on the
 tools, inputs, and outputs defined in the plan.
+
+For new projects, consider using:
+- `portia.builder.plan_v2.PlanV2` instead of `Plan`
+- `portia.builder.plan_builder_v2.PlanBuilderV2` instead of `PlanBuilder`
 
 """
 
@@ -26,7 +35,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_valid
 from typing_extensions import deprecated
 
 from portia.common import Serializable
+from portia.deprecation_utils import log_deprecation_warning, warn_on_v1_import
 from portia.prefixed_uuid import PlanUUID
+
+# Warn on import of V1 plan classes when PLAN_V2_DEFAULT is enabled
+warn_on_v1_import("portia.plan.PlanBuilder", "portia.builder.plan_builder_v2.PlanBuilderV2")
+warn_on_v1_import("portia.plan.Plan", "portia.builder.plan_v2.PlanV2")
 
 
 @deprecated("Use PlanBuilderV2 instead")
@@ -63,6 +77,9 @@ class PlanBuilder:
                 for the query.
 
         """
+        # Log deprecation warning on instantiation
+        log_deprecation_warning("PlanBuilder", "PlanBuilderV2")
+
         self.query = query if query is not None else ""
         self.steps = []
         self.plan_inputs = []
@@ -529,6 +546,12 @@ class Plan(BaseModel):
         if len(input_names) != len(set(input_names)):
             raise ValueError("Plan input names must be unique")
 
+        return self
+
+    @model_validator(mode="after")
+    def log_plan_deprecation(self) -> Self:
+        """Log deprecation warning when Plan is instantiated."""
+        log_deprecation_warning("Plan", "PlanV2")
         return self
 
 
