@@ -60,6 +60,9 @@ class PlanBuilderV2:
         """
         self.plan = PlanV2(steps=[], label=label)
         self._block_stack: list[ConditionalBlock | LoopBlock] = []
+        self._in_parallel = False
+        self._current_parallel_group = 0
+        self._current_max_parallelism = 1
 
     def input(
         self,
@@ -150,6 +153,7 @@ class PlanBuilderV2:
                 via StepOutput("name_of_step") rather than by index.
 
         """
+        self._parallel_guard()
         # Validate that exactly one of while_, do_while_, or over is set
         loop_params = [while_, do_while_, over]
         set_params = [param for param in loop_params if param is not None]
@@ -175,7 +179,7 @@ class PlanBuilderV2:
             end_step_index=None,
         )
         self._block_stack.append(loop_block)
-        self.plan.steps.append(
+        self.add_step(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 over=over,
@@ -211,6 +215,7 @@ class PlanBuilderV2:
                 via StepOutput("name_of_step") rather than by index.
 
         """
+        self._parallel_guard()
         if len(self._block_stack) == 0 or not (loop_block := self._current_loop_block):
             raise PlanBuilderError(
                 "endloop must be called from a loop block. Please add a loop first."
@@ -219,7 +224,7 @@ class PlanBuilderV2:
         start_loop_step = self.plan.steps[loop_block.start_step_index]
         if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
-        self.plan.steps.append(
+        self.add_step(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 condition=start_loop_step.condition,
@@ -263,13 +268,14 @@ class PlanBuilderV2:
               if the condition is a string.
 
         """
+        self._parallel_guard()
         parent_block = self._current_conditional_block
         conditional_block = ConditionalBlock(
             clause_step_indexes=[len(self.plan.steps)],
             parent_conditional_block=parent_block,
         )
         self._block_stack.append(conditional_block)
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=condition,
                 args=args or {},
@@ -318,12 +324,13 @@ class PlanBuilderV2:
               if the condition is a string.
 
         """
+        self._parallel_guard()
         if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], ConditionalBlock):
             raise PlanBuilderError(
                 "else_if_ must be called from a conditional block. Please add an if_ first."
             )
         self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=condition,
                 args=args or {},
@@ -355,12 +362,13 @@ class PlanBuilderV2:
         Note: it is else_() rather than else() because else is a keyword in Python.
 
         """
+        self._parallel_guard()
         if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], ConditionalBlock):
             raise PlanBuilderError(
                 "else_ must be called from a conditional block. Please add an if_ first."
             )
         self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=lambda: True,
                 args={},
@@ -394,12 +402,13 @@ class PlanBuilderV2:
         error when building the plan.
 
         """
+        self._parallel_guard()
         if len(self._block_stack) == 0 or not isinstance(self._block_stack[-1], ConditionalBlock):
             raise PlanBuilderError(
                 "endif must be called from a conditional block. Please add an if_ first."
             )
         self._block_stack[-1].clause_step_indexes.append(len(self.plan.steps))
-        self.plan.steps.append(
+        self.add_step(
             ConditionalStep(
                 condition=lambda: True,
                 args={},
@@ -443,7 +452,7 @@ class PlanBuilderV2:
               config will be used.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             LLMStep(
                 task=task,
                 inputs=inputs or [],
@@ -481,7 +490,7 @@ class PlanBuilderV2:
               via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             InvokeToolStep(
                 tool=tool,
                 args=args or {},
@@ -562,7 +571,7 @@ class PlanBuilderV2:
                 the config will be used.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             SingleToolAgentStep(
                 tool=tool,
                 task=task,
@@ -605,7 +614,7 @@ class PlanBuilderV2:
                 config will be used.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             ReActAgentStep(
                 task=task,
                 tools=tools or [],
@@ -642,7 +651,7 @@ class PlanBuilderV2:
                 referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             UserVerifyStep(
                 message=message,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
@@ -683,7 +692,7 @@ class PlanBuilderV2:
                 referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        self.plan.steps.append(
+        self.add_step(
             UserInputStep(
                 message=message,
                 options=options,
@@ -704,6 +713,10 @@ class PlanBuilderV2:
             step: A pre-built step instance that inherits from StepV2.
 
         """
+        step.parallel_group = self._current_parallel_group
+        step.max_parallelism = self._current_max_parallelism
+        if not self._in_parallel:
+            self._current_parallel_group += 1
         self.plan.steps.append(step)
         return self
 
@@ -765,7 +778,7 @@ class PlanBuilderV2:
                 # Input values passed in here overwrite any default values for the input
                 plan_input.value = input_values.get(plan_input.name, plan_input.value)
 
-        self.plan.steps.append(
+        self.add_step(
             SubPlanStep(
                 plan=plan,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
@@ -828,3 +841,29 @@ class PlanBuilderV2:
         )
 
         return self.plan
+
+
+
+    def parallel(self, * , max_parallelism: int | None = None) -> PlanBuilderV2:
+        """Switch subsequent steps to parallel execution."""
+        if self._in_parallel:
+            return self
+        self._in_parallel = True
+        self._current_parallel_group += 1
+        self._current_max_parallelism = max_parallelism
+        return self
+
+
+    def series(self) -> PlanBuilderV2:
+        """Switch subsequent steps back to sequential execution."""
+        if not self._in_parallel:
+            return self
+        self._in_parallel = False
+        self._current_parallel_group += 1
+        self._current_max_parallelism = 1
+        return self
+
+    def _parallel_guard(self) -> None:
+        """Guard against adding steps to a parallel group that shouldn't be in a parallel group."""
+        if self._in_parallel:
+            raise PlanBuilderError("This Step type cannot be added to a parallel group.")
