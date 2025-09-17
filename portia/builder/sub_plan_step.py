@@ -1,6 +1,12 @@
 """Step that executes a sub-plan within a parent plan."""
 
-from typing import Any, override
+import sys
+from typing import Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override  # pragma: no cover
 
 from langsmith import traceable
 from pydantic import Field

@@ -7,7 +7,8 @@ from unittest.mock import Mock, patch
 
 from portia.builder.llm_step import LLMStep
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import StepV2
+from portia.builder.step_v2 import StepData, StepV2
+from portia.builder.user_input import UserInputStep
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput, Variable
 from portia.plan import Step as PlanStep
@@ -311,3 +312,183 @@ def test_inputs_to_legacy_plan_variables() -> None:
         assert all(isinstance(var, Variable) for var in result)
         assert result[0].name == "input1"
         assert result[1].name == "step_0_output"
+
+
+def test_step_data_initialization() -> None:
+    """Test StepData initialization."""
+    step_data = StepData(
+        id="test_step",
+        type="TestStep",
+        name="test_step",
+        task="Test task",
+        inputs=["input1"],
+        outputs=["output1"],
+        tool_id="test_tool",
+        condition="test condition",
+        metadata={"key": "value"},
+    )
+
+    assert step_data.id == "test_step"
+    assert step_data.type == "TestStep"
+    assert step_data.name == "test_step"
+    assert step_data.task == "Test task"
+    assert step_data.inputs == ["input1"]
+    assert step_data.outputs == ["output1"]
+    assert step_data.tool_id == "test_tool"
+    assert step_data.condition == "test condition"
+    assert step_data.metadata == {"key": "value"}
+
+
+def test_step_data_immutable() -> None:
+    """Test StepData is immutable."""
+    from pydantic_core import ValidationError
+
+    step_data = StepData(
+        id="test_step",
+        type="TestStep",
+        name="test_step",
+    )
+
+    # Should not be able to modify fields
+    try:
+        step_data.id = "new_id"
+        raise AssertionError("Should not be able to modify StepData field")
+    except ValidationError:
+        pass  # Expected behavior - pydantic raises ValidationError for frozen models
+
+
+def test_step_v2_to_step_data_basic() -> None:
+    """Test StepV2 to_step_data method with basic step."""
+    step = ConcreteStepV2("my_step")
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$my_step_output"
+
+    step_data = step.to_step_data(mock_plan)
+
+    assert isinstance(step_data, StepData)
+    assert step_data.id == "my_step"
+    assert step_data.type == "ConcreteStepV2"
+    assert step_data.name == "my_step"
+    assert step_data.task is None  # ConcreteStepV2 doesn't have task attribute
+    assert step_data.inputs == []
+    assert step_data.outputs == ["test_output"]  # From to_legacy_step mock
+    assert step_data.tool_id == "test_tool"  # From to_legacy_step mock
+    assert step_data.condition is None
+    assert step_data.metadata == {}
+
+
+def test_step_v2_to_step_data_llm_step() -> None:
+    """Test to_step_data with LLMStep including inputs and metadata."""
+    from pydantic import BaseModel
+
+    inputs = [Input("user_query"), StepOutput(0), "literal_value"]
+
+    class MockOutputSchema(BaseModel):
+        result: str
+
+    step = LLMStep(
+        task="Analyze data",
+        step_name="analysis",
+        inputs=inputs,
+        output_schema=MockOutputSchema,
+        system_prompt="You are helpful",
+        model="gpt-4",
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$analysis_output"
+
+    # Mock the _resolve_input_names_for_printing method for inputs
+    with patch.object(step, "_resolve_input_names_for_printing") as mock_resolve:
+        mock_resolve.side_effect = lambda val, _: (
+            "$user_query"
+            if isinstance(val, Input)
+            else "$step_0_output"
+            if isinstance(val, StepOutput)
+            else str(val)
+        )
+
+        step_data = step.to_step_data(mock_plan)
+
+    assert step_data.id == "analysis"
+    assert step_data.type == "LLMStep"
+    assert step_data.name == "analysis"
+    assert step_data.task == "Analyze data"
+    assert step_data.inputs == ["$user_query", "$step_0_output", "literal_value"]
+    assert step_data.tool_id == "llm_tool"  # LLMTool.LLM_TOOL_ID
+    assert step_data.metadata == {
+        "output_schema": "MockOutputSchema",
+        "system_prompt": "You are helpful",
+        "model": "gpt-4",
+    }
+
+
+def test_step_v2_to_step_data_user_input_step() -> None:
+    """Test to_step_data with UserInputStep including options metadata."""
+    step = UserInputStep(
+        step_name="user_choice",
+        message="Select an option",
+        options=["Option A", "Option B"],
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$user_choice_output"
+
+    step_data = step.to_step_data(mock_plan)
+
+    assert step_data.id == "user_choice"
+    assert step_data.type == "UserInputStep"
+    assert step_data.name == "user_choice"
+    assert step_data.task is None  # UserInputStep uses 'message' not 'task'
+    assert step_data.inputs == []
+    assert step_data.tool_id is None  # UserInputStep has no tool
+    assert step_data.metadata == {
+        "options": ["Option A", "Option B"],
+        "input_type": "multiple_choice",
+    }
+
+
+def test_step_v2_to_step_data_user_input_step_text() -> None:
+    """Test to_step_data with UserInputStep for text input."""
+    step = UserInputStep(
+        step_name="user_text",
+        message="Enter some text",
+        options=None,
+    )
+
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$user_text_output"
+
+    step_data = step.to_step_data(mock_plan)
+
+    assert step_data.metadata == {
+        "input_type": "text",
+    }
+
+
+def test_step_v2_to_step_data_with_condition() -> None:
+    """Test to_step_data extracts condition from legacy step."""
+    # Create a simple test using the actual LLMStep to_legacy_step implementation
+    step = LLMStep(task="Test task", step_name="test_step")
+    mock_plan = Mock()
+    mock_plan.step_output_name.return_value = "$test_output"
+
+    # Mock _get_legacy_condition to return a condition
+    with patch.object(step, "_get_legacy_condition", return_value="If $previous_step is true"):
+        step_data = step.to_step_data(mock_plan)
+
+    assert step_data.condition == "If $previous_step is true"
+
+
+def test_step_v2_to_step_data_no_inputs() -> None:
+    """Test to_step_data with step that has no inputs attribute."""
+    step = ConcreteStepV2("no_inputs")
+
+    # Remove inputs attribute if it exists
+    if hasattr(step, "inputs"):
+        delattr(step, "inputs")
+
+    mock_plan = Mock()
+    step_data = step.to_step_data(mock_plan)
+
+    assert step_data.inputs == []

@@ -2759,7 +2759,7 @@ class Portia:
                     PlanV2StepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=False,
-                        tool_id=step.to_legacy_step(plan).tool_id,
+                        tool_id=step.to_step_data(plan).tool_id,
                     )
                 )
                 return self._handle_execution_error(
@@ -2770,7 +2770,7 @@ class Portia:
                     PlanV2StepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=True,
-                        tool_id=step.to_legacy_step(plan).tool_id,
+                        tool_id=step.to_step_data(plan).tool_id,
                     )
                 )
             jump_to_step_index = None

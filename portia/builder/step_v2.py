@@ -22,6 +22,38 @@ if TYPE_CHECKING:
     from portia.run_context import RunContext
 
 
+class StepData(BaseModel):
+    """Lightweight dataclass representing the serializable view of a step for visualization.
+
+    This provides the essential step information needed by the UI without
+    the complexity of the full step implementation.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str = Field(description="Unique identifier for this step within the plan.")
+    type: str = Field(description="The type of step (e.g., 'LLMStep', 'UserInputStep').")
+    name: str = Field(description="Human-readable name/label for this step.")
+    task: str | None = Field(
+        default=None, description="The task description for this step, if applicable."
+    )
+    inputs: list[str] = Field(
+        default_factory=list, description="List of input names/references used by this step."
+    )
+    outputs: list[str] = Field(
+        default_factory=list, description="List of output names produced by this step."
+    )
+    tool_id: str | None = Field(
+        default=None, description="The ID of the tool used by this step, if applicable."
+    )
+    condition: str | None = Field(
+        default=None, description="The condition controlling when this step runs, if any."
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata specific to this step type."
+    )
+
+
 class StepV2(BaseModel, ABC):
     """Abstract base class for all steps executed within a plan.
 
@@ -58,6 +90,62 @@ class StepV2(BaseModel, ABC):
         Dashboard.
         """
         raise NotImplementedError  # pragma: no cover
+
+    def to_step_data(self, plan: PlanV2) -> StepData:
+        """Convert this step to a StepData instance for visualization.
+
+        This provides a lightweight, serializable representation of the step
+        that contains the essential information needed by the UI.
+
+        Args:
+            plan: The plan containing this step.
+
+        Returns:
+            StepData: A lightweight representation of this step.
+
+        """
+        # Convert to legacy step first to get standardized data
+        legacy_step = self.to_legacy_step(plan)
+
+        # Extract input names from references
+        input_names = []
+        if hasattr(self, "inputs") and self.inputs:  # type: ignore[attr-defined]
+            for input_item in self.inputs:  # type: ignore[attr-defined]
+                if isinstance(input_item, Reference):
+                    name = self._resolve_input_names_for_printing(input_item, plan)
+                    if isinstance(name, str):
+                        input_names.append(name)
+                else:
+                    # For non-reference inputs, just convert to string
+                    input_names.append(str(input_item))
+
+        # Create metadata dict with step-specific information
+        metadata: dict[str, Any] = {}
+
+        # Add any additional step-specific fields to metadata
+        if hasattr(self, "output_schema") and self.output_schema is not None:  # type: ignore[attr-defined]
+            metadata["output_schema"] = self.output_schema.__name__  # type: ignore[attr-defined]
+        if hasattr(self, "system_prompt") and self.system_prompt is not None:  # type: ignore[attr-defined]
+            metadata["system_prompt"] = self.system_prompt  # type: ignore[attr-defined]
+        if hasattr(self, "model") and self.model is not None:  # type: ignore[attr-defined]
+            metadata["model"] = str(self.model)  # type: ignore[attr-defined]
+        if hasattr(self, "options") and self.options is not None:  # type: ignore[attr-defined]
+            metadata["options"] = self.options  # type: ignore[attr-defined]
+        if hasattr(self, "message") and hasattr(self, "options"):
+            # This is a UserInputStep
+            metadata["input_type"] = "multiple_choice" if self.options else "text"  # type: ignore[attr-defined]
+
+        return StepData(
+            id=self.step_name,
+            type=self.__class__.__name__,
+            name=self.step_name,
+            task=getattr(self, "task", None),
+            inputs=input_names,
+            outputs=[legacy_step.output],
+            tool_id=legacy_step.tool_id,
+            condition=legacy_step.condition,
+            metadata=metadata,
+        )
 
     def _resolve_references(
         self,
