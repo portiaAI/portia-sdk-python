@@ -43,6 +43,9 @@ from portia.config import (
     default_config,
 )
 
+# Cost estimation related classes
+from portia.cost_estimator import CostEstimator
+
 # Error classes
 from portia.errors import (
     ConfigNotFoundError,
@@ -121,6 +124,7 @@ __all__ = [
     "ConditionalStep",
     "Config",
     "ConfigNotFoundError",
+    "CostEstimator",
     "CrawlTool",
     "CustomClarification",
     "DefaultToolRegistry",
