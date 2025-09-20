@@ -144,15 +144,19 @@ def mock_openai_globally() -> Any:  # noqa: ANN401
     class MockOpenAIClient:
         """Mock OpenAI client."""
 
+        def __init__(self) -> None:
+            self.base_url = "https://api.openai.com/v1"
+
         class Chat:
+            def __init__(self) -> None:
+                self.completions = self.Completions()
+
             class Completions:
                 def create(self, **kwargs: Any) -> MockOpenAIResponse:  # noqa: ARG002
                     return MockOpenAIResponse("Mock response from integration test")
 
                 async def acreate(self, **kwargs: Any) -> MockOpenAIResponse:  # noqa: ARG002
                     return MockOpenAIResponse("Mock async response from integration test")
-
-            completions = Completions()
 
         chat = Chat()
 

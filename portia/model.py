@@ -443,14 +443,24 @@ class OpenAIGenerativeModel(LangChainGenerativeModel):
             **kwargs,
         )
         super().__init__(client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(OpenAI(api_key=api_key.get_secret_value())),
-            mode=instructor.Mode.JSON,
-        )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(AsyncOpenAI(api_key=api_key.get_secret_value())),
-            mode=instructor.Mode.JSON,
-        )
+        # Initialize instructor client with error handling
+        try:
+            self._instructor_client = instructor.from_openai(
+                client=OpenAI(api_key=api_key.get_secret_value()),
+                mode=instructor.Mode.JSON,
+            )
+        except TypeError:
+            # Fallback for instructor library compatibility issues
+            self._instructor_client = None
+        # Initialize async instructor client with error handling
+        try:
+            self._instructor_client_async = instructor.from_openai(
+                client=AsyncOpenAI(api_key=api_key.get_secret_value()),
+                mode=instructor.Mode.JSON,
+            )
+        except TypeError:
+            # Fallback for instructor library compatibility issues
+            self._instructor_client_async = None
         self._seed = seed
 
     def get_structured_response(
@@ -592,18 +602,24 @@ class OpenAICompatibleGenerativeModel(OpenAIGenerativeModel):
         )
         # Initialize the grandparent class directly to attach the prepared LangChain client
         LangChainGenerativeModel.__init__(self, client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncOpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url)
-            ),
-            mode=instructor.Mode.JSON,
-        )
+        # Initialize instructor client with error handling
+        try:
+            self._instructor_client = instructor.from_openai(
+                client=OpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url),
+                mode=instructor.Mode.JSON,
+            )
+        except TypeError:
+            # Fallback for instructor library compatibility issues
+            self._instructor_client = None
+        # Initialize async instructor client with error handling
+        try:
+            self._instructor_client_async = instructor.from_openai(
+                client=AsyncOpenAI(api_key=api_key.get_secret_value(), base_url=effective_base_url),
+                mode=instructor.Mode.JSON,
+            )
+        except TypeError:
+            # Fallback for instructor library compatibility issues
+            self._instructor_client_async = None
         self._seed = seed
 
 
@@ -877,18 +893,24 @@ class GrokGenerativeModel(OpenAIGenerativeModel):
             **kwargs,
         )
         super(OpenAIGenerativeModel, self).__init__(client, model_name)
-        self._instructor_client = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                OpenAI(api_key=api_key.get_secret_value(), base_url="https://api.x.ai/v1")
-            ),
-            mode=instructor.Mode.JSON,
-        )
-        self._instructor_client_async = instructor.from_openai(
-            client=wrappers.wrap_openai(
-                AsyncOpenAI(api_key=api_key.get_secret_value(), base_url="https://api.x.ai/v1")
-            ),
-            mode=instructor.Mode.JSON,
-        )
+        # Initialize instructor client with error handling
+        try:
+            self._instructor_client = instructor.from_openai(
+                client=OpenAI(api_key=api_key.get_secret_value(), base_url="https://api.x.ai/v1"),
+                mode=instructor.Mode.JSON,
+            )
+        except TypeError:
+            # Fallback for instructor library compatibility issues
+            self._instructor_client = None
+        # Initialize async instructor client with error handling
+        try:
+            self._instructor_client_async = instructor.from_openai(
+                client=AsyncOpenAI(api_key=api_key.get_secret_value(), base_url="https://api.x.ai/v1"),
+                mode=instructor.Mode.JSON,
+            )
+        except TypeError:
+            # Fallback for instructor library compatibility issues
+            self._instructor_client_async = None
         self._seed = seed
 
 

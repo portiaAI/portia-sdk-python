@@ -133,7 +133,7 @@ def local_portia() -> Portia:
         storage_class=StorageClass.MEMORY,
         default_log_level=LogLevel.DEBUG,
         portia_api_key=None,
-        default_model="openai/gpt-4.1",  # Set a default model to avoid LLM provider validation
+        default_model="openai/gpt-4",  # Use a valid OpenAI model
     )
 
     # Create Portia instance and replace the search tool with our mock
