@@ -23,9 +23,9 @@ class TestBrowserToolAllowedDomainsValidation:
         assert BrowserTool.validate_allowed_domains(raw) == expected
 
     def test_validate_allowed_domains_invalid_container_type(self) -> None:
-        """Non-list container raises TypeError (TRY004)."""
+        """Non-list container raises ValueError for validation semantics."""
         with pytest.raises(
-            TypeError, match="allowed_domains must be a list of domain strings"
+            ValueError, match="allowed_domains must be a list of domain strings"
         ):
             BrowserTool.validate_allowed_domains("not a list")  # type: ignore[arg-type]
 
