@@ -10,13 +10,13 @@ import pytest
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel, Field
 
-from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.clarification import InputClarification
 from portia.errors import InvalidAgentError
 from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.react_agent import FinalResultTool, ReActAgent
 from portia.execution_agents.react_clarification_tool import ReActClarificationTool
 from portia.execution_hooks import ExecutionHooks
+from portia.plan import PlanBuilder
 from portia.run_context import RunContext
 from tests.utils import (
     AdditionTool,
@@ -94,7 +94,7 @@ def test_react_agent_initialization(mock_run_context: RunContext) -> None:
 @pytest.mark.asyncio
 async def test_react_agent_immediate_final_result(mock_run_context: RunContext) -> None:
     """Test agent that calls final result tool immediately without any other tool calls."""
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Add numbers").build()
     mock_model_response = AIMessage(
         content="I can answer directly",
         tool_calls=[
@@ -137,7 +137,7 @@ async def test_react_agent_immediate_final_result(mock_run_context: RunContext) 
 @pytest.mark.asyncio
 async def test_react_agent_single_tool_call_then_final_result(mock_run_context: RunContext) -> None:
     """Test agent runs with single tool call, then calls final result tool - no structured."""
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Add numbers").build()
     mock_agent_model = get_mock_generative_model()
     mock_agent_model.to_langchain().ainvoke.side_effect = [  # pyright: ignore[reportAttributeAccessIssue]
         AIMessage(
@@ -191,7 +191,7 @@ async def test_react_agent_multiple_tool_calls_then_final_result(
     mock_run_context: RunContext,
 ) -> None:
     """Test agent runs with 3 tool calls to 2 different tools, then final result."""
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Add numbers").build()
     mock_agent_model = get_mock_generative_model()
     mock_agent_model.to_langchain().ainvoke.side_effect = [  # pyright: ignore[reportAttributeAccessIssue]
         AIMessage(
@@ -261,7 +261,7 @@ async def test_react_agent_multiple_tool_calls_then_final_result(
 @pytest.mark.asyncio
 async def test_react_agent_with_clarification_tool(mock_run_context: RunContext) -> None:
     """Test agent calls clarification tool and we receive clarification as output."""
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Add numbers").build()
     mock_agent_model = get_mock_generative_model()
     mock_agent_model.to_langchain().ainvoke.side_effect = [  # pyright: ignore[reportAttributeAccessIssue]
         AIMessage(
@@ -341,7 +341,7 @@ async def test_react_agent_with_clarification_tool(mock_run_context: RunContext)
 @pytest.mark.asyncio
 async def test_react_agent_recursion_limit_error(mock_run_context: RunContext) -> None:
     """Test that an error is thrown when recursion limit is hit."""
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Add numbers").build()
     call_counter = 0
 
     def generate_response(*_args: object, **_kwargs: object) -> AIMessage:
@@ -382,7 +382,7 @@ async def test_react_agent_execution_hooks_called(mock_run_context: RunContext) 
     mock_run_context.execution_hooks = ExecutionHooks(
         before_tool_call=mock.MagicMock(return_value=None), after_tool_call=mock.MagicMock()
     )
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Complete task").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Complete task").build()
 
     mock_model_response = AIMessage(
         content="Task done",
@@ -427,7 +427,7 @@ async def test_react_agent_execution_hooks_called(mock_run_context: RunContext) 
 @pytest.mark.asyncio
 async def test_react_agent_prestep_clarification(mock_run_context: RunContext) -> None:
     """Test pre-step execution hook that throws a clarification."""
-    mock_run_context.plan = PlanBuilderV2().react_agent_step(task="Add numbers").build()
+    mock_run_context.plan = PlanBuilder().react_agent_step(task="Add numbers").build()
     before_tool_call_mock = mock.MagicMock(
         return_value=InputClarification(
             plan_run_id=mock_run_context.plan_run.id,

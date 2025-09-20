@@ -109,7 +109,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
             except ValidationError as e:  # pragma: no cover
                 err = PlanError(  # pragma: no cover
                     "LLM unable to create well-structured plan - please either retry the request, "  # pragma: no cover # noqa: E501
-                    "upgrade to a more powerful model or consider using our PlanBuilderV2 "  # pragma: no cover # noqa: E501
+                    "upgrade to a more powerful model or consider using our PlanBuilder "  # pragma: no cover # noqa: E501
                     "interface instead."  # pragma: no cover
                 )  # pragma: no cover
                 logger().exception("Planning error", err)  # pragma: no cover

@@ -1,4 +1,4 @@
-"""Conditional evaluation agent for PlanV2."""
+"""Conditional evaluation agent for Plan."""
 
 from typing import Any
 
@@ -18,7 +18,7 @@ class BooleanResponse(BaseModel):
 
 
 class ConditionalEvaluationAgent:
-    """Conditional evaluation agent for PlanV2."""
+    """Conditional evaluation agent for Plan."""
 
     def __init__(self, config: Config) -> None:
         """Initialize the conditional evaluation agent."""

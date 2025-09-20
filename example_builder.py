@@ -1,4 +1,4 @@
-"""A simple example of using the PlanBuilderV2.
+"""A simple example of using the PlanBuilder.
 
 This example demonstrates how to build and execute a multi-step agentic workflow
 that combines tool calling, user interactions, conditional logic, and LLM tasks.
@@ -7,7 +7,7 @@ that combines tool calling, user interactions, conditional logic, and LLM tasks.
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-from portia import Input, PlanBuilderV2, Portia, StepOutput
+from portia import Input, PlanBuilder, Portia, StepOutput
 from portia.cli import CLIExecutionHooks
 
 load_dotenv()
@@ -33,7 +33,7 @@ portia = Portia(execution_hooks=CLIExecutionHooks())
 
 # Build a multi-step plan using our plan builder
 plan = (
-    PlanBuilderV2("Buy some gold")  # Plan description
+    PlanBuilder("Buy some gold")  # Plan description
     # Define plan inputs - Input() references these throughout the plan
     .input(name="country", description="The country to purchase the gold in", default_value="UK")
     # Call a search tool to get the currency for the provided country
@@ -117,7 +117,7 @@ print(plan_run)  # noqa: T201
 
 # example for_each loop
 plan = (
-    PlanBuilderV2("Buy some gold")
+    PlanBuilder("Buy some gold")
     .function_step(function=lambda: [1, 2, 3], step_name="Items")  # create a list of items
     .loop(
         over=StepOutput("Items"), step_name="Loop"
@@ -142,7 +142,7 @@ class WhileCondition:
 
 while_condition = WhileCondition()
 plan = (
-    PlanBuilderV2("Buy some gold")
+    PlanBuilder("Buy some gold")
     .loop(
         while_=while_condition.run, step_name="Loop"
     )  # name the loop, iterate while the condition is true
@@ -168,7 +168,7 @@ class Iterator:
 
 iterator = Iterator()
 plan = (
-    PlanBuilderV2("Buy some gold")
+    PlanBuilder("Buy some gold")
     .loop(
         do_while_=lambda x: x < 4,  # noqa: PLR2004
         args={"x": StepOutput("test_function")},

@@ -66,8 +66,8 @@ class ToolCallTelemetryEvent(BaseTelemetryEvent):
 
 
 @dataclass
-class PlanV2StepExecutionTelemetryEvent(BaseTelemetryEvent):
-    """Telemetry event for tracking PlanV2 step execution.
+class PlanStepExecutionTelemetryEvent(BaseTelemetryEvent):
+    """Telemetry event for tracking Plan step execution.
 
     Attributes:
         step_type: The type of the step being executed.
@@ -79,12 +79,12 @@ class PlanV2StepExecutionTelemetryEvent(BaseTelemetryEvent):
     step_type: str
     success: bool
     tool_id: str | None
-    name: str = "plan_v2_step_execution"  # type: ignore reportIncompatibleMethodOverride
+    name: str = "plan_step_execution"  # type: ignore reportIncompatibleMethodOverride
 
 
 @dataclass
-class PlanV2BuildTelemetryEvent(BaseTelemetryEvent):
-    """Telemetry event for tracking PlanV2 builds.
+class PlanBuildTelemetryEvent(BaseTelemetryEvent):
+    """Telemetry event for tracking Plan builds.
 
     Attributes:
         plan_length: The number of steps in the plan.
@@ -94,7 +94,7 @@ class PlanV2BuildTelemetryEvent(BaseTelemetryEvent):
 
     plan_length: int
     step_type_counts: dict[str, int]
-    name: str = "plan_v2_build"  # type: ignore reportIncompatibleMethodOverride
+    name: str = "plan_build"  # type: ignore reportIncompatibleMethodOverride
 
 
 @dataclass

@@ -26,7 +26,7 @@ def mock_run_data() -> Mock:
 
 @pytest.fixture
 def mock_plan_v2() -> Mock:
-    """Create mock PlanV2 for testing LoopStep."""
+    """Create mock Plan for testing LoopStep."""
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "loop_output"
     return mock_plan

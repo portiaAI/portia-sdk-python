@@ -7,10 +7,10 @@ from langsmith import traceable
 from pydantic import Field, model_validator
 
 from portia.builder.loops import LoopStepResult, LoopStepType, LoopType
-from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Reference
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepV2
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
+from portia.plan import Plan as PlanV2
 from portia.plan import Step
 from portia.run_context import RunContext
 

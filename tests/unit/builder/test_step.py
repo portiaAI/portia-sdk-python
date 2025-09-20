@@ -1,4 +1,4 @@
-"""Test the step_v2 module."""
+"""Test the step module."""
 
 from __future__ import annotations
 
@@ -7,18 +7,18 @@ from unittest.mock import Mock, patch
 
 from portia.builder.llm_step import LLMStep
 from portia.builder.reference import Input, StepOutput
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepBuilder
 from portia.execution_agents.output import LocalDataValue
 from portia.plan import PlanInput, Variable
 from portia.plan import Step as PlanStep
 from portia.run_context import StepOutputValue
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.plan import Plan
 
 
-class ConcreteStepV2(StepV2):
-    """Concrete implementation of StepV2 for testing base functionality."""
+class ConcreteStepBuilder(StepBuilder):
+    """Concrete implementation of StepBuilder for testing base functionality."""
 
     def __init__(self, step_name: str = "test_step") -> None:
         """Initialize concrete step."""
@@ -28,7 +28,7 @@ class ConcreteStepV2(StepV2):
         """Mock run method."""
         return "test result"
 
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:  # noqa: ARG002
+    def to_legacy_step(self, plan: Plan) -> PlanStep:  # noqa: ARG002
         """Mock to_legacy_step method."""
         return PlanStep(
             task="Test task",
@@ -39,14 +39,14 @@ class ConcreteStepV2(StepV2):
 
 
 def test_step_v2_initialization() -> None:
-    """Test StepV2 initialization."""
-    step = ConcreteStepV2("my_step")
+    """Test StepBuilder initialization."""
+    step = ConcreteStepBuilder("my_step")
     assert step.step_name == "my_step"
 
 
 def test_resolve_input_reference_with_non_reference() -> None:
     """Test _resolve_input_reference with non-reference input."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_run_data = Mock()
 
     result = step._resolve_references("plain_string", mock_run_data)
@@ -58,7 +58,7 @@ def test_resolve_input_reference_with_non_reference() -> None:
 
 def test_resolve_input_reference_with_reference() -> None:
     """Test _resolve_input_reference with Reference input."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_run_data = Mock()
     reference = StepOutput(0)
 
@@ -71,7 +71,7 @@ def test_resolve_input_reference_with_reference() -> None:
 
 def test_resolve_input_reference_with_string_template_step_output() -> None:
     """Test _resolve_input_reference with string containing StepOutput template."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_run_data = Mock()
     mock_run_data.storage = Mock()
     mock_run_data.step_output_values = [
@@ -92,7 +92,7 @@ def test_resolve_input_reference_with_string_template_step_output() -> None:
 
 def test_resolve_input_reference_with_string_template_input() -> None:
     """Test _resolve_input_reference with string containing Input template."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_run_data = Mock()
     mock_run_data.storage = Mock()
     mock_run_data.plan = Mock()
@@ -109,7 +109,7 @@ def test_resolve_input_reference_with_string_template_input() -> None:
 
 def test_resolve_input_reference_with_string_template_step_both() -> None:
     """Test _resolve_input_reference with string containing StepOutput template."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_run_data = Mock()
     mock_run_data.storage = Mock()
     mock_run_data.step_output_values = [
@@ -134,7 +134,7 @@ def test_resolve_input_reference_with_string_template_step_both() -> None:
 
 def test_resolve_input_reference_with_regular_value() -> None:
     """Test _resolve_input_reference with regular value."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_run_data = Mock()
 
     result = step._resolve_references("regular_value", mock_run_data)
@@ -244,7 +244,7 @@ def test_string_templating_with_path_comprehensive() -> None:
 
 def test_resolve_input_names_for_printing_with_reference() -> None:
     """Test _resolve_input_names_for_printing with Reference."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_plan = Mock()
     reference = StepOutput(0)
 
@@ -259,7 +259,7 @@ def test_resolve_input_names_for_printing_with_reference() -> None:
 
 def test_resolve_input_names_for_printing_with_reference_already_prefixed() -> None:
     """Test _resolve_input_names_for_printing with Reference that already has $ prefix."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_plan = Mock()
     mock_reference = StepOutput(0)
 
@@ -271,7 +271,7 @@ def test_resolve_input_names_for_printing_with_reference_already_prefixed() -> N
 
 def test_resolve_input_names_for_printing_with_list() -> None:
     """Test _resolve_input_names_for_printing with list."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_plan = Mock()
     reference = Input("test_input")
 
@@ -284,7 +284,7 @@ def test_resolve_input_names_for_printing_with_list() -> None:
 
 def test_resolve_input_names_for_printing_with_regular_value() -> None:
     """Test _resolve_input_names_for_printing with regular value."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_plan = Mock()
 
     result = step._resolve_input_names_for_printing("regular_value", mock_plan)
@@ -293,7 +293,7 @@ def test_resolve_input_names_for_printing_with_regular_value() -> None:
 
 def test_inputs_to_legacy_plan_variables() -> None:
     """Test _inputs_to_legacy_plan_variables method."""
-    step = ConcreteStepV2()
+    step = ConcreteStepBuilder()
     mock_plan = Mock()
 
     ref1 = Input("test_input")

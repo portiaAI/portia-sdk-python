@@ -1,4 +1,4 @@
-"""Test the Portia class with PlanV2."""
+"""Test the Portia class with Plan."""
 
 from __future__ import annotations
 
@@ -12,14 +12,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
 
-from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.reference import Input
 from portia.clarification import ActionClarification, ClarificationCategory
 from portia.clarification_handler import ClarificationHandler
 from portia.config import Config, StorageClass
 from portia.errors import InvalidPlanRunStateError
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
-from portia.plan import Plan, PlanContext, PlanInput, Step
+from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step
 from portia.plan_run import PlanRun, PlanRunState
 from portia.portia import Portia
 from portia.tool import ReadyResponse, Tool, ToolRunContext, _ArgsSchemaPlaceholder
@@ -29,9 +28,9 @@ from tests.utils import AdditionTool, ClarificationTool
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from portia.builder.plan_v2 import PlanV2
     from portia.clarification import Clarification
     from portia.execution_agents.output import Output
+    from portia.plan import Plan
 
 
 class ErrorClarificationHandler(ClarificationHandler):
@@ -107,10 +106,10 @@ class ErrorTool(Tool):
         raise RuntimeError("Tool execution failed")
 
 
-def _build_addition_plan() -> PlanV2:
+def _build_addition_plan() -> Plan:
     """Build a simple addition plan using the builder."""
     return (
-        PlanBuilderV2("Add two numbers")
+        PlanBuilder("Add two numbers")
         .input(name="num_a", description="First number to add")
         .input(name="num_b", description="Second number to add")
         .invoke_tool_step(
@@ -138,9 +137,9 @@ def _create_portia_with_storage(storage_type: str, tmp_dir: str) -> Portia:
 
 @pytest.mark.parametrize("storage_type", ["local", "disk"])
 def test_portia_run_plan_v2_sync_mainline(storage_type: str) -> None:
-    """Test running a PlanV2 synchronously works as expected for mainline case."""
+    """Test running a Plan synchronously works as expected for mainline case."""
     plan = (
-        PlanBuilderV2("Test sync mainline")
+        PlanBuilder("Test sync mainline")
         .function_step(function=lambda: "Step 1 result")
         .function_step(function=lambda: "Step 2 result")
         .build()
@@ -166,9 +165,9 @@ def test_portia_run_plan_v2_sync_mainline(storage_type: str) -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("storage_type", ["local", "disk"])
 async def test_portia_run_plan_v2_async_mainline(storage_type: str) -> None:
-    """Test running a PlanV2 asynchronously works as expected for mainline case."""
+    """Test running a Plan asynchronously works as expected for mainline case."""
     plan = (
-        PlanBuilderV2("Test async mainline")
+        PlanBuilder("Test async mainline")
         .function_step(function=lambda: "Step 1 result")
         .function_step(function=lambda: "Step 2 result")
         .build()
@@ -225,7 +224,7 @@ async def test_portia_run_plan_v2_with_plan_inputs(
     portia: Portia,
     plan_run_inputs: list[PlanInput] | list[dict[str, object]] | dict[str, object],
 ) -> None:
-    """Test running a PlanV2 asynchronously with plan inputs in different formats."""
+    """Test running a Plan asynchronously with plan inputs in different formats."""
     plan = _build_addition_plan()
     end_user = portia.initialize_end_user()
 
@@ -249,10 +248,10 @@ async def test_portia_run_plan_v2_with_plan_inputs(
     assert plan_run.outputs.final_output.get_value() == 17
 
 
-def _build_plan_with_default_inputs() -> PlanV2:
+def _build_plan_with_default_inputs() -> Plan:
     """Build a plan with some inputs that have defaults and some that don't."""
     return (
-        PlanBuilderV2("Test plan with default inputs")
+        PlanBuilder("Test plan with default inputs")
         .input(name="required_input", description="This input is required")
         .input(
             name="optional_input",
@@ -299,7 +298,7 @@ def test_portia_run_plan_v2_missing_inputs(
     should_succeed: bool,
     expected_output: str | None,
 ) -> None:
-    """Test running a PlanV2 asynchronously with missing inputs.
+    """Test running a Plan asynchronously with missing inputs.
 
     Should work with defaults, fail without.
     """
@@ -319,10 +318,10 @@ def test_portia_run_plan_v2_missing_inputs(
     assert plan_run.outputs.final_output.get_value() == expected_output
 
 
-def _build_plan_with_multiple_default_inputs() -> PlanV2:
+def _build_plan_with_multiple_default_inputs() -> Plan:
     """Build a plan with multiple inputs, some with defaults and some without."""
     return (
-        PlanBuilderV2("Test plan with multiple default inputs")
+        PlanBuilder("Test plan with multiple default inputs")
         .input(name="required_input_1", description="This input is required")
         .input(name="required_input_2", description="This input is also required")
         .input(
@@ -348,10 +347,10 @@ def _build_plan_with_multiple_default_inputs() -> PlanV2:
     )
 
 
-def _build_plan_with_all_default_inputs() -> PlanV2:
+def _build_plan_with_all_default_inputs() -> Plan:
     """Build a plan where all inputs have default values."""
     return (
-        PlanBuilderV2("Test plan with all default inputs")
+        PlanBuilder("Test plan with all default inputs")
         .input(
             name="input_1",
             description="This input has a default",
@@ -404,7 +403,7 @@ def test_portia_run_plan_v2_with_default_inputs_comprehensive(
     plan_run_inputs: dict[str, object],
     expected_output: str,
 ) -> None:
-    """Test running a PlanV2 with various combinations of default and provided inputs."""
+    """Test running a Plan with various combinations of default and provided inputs."""
     plan = _build_plan_with_multiple_default_inputs()
     end_user = portia.initialize_end_user()
 
@@ -432,7 +431,7 @@ def test_portia_run_plan_v2_with_all_default_inputs(
     plan_run_inputs: dict[str, object],
     expected_output: str,
 ) -> None:
-    """Test running a PlanV2 where all inputs have default values."""
+    """Test running a Plan where all inputs have default values."""
     plan = _build_plan_with_all_default_inputs()
     end_user = portia.initialize_end_user()
 
@@ -446,7 +445,7 @@ def test_portia_run_plan_v2_with_all_default_inputs(
 
 @pytest.mark.asyncio
 async def test_run_builder_plan_execution_hooks(portia: Portia) -> None:
-    """Test that execution hooks are called when running a PlanV2."""
+    """Test that execution hooks are called when running a Plan."""
     execution_hooks = ExecutionHooks(
         before_plan_run=MagicMock(),
         before_step_execution=MagicMock(),
@@ -455,7 +454,7 @@ async def test_run_builder_plan_execution_hooks(portia: Portia) -> None:
     )
     portia.execution_hooks = execution_hooks
     plan = (
-        PlanBuilderV2("Test execution hooks")
+        PlanBuilder("Test execution hooks")
         .function_step(function=lambda: "Step 1 result")
         .function_step(function=lambda: "Step 2 result")
         .build()
@@ -472,7 +471,7 @@ async def test_run_builder_plan_execution_hooks(portia: Portia) -> None:
 
 @pytest.mark.asyncio
 async def test_run_builder_plan_execution_hooks_with_skip(portia: Portia) -> None:
-    """Test that before_step_execution can skip steps for PlanV2."""
+    """Test that before_step_execution can skip steps for Plan."""
 
     def before_step_execution(plan: Plan, plan_run: PlanRun, step: Step):  # noqa: ANN202, ARG001
         return (
@@ -487,7 +486,7 @@ async def test_run_builder_plan_execution_hooks_with_skip(portia: Portia) -> Non
     )
     portia.execution_hooks = execution_hooks
     plan = (
-        PlanBuilderV2("Test execution hooks with skip")
+        PlanBuilder("Test execution hooks with skip")
         .function_step(function=lambda: "Step 1 result")
         .function_step(function=lambda: "Step 2 result")
         .build()
@@ -511,7 +510,7 @@ async def test_run_builder_plan_execution_hooks_after_step_error(portia: Portia)
     )
     portia.execution_hooks = execution_hooks
     plan = (
-        PlanBuilderV2("Test execution hooks after step error")
+        PlanBuilder("Test execution hooks after step error")
         .function_step(function=lambda: "Step 1 result")
         .build()
     )
@@ -530,7 +529,7 @@ async def test_run_builder_plan_appends_plan_run_to_trace_metadata(
     mock_run_tree = MagicMock()
     mock_get_run_tree.return_value = mock_run_tree
 
-    plan = PlanBuilderV2("Trace metadata").function_step(function=lambda: "Step result").build()
+    plan = PlanBuilder("Trace metadata").function_step(function=lambda: "Step result").build()
     plan_run = await portia.arun_plan(plan)
 
     mock_run_tree.add_metadata.assert_called_once()
@@ -574,9 +573,9 @@ async def test_portia_run_plan_v2_with_final_output_schema(
     runtime_schema: type[BaseModel] | None,
     expected_schema_type: type[BaseModel],
 ) -> None:
-    """Test running a PlanV2 with final output schemas (async only)."""
+    """Test running a Plan with final output schemas (async only)."""
     plan = (
-        PlanBuilderV2("Test final output schema")
+        PlanBuilder("Test final output schema")
         .function_step(function=lambda: "test result")
         .final_output(output_schema=plan_schema)
     ).build()
@@ -636,9 +635,9 @@ async def test_portia_run_plan_v2_with_clarification_error(
     plan_output_schema: type[BaseModel] | None,
     use_clarification_handler: bool,
 ) -> None:
-    """Test running a PlanV2 when a clarification error occurs."""
+    """Test running a Plan when a clarification error occurs."""
     # Build the plan with a clarification step instead of error tool
-    plan_builder = PlanBuilderV2("Test clarification error")
+    plan_builder = PlanBuilder("Test clarification error")
     plan_builder = plan_builder.invoke_tool_step(
         step_name="Clarification step",
         tool="clarification_tool",
@@ -685,9 +684,9 @@ async def test_portia_run_plan_v2_with_clarification_error(
 
 @pytest.mark.asyncio
 async def test_portia_resume_plan_v2_not_ready(portia: Portia) -> None:
-    """Test resuming a PlanV2 when the plan isn't ready (NOT_STARTED state)."""
+    """Test resuming a Plan when the plan isn't ready (NOT_STARTED state)."""
     plan = (
-        PlanBuilderV2("Test resume not ready")
+        PlanBuilder("Test resume not ready")
         .invoke_tool_step(
             step_name="Add step",
             tool="add_tool",
@@ -718,9 +717,9 @@ async def test_portia_resume_plan_v2_not_ready(portia: Portia) -> None:
 def test_portia_resume_plan_v2_after_clarification_success(
     use_clarification_handler: bool,
 ) -> None:
-    """Test resuming a PlanV2 after a clarification is resolved successfully."""
+    """Test resuming a Plan after a clarification is resolved successfully."""
     plan = (
-        PlanBuilderV2("Test resume after clarification")
+        PlanBuilder("Test resume after clarification")
         .invoke_tool_step(
             step_name="Clarification step",
             tool="clarification_tool",
@@ -756,14 +755,14 @@ def test_portia_resume_plan_v2_after_clarification_success(
 
 @pytest.mark.asyncio
 async def test_portia_resume_plan_v2_after_clarification_success_async(portia: Portia) -> None:
-    """Test resuming a PlanV2 after a clarification is resolved successfully.
+    """Test resuming a Plan after a clarification is resolved successfully.
 
     Note: This test currently fails due to a bug in clarification handling where
     resolved clarifications don't properly advance to the next step on resume.
     The issue affects both sync and async modes equally.
     """
     plan = (
-        PlanBuilderV2("Test resume after clarification")
+        PlanBuilder("Test resume after clarification")
         .invoke_tool_step(
             step_name="Clarification step",
             tool="clarification_tool",
@@ -796,9 +795,9 @@ async def test_portia_resume_plan_v2_after_clarification_success_async(portia: P
 
 @pytest.mark.asyncio
 async def test_portia_resume_plan_v2_invalid_state(portia: Portia) -> None:
-    """Test running a PlanV2 asynchronously from an invalid state."""
+    """Test running a Plan asynchronously from an invalid state."""
     plan = (
-        PlanBuilderV2("Test invalid state async")
+        PlanBuilder("Test invalid state async")
         .function_step(function=lambda: "Step result")
         .build()
     )
@@ -821,9 +820,9 @@ async def test_portia_resume_plan_v2_invalid_state(portia: Portia) -> None:
 
 @pytest.mark.asyncio
 async def test_portia_resume_plan_v2_keyboard_interrupt(portia: Portia) -> None:
-    """Test running a PlanV2 asynchronously handles keyboard interrupt."""
+    """Test running a Plan asynchronously handles keyboard interrupt."""
     plan = (
-        PlanBuilderV2("Test keyboard interrupt async")
+        PlanBuilder("Test keyboard interrupt async")
         .function_step(function=lambda: "Step result")
         .build()
     )
@@ -849,10 +848,10 @@ async def test_portia_resume_plan_v2_keyboard_interrupt(portia: Portia) -> None:
 
 @pytest.mark.asyncio
 async def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
-    """Test that final output is set even if summary generation fails with PlanV2."""
+    """Test that final output is set even if summary generation fails with Plan."""
     # Create a single step plan with final output processing
     plan = (
-        PlanBuilderV2("Test summary error handling")
+        PlanBuilder("Test summary error handling")
         .function_step(function=lambda: "Some output")
         .final_output()  # Enable final output processing which includes summary generation
         .build()
@@ -878,9 +877,9 @@ async def test_portia_get_final_output_handles_summary_error(portia: Portia) -> 
 
 @pytest.mark.asyncio
 async def test_portia_wait_for_ready_max_retries_plan_v2(portia: Portia) -> None:
-    """Test wait for ready with max retries using PlanV2."""
+    """Test wait for ready with max retries using Plan."""
     plan = (
-        PlanBuilderV2("Test max retries")
+        PlanBuilder("Test max retries")
         .invoke_tool_step(
             step_name="Clarification step",
             tool="clarification_tool",
@@ -909,9 +908,9 @@ async def test_portia_wait_for_ready_max_retries_plan_v2(portia: Portia) -> None
 
 @pytest.mark.asyncio
 async def test_portia_wait_for_ready_backoff_period_plan_v2(portia: Portia) -> None:
-    """Test wait for ready with backoff period using PlanV2."""
+    """Test wait for ready with backoff period using Plan."""
     plan = (
-        PlanBuilderV2("Test backoff period")
+        PlanBuilder("Test backoff period")
         .invoke_tool_step(
             step_name="Clarification step",
             tool="clarification_tool",
@@ -942,7 +941,7 @@ async def test_portia_wait_for_ready_backoff_period_plan_v2(portia: Portia) -> N
 
 @pytest.mark.asyncio
 async def test_portia_plan_v2_initial_readiness_check_with_action_clarification() -> None:
-    """Test PlanV2 run_plan flow with initial tool readiness check requiring clarification."""
+    """Test Plan run_plan flow with initial tool readiness check requiring clarification."""
     ready_tool = ReadyTestTool()
 
     config = Config.from_default(
@@ -952,7 +951,7 @@ async def test_portia_plan_v2_initial_readiness_check_with_action_clarification(
     portia = Portia(config=config, tools=tool_registry)
 
     plan = (
-        PlanBuilderV2("Test readiness check with action clarification")
+        PlanBuilder("Test readiness check with action clarification")
         .invoke_tool_step(
             step_name="Use ready tool",
             tool="ready_test_tool",
@@ -988,7 +987,7 @@ async def test_portia_plan_v2_initial_readiness_check_with_action_clarification(
 
 @pytest.mark.asyncio
 async def test_portia_plan_v2_tool_error_in_invoke_tool_step() -> None:
-    """Test PlanV2 run_plan flow when a tool raises an error during execution."""
+    """Test Plan run_plan flow when a tool raises an error during execution."""
     error_tool = ErrorTool()
 
     config = Config.from_default(
@@ -998,7 +997,7 @@ async def test_portia_plan_v2_tool_error_in_invoke_tool_step() -> None:
     portia = Portia(config=config, tools=tool_registry)
 
     plan = (
-        PlanBuilderV2("Test tool error in invoke_tool_step")
+        PlanBuilder("Test tool error in invoke_tool_step")
         .invoke_tool_step(
             step_name="Use error tool",
             tool="error_tool",

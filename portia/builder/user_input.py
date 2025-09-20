@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepV2
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -24,7 +24,7 @@ from portia.clarification import (
 from portia.plan import Step
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.plan import Plan as PlanV2
     from portia.run_context import RunContext
 
 

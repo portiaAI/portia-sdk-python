@@ -9,14 +9,13 @@ import pytest
 from pydantic import BaseModel
 
 from portia.builder.llm_step import LLMStep
-from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input, Reference, StepOutput, default_step_name
 from portia.execution_agents.output import LocalDataValue
-from portia.plan import PlanInput
+from portia.plan import Plan, PlanInput
 from portia.run_context import RunContext, StepOutputValue
 
 if TYPE_CHECKING:
-    from portia.builder.step_v2 import StepV2
+    from portia.builder.step import Step as StepBuilder
 
 
 # Test cases for the default_step_name function
@@ -80,7 +79,7 @@ def test_get_legacy_name_with_int_step() -> None:
     step_output = StepOutput(2)
 
     # Create a mock plan that returns a specific output name
-    mock_plan = Mock(spec=PlanV2)
+    mock_plan = Mock(spec=Plan)
     mock_plan.step_output_name.return_value = "$step_2_output"
 
     result = step_output.get_legacy_name(mock_plan)
@@ -94,7 +93,7 @@ def test_get_legacy_name_with_string_step() -> None:
     step_output = StepOutput("named_step")
 
     # Create a mock plan that returns a specific output name
-    mock_plan = Mock(spec=PlanV2)
+    mock_plan = Mock(spec=Plan)
     mock_plan.step_output_name.return_value = "$named_step_output"
 
     result = step_output.get_legacy_name(mock_plan)
@@ -107,7 +106,7 @@ def test_get_legacy_name_with_negative_step() -> None:
     """Test get_legacy_name with negative step index."""
     step_output = StepOutput(-1)
 
-    mock_plan = Mock(spec=PlanV2)
+    mock_plan = Mock(spec=Plan)
     mock_plan.step_output_name.return_value = "$step_2_output"
 
     result = step_output.get_legacy_name(mock_plan)
@@ -500,7 +499,7 @@ def test_get_legacy_name() -> None:
     """Test get_legacy_name method."""
     input_ref = Input("my_input")
 
-    result = input_ref.get_legacy_name(Mock(spec=PlanV2))
+    result = input_ref.get_legacy_name(Mock(spec=Plan))
 
     assert result == "my_input"
 
@@ -775,11 +774,11 @@ def test_input_get_value_with_path_pydantic_model() -> None:
 
 
 def test_step_output_and_input_with_real_plan() -> None:
-    """Test StepOutput and Input with a real PlanV2 instance."""
+    """Test StepOutput and Input with a real Plan instance."""
     # Create a real plan with steps and inputs
     step = LLMStep(task="Test task", step_name="test_step")
     plan_input = PlanInput(name="test_input", description="Test input")
-    plan = PlanV2(steps=[step], plan_inputs=[plan_input])
+    plan = Plan(steps=[step], plan_inputs=[plan_input])
 
     # Test StepOutput
     step_output = StepOutput(0)
@@ -799,7 +798,7 @@ def test_step_output_and_input_with_real_plan() -> None:
 def test_multiple_inputs_and_outputs() -> None:
     """Test with multiple inputs and step outputs."""
     # Create plan with multiple steps and inputs
-    steps: list[StepV2] = [
+    steps: list[StepBuilder] = [
         LLMStep(task="First task", step_name="first_step"),
         LLMStep(task="Second task", step_name="second_step"),
         LLMStep(task="Third task", step_name="third_step"),
@@ -808,7 +807,7 @@ def test_multiple_inputs_and_outputs() -> None:
         PlanInput(name="input1", description="First input"),
         PlanInput(name="input2", description="Second input"),
     ]
-    plan = PlanV2(steps=steps, plan_inputs=inputs)
+    plan = Plan(steps=steps, plan_inputs=inputs)
 
     # Test various StepOutput references
     assert StepOutput(0).get_legacy_name(plan) == "$step_0_output"
@@ -1290,7 +1289,7 @@ def test_reference_argument_conversion(input_str: str, expected_argument: Any) -
 class TestReference(Reference):
     """Test Reference class. Implements the abstract methods of the Reference class."""
 
-    def get_legacy_name(self, plan: PlanV2) -> str:  # noqa: ARG002
+    def get_legacy_name(self, plan: Plan) -> str:  # noqa: ARG002
         """Get the legacy name of the reference."""
         return "test_reference"
 

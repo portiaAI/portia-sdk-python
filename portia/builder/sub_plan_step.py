@@ -5,16 +5,16 @@ from typing import Any, override
 from langsmith import traceable
 from pydantic import Field
 
-from portia.builder.plan_v2 import PlanV2
 from portia.builder.reference import Input
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepV2
+from portia.plan import Plan as PlanV2
 from portia.plan import PlanInput, Step
 from portia.portia import Portia
 from portia.run_context import RunContext
 
 
 class SubPlanStep(StepV2):
-    """A step that executes a nested PlanV2 and returns its final result.
+    """A step that executes a nested Plan and returns its final result.
 
     This step allows for modular plan composition by executing a complete sub-plan
     within the context of a larger plan. The sub-plan runs with its own input values

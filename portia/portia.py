@@ -32,7 +32,6 @@ from pydantic import BaseModel
 from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalStepResult
 from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopStepResult, LoopStepType
-from portia.builder.plan_v2 import PlanV2
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -73,6 +72,7 @@ from portia.introspection_agents.introspection_agent import (
 from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
+from portia.plan import Plan as PlanV2
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
@@ -84,7 +84,7 @@ from portia.storage import (
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
 from portia.telemetry.views import (
-    PlanV2StepExecutionTelemetryEvent,
+    PlanStepExecutionTelemetryEvent,
     PortiaFunctionCallTelemetryEvent,
 )
 from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
@@ -2756,7 +2756,7 @@ class Portia:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
                 self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
+                    PlanStepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=False,
                         tool_id=step.to_legacy_step(plan).tool_id,
@@ -2767,7 +2767,7 @@ class Portia:
                 )
             else:
                 self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
+                    PlanStepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=True,
                         tool_id=step.to_legacy_step(plan).tool_id,

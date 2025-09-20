@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence  # noqa: TC003
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepV2
 from portia.model import GenerativeModel  # noqa: TC001
 
 if sys.version_info >= (3, 12):
@@ -23,7 +23,7 @@ from portia.tool import Tool  # noqa: TC001
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.plan import Plan as PlanV2
     from portia.run_context import RunContext
 
 

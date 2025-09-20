@@ -1,4 +1,4 @@
-"""Test the PlanBuilderV2 class."""
+"""Test the PlanBuilder class."""
 
 from __future__ import annotations
 
@@ -13,16 +13,14 @@ from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.llm_step import LLMStep
 from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopBlock, LoopStepType, LoopType
-from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
-from portia.builder.plan_v2 import PlanV2
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Input, StepOutput
 from portia.builder.single_tool_agent_step import SingleToolAgentStep
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepBuilder
 from portia.builder.sub_plan_step import SubPlanStep
 from portia.builder.user_input import UserInputStep
 from portia.builder.user_verify import UserVerifyStep
-from portia.plan import PlanInput, Step
+from portia.plan import Plan, PlanBuilder, PlanBuilderError, PlanInput, Step
 from portia.tool import Tool
 from portia.tool_decorator import tool
 
@@ -60,14 +58,14 @@ class MockTool(Tool):
         return "mock result"
 
 
-class CustomStep(StepV2):
+class CustomStep(StepBuilder):
     """Custom step for testing."""
 
     async def run(self, run_data: RunContext) -> Any:  # noqa: ANN401, ARG002
         """Execute the step."""
         return "mock result"
 
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_legacy_step(self, plan: Plan) -> Step:
         """Convert this step to a Step from plan.py.
 
         A Step is the legacy representation of a step in the plan, and is still used in the
@@ -77,14 +75,14 @@ class CustomStep(StepV2):
         raise NotImplementedError
 
 
-# Test cases for PlanBuilderV2
+# Test cases for PlanBuilder
 
 
 def test_initialization_default_label() -> None:
-    """Test PlanBuilderV2 initialization with default label."""
-    builder = PlanBuilderV2()
+    """Test PlanBuilder initialization with default label."""
+    builder = PlanBuilder()
 
-    assert isinstance(builder.plan, PlanV2)
+    assert isinstance(builder.plan, Plan)
     assert builder.plan.label == "Run the plan built with the Plan Builder"
     assert builder.plan.steps == []
     assert builder.plan.plan_inputs == []
@@ -93,16 +91,16 @@ def test_initialization_default_label() -> None:
 
 
 def test_initialization_custom_label() -> None:
-    """Test PlanBuilderV2 initialization with custom label."""
+    """Test PlanBuilder initialization with custom label."""
     custom_label = "Custom Plan Label"
-    builder = PlanBuilderV2(label=custom_label)
+    builder = PlanBuilder(label=custom_label)
 
     assert builder.plan.label == custom_label
 
 
 def test_input_method() -> None:
     """Test the input() method for adding plan inputs."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     # Test adding input with name only
     result = builder.input(name="user_name")
@@ -116,7 +114,7 @@ def test_input_method() -> None:
 
 def test_input_method_with_description() -> None:
     """Test the input() method with description."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.input(name="user_name", description="The name of the user")
 
@@ -128,7 +126,7 @@ def test_input_method_with_description() -> None:
 
 def test_input_method_multiple_inputs() -> None:
     """Test adding multiple inputs."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.input(name="name", description="User name").input(name="age", description="User age")
 
@@ -141,7 +139,7 @@ def test_input_method_multiple_inputs() -> None:
 
 def test_input_method_with_default_value() -> None:
     """Test the input() method with default value."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.input(name="user_name", description="The name of the user", default_value="John Doe")
 
@@ -153,7 +151,7 @@ def test_input_method_with_default_value() -> None:
 
 def test_input_method_with_various_default_values() -> None:
     """Test the input() method with various types of default values."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     # Test with different types of default values
     default_bool = True
@@ -178,7 +176,7 @@ def test_input_method_with_various_default_values() -> None:
 
 def test_llm_step_method_basic() -> None:
     """Test the llm_step() method with basic parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.llm_step(task="Analyze the data")
 
@@ -193,7 +191,7 @@ def test_llm_step_method_basic() -> None:
 
 def test_llm_step_method_with_all_parameters() -> None:
     """Test the llm_step() method with all parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     inputs = ["input1", StepOutput(0), Input("user_input")]
 
     builder.llm_step(
@@ -213,7 +211,7 @@ def test_llm_step_method_with_all_parameters() -> None:
 
 def test_llm_step_method_with_model() -> None:
     """Test llm_step accepts a model parameter."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     builder.llm_step(task="Analyze", model="openai/gpt-4o")
     step = builder.plan.steps[0]
     assert isinstance(step, LLMStep)
@@ -222,7 +220,7 @@ def test_llm_step_method_with_model() -> None:
 
 def test_llm_step_method_auto_generated_step_name() -> None:
     """Test that step names are auto-generated correctly."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.llm_step(task="First step")
     builder.llm_step(task="Second step")
@@ -233,7 +231,7 @@ def test_llm_step_method_auto_generated_step_name() -> None:
 
 def test_invoke_tool_step_method_with_string_tool() -> None:
     """Test the invoke_tool_step() method with string tool identifier."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     args = {"param1": "value1", "param2": StepOutput(0)}
 
     result = builder.invoke_tool_step(tool="search_tool", args=args)
@@ -249,7 +247,7 @@ def test_invoke_tool_step_method_with_string_tool() -> None:
 
 def test_invoke_tool_step_method_with_tool_instance() -> None:
     """Test the invoke_tool_step() method with Tool instance."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     mock_tool = MockTool()
 
     builder.invoke_tool_step(tool=mock_tool, args={"input": "test"})
@@ -261,7 +259,7 @@ def test_invoke_tool_step_method_with_tool_instance() -> None:
 
 def test_invoke_tool_step_method_with_all_parameters() -> None:
     """Test the invoke_tool_step() method with all parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.invoke_tool_step(
         tool="test_tool",
@@ -280,7 +278,7 @@ def test_invoke_tool_step_method_with_all_parameters() -> None:
 
 def test_invoke_tool_step_method_no_args() -> None:
     """Test the invoke_tool_step() method with no args."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.invoke_tool_step(tool="no_args_tool")
 
@@ -291,7 +289,7 @@ def test_invoke_tool_step_method_no_args() -> None:
 
 def test_function_step_method_basic() -> None:
     """Test the function_step() method with basic parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.function_step(function=example_function_for_testing)
 
@@ -308,7 +306,7 @@ def test_function_step_method_basic() -> None:
 
 def test_function_step_method_with_all_parameters() -> None:
     """Test the function_step() method with all parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     args = {"x": 42, "y": Input("user_input")}
 
     builder.function_step(
@@ -330,7 +328,7 @@ def test_function_step_method_with_all_parameters() -> None:
 
 def test_single_tool_agent_step_method_basic() -> None:
     """Test the single_tool_agent_step() method with basic parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.single_tool_agent_step(tool="agent_tool", task="Complete the task")
 
@@ -346,7 +344,7 @@ def test_single_tool_agent_step_method_basic() -> None:
 
 def test_single_tool_agent_step_method_with_all_parameters() -> None:
     """Test the single_tool_agent_step() method with all parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     inputs = ["context", StepOutput(0)]
 
     builder.single_tool_agent_step(
@@ -368,7 +366,7 @@ def test_single_tool_agent_step_method_with_all_parameters() -> None:
 
 def test_single_tool_agent_step_method_with_model() -> None:
     """Test single_tool_agent_step accepts a model parameter."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     builder.single_tool_agent_step(tool="search_tool", task="Find", model="openai/gpt-4o")
     step = builder.plan.steps[0]
     assert isinstance(step, SingleToolAgentStep)
@@ -377,7 +375,7 @@ def test_single_tool_agent_step_method_with_model() -> None:
 
 def test_single_tool_agent_step_accepts_tool_object() -> None:
     """Test single_tool_agent_step accepts a Tool instance."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     mock_tool = MockTool()
 
     builder.single_tool_agent_step(tool=mock_tool, task="Use the tool")
@@ -389,7 +387,7 @@ def test_single_tool_agent_step_accepts_tool_object() -> None:
 
 def test_react_agent_step_method_basic() -> None:
     """Test the react_agent_step() method with basic parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     tools = ["search_tool", "calculator_tool"]
 
     result = builder.react_agent_step(task="Research and calculate", tools=tools)
@@ -408,7 +406,7 @@ def test_react_agent_step_method_basic() -> None:
 
 def test_react_agent_step_accepts_tool_objects() -> None:
     """Test react_agent_step accepts Tool instances."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     tools = [MockTool()]
 
     builder.react_agent_step(task="Research", tools=tools)
@@ -420,7 +418,7 @@ def test_react_agent_step_accepts_tool_objects() -> None:
 
 def test_react_agent_step_method_with_all_parameters() -> None:
     """Test the react_agent_step() method with all parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     tools = ["search_tool", "calculator_tool", "weather_tool"]
     inputs = ["context", StepOutput(0), Input("user_query")]
 
@@ -447,7 +445,7 @@ def test_react_agent_step_method_with_all_parameters() -> None:
 
 def test_react_agent_step_method_with_model() -> None:
     """Test react_agent_step accepts a model parameter."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     builder.react_agent_step(task="Research", model="openai/gpt-4o")
     step = builder.plan.steps[0]
     assert isinstance(step, ReActAgentStep)
@@ -456,7 +454,7 @@ def test_react_agent_step_method_with_model() -> None:
 
 def test_react_agent_step_method_single_tool() -> None:
     """Test the react_agent_step() method with a single tool."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.react_agent_step(task="Simple task", tools=["single_tool"])
 
@@ -467,7 +465,7 @@ def test_react_agent_step_method_single_tool() -> None:
 
 def test_user_verify_step_method() -> None:
     """Test the user_verify_step() method."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.user_verify(message="Check this")
 
@@ -480,7 +478,7 @@ def test_user_verify_step_method() -> None:
 
 def test_user_input_text_input_method() -> None:
     """Test the user_input() method for text input."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.user_input(message="Please enter your name")
 
@@ -494,7 +492,7 @@ def test_user_input_text_input_method() -> None:
 
 def test_user_input_multiple_choice_method() -> None:
     """Test the user_input() method for multiple choice."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     options = ["red", "green", "blue"]
 
     result = builder.user_input(
@@ -514,7 +512,7 @@ def test_user_input_multiple_choice_method() -> None:
 
 def test_final_output_method_basic() -> None:
     """Test the final_output() method with basic parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.final_output()
 
@@ -525,7 +523,7 @@ def test_final_output_method_basic() -> None:
 
 def test_final_output_method_with_schema() -> None:
     """Test the final_output() method with output schema."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.final_output(output_schema=OutputSchema)
 
@@ -535,7 +533,7 @@ def test_final_output_method_with_schema() -> None:
 
 def test_final_output_method_with_summarize() -> None:
     """Test the final_output() method with summarize enabled."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.final_output(summarize=True)
 
@@ -545,7 +543,7 @@ def test_final_output_method_with_summarize() -> None:
 
 def test_final_output_method_with_all_parameters() -> None:
     """Test the final_output() method with all parameters."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.final_output(output_schema=OutputSchema, summarize=True)
 
@@ -554,8 +552,8 @@ def test_final_output_method_with_all_parameters() -> None:
 
 
 def test_build_method() -> None:
-    """Test the build() method returns correct PlanV2 instance."""
-    builder = PlanBuilderV2(label="Test Plan")
+    """Test the build() method returns correct Plan instance."""
+    builder = PlanBuilder(label="Test Plan")
 
     builder.input(name="test_input", description="Test input description")
     builder.llm_step(task="Test task")
@@ -563,7 +561,7 @@ def test_build_method() -> None:
 
     plan = builder.build()
 
-    assert isinstance(plan, PlanV2)
+    assert isinstance(plan, Plan)
     assert plan is builder.plan  # Should return the same instance
     assert plan.label == "Test Plan"
     assert len(plan.plan_inputs) == 1
@@ -574,7 +572,7 @@ def test_build_method() -> None:
 
 def test_method_chaining() -> None:
     """Test that all methods return self for proper chaining."""
-    builder = PlanBuilderV2("Chaining Test")
+    builder = PlanBuilder("Chaining Test")
 
     result = (
         builder.input(name="user_name", description="Name of the user", default_value="John Doe")
@@ -607,10 +605,10 @@ def test_method_chaining() -> None:
 
 def test_empty_plan_build() -> None:
     """Test building an empty plan."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     plan = builder.build()
 
-    assert isinstance(plan, PlanV2)
+    assert isinstance(plan, Plan)
     assert len(plan.steps) == 0
     assert len(plan.plan_inputs) == 0
     assert plan.final_output_schema is None
@@ -619,7 +617,7 @@ def test_empty_plan_build() -> None:
 
 def test_step_name_generation_with_mixed_steps() -> None:
     """Test step name generation with different types of steps."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.llm_step(task="LLM task")
     builder.invoke_tool_step(tool="tool1")
@@ -634,7 +632,7 @@ def test_step_name_generation_with_mixed_steps() -> None:
 
 def test_custom_step_names_override_auto_generation() -> None:
     """Test that custom step names override auto-generation."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.llm_step(task="First", step_name="custom_first")
     builder.llm_step(task="Second")  # Should get step_1
@@ -647,7 +645,7 @@ def test_custom_step_names_override_auto_generation() -> None:
 
 def test_references_in_inputs_and_args() -> None:
     """Test using references (StepOutput and Input) in various contexts."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     # Add inputs to reference
     builder.input(name="user_query", description="The user's query")
@@ -678,7 +676,7 @@ def test_references_in_inputs_and_args() -> None:
 
 def test_add_step_method_basic() -> None:
     """Test the add_step() method with basic functionality."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     custom_step = CustomStep(step_name="custom_step")
 
     result = builder.add_step(custom_step)
@@ -690,7 +688,7 @@ def test_add_step_method_basic() -> None:
 
 def test_add_step_method_with_different_step_types() -> None:
     """Test the add_step() method with different step types."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     llm_step = LLMStep(task="LLM task", step_name="llm_step")
     tool_step = InvokeToolStep(tool="search_tool", args={"query": "test"}, step_name="tool_step")
@@ -712,9 +710,9 @@ def test_add_step_method_with_different_step_types() -> None:
 
 def test_add_sub_plan_method() -> None:
     """Test the add_sub_plan() method."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
-    sub_plan = PlanBuilderV2().llm_step(task="Task from subplan", step_name="inner").build()
+    sub_plan = PlanBuilder().llm_step(task="Task from subplan", step_name="inner").build()
 
     result = builder.add_sub_plan(sub_plan, step_name="run_sub")
 
@@ -727,7 +725,7 @@ def test_add_sub_plan_method() -> None:
 
 def test_add_sub_plan_method_with_iterable() -> None:
     """Test the add_sub_plan() method with an iterable of steps."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     steps = [
         LLMStep(task="First task", step_name="step1"),
@@ -749,11 +747,11 @@ def test_add_sub_plan_method_with_iterable() -> None:
 
 def test_add_sub_plan_method_with_plan_v2_duplicate_inputs_error() -> None:
     """Test the add_sub_plan() method raises error for duplicate plan inputs."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.input(name="shared_input", description="Shared input name")
 
-    other_plan = PlanV2(
+    other_plan = Plan(
         label="Other plan",
         steps=[LLMStep(task="Task", step_name="step1")],
         plan_inputs=[
@@ -769,15 +767,15 @@ def test_add_sub_plan_method_with_plan_v2_duplicate_inputs_error() -> None:
 
 def test_add_sub_plan_method_with_empty_iterable() -> None:
     """Test the add_sub_plan() method with an empty iterable."""
-    builder = PlanBuilderV2().llm_step(task="Initial step").add_sub_plan([])
+    builder = PlanBuilder().llm_step(task="Initial step").add_sub_plan([])
     # The add_sub_plan still adds a step - it just does nothing
     assert len(builder.plan.steps) == 2
 
 
 def test_add_sub_plan_method_with_empty_plan_v2() -> None:
-    """Test the add_sub_plan() method with an empty PlanV2."""
-    builder = PlanBuilderV2().input(name="existing_input").llm_step(task="Initial step")
-    empty_plan = PlanBuilderV2().build()
+    """Test the add_sub_plan() method with an empty Plan."""
+    builder = PlanBuilder().input(name="existing_input").llm_step(task="Initial step")
+    empty_plan = PlanBuilder().build()
 
     result = builder.add_sub_plan(empty_plan)
 
@@ -787,10 +785,10 @@ def test_add_sub_plan_method_with_empty_plan_v2() -> None:
 
 def test_add_sub_plan_method_chaining_with_different_sources() -> None:
     """Test chaining add_sub_plan() method with different sources."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     step_list = [LLMStep(task="List step", step_name="list_step")]
-    plan_with_steps = PlanV2(
+    plan_with_steps = Plan(
         label="Source plan",
         steps=[InvokeToolStep(tool="plan_tool", args={}, step_name="plan_step")],
         plan_inputs=[PlanInput(name="plan_input", description="From plan")],
@@ -808,8 +806,8 @@ def test_add_sub_plan_method_chaining_with_different_sources() -> None:
 
 def test_add_sub_plan_with_invalid_input_name_error() -> None:
     """Test add_sub_plan raises error for invalid input names."""
-    builder = PlanBuilderV2()
-    sub_plan = PlanBuilderV2().input(name="valid_input").llm_step(task="Task").build()
+    builder = PlanBuilder()
+    sub_plan = PlanBuilder().input(name="valid_input").llm_step(task="Task").build()
 
     with pytest.raises(PlanBuilderError):
         builder.add_sub_plan(sub_plan, input_values={"invalid": "value"})
@@ -818,18 +816,18 @@ def test_add_sub_plan_with_invalid_input_name_error() -> None:
 def test_add_step_and_add_sub_plan_integration() -> None:
     """Test integration of add_step and add_sub_plan methods together."""
     step_batch = (
-        PlanBuilderV2()
+        PlanBuilder()
         .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
         .function_step(function=example_function_for_testing, args={}, step_name="batch2")
         .build()
     )
 
     builder = (
-        PlanBuilderV2()
+        PlanBuilder()
         .add_step(LLMStep(task="Individual step", step_name="individual"))
         .add_sub_plan(step_batch)
         .add_sub_plan(
-            PlanBuilderV2().add_step(LLMStep(task="From plan", step_name="from_plan")).build()
+            PlanBuilder().add_step(LLMStep(task="From plan", step_name="from_plan")).build()
         )
         .add_step(SingleToolAgentStep(tool="final_tool", task="Final step", step_name="final"))
     )
@@ -844,7 +842,7 @@ def test_add_step_and_add_sub_plan_integration() -> None:
 
 def test_basic_if_endif_block() -> None:
     """Test basic if-endif conditional block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return True
@@ -880,7 +878,7 @@ def test_basic_if_endif_block() -> None:
 
 def test_if_else_endif_block() -> None:
     """Test if-else-endif conditional block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return False
@@ -916,7 +914,7 @@ def test_if_else_endif_block() -> None:
 
 def test_if_else_if_else_endif_block() -> None:
     """Test if-else_if-else-endif conditional block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def first_condition() -> bool:
         return False
@@ -969,7 +967,7 @@ def test_if_else_if_else_endif_block() -> None:
 
 def test_nested_if_blocks() -> None:
     """Test nested if blocks."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def outer_condition() -> bool:
         return True
@@ -1022,7 +1020,7 @@ def test_nested_if_blocks() -> None:
 
 def test_conditional_with_string_condition() -> None:
     """Test conditional block with string condition."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.if_("len(input_data) > 0").llm_step(task="Process data").endif()
 
@@ -1034,7 +1032,7 @@ def test_conditional_with_string_condition() -> None:
 
 def test_conditional_with_args() -> None:
     """Test conditional block with arguments."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition(value: int) -> bool:
         return value > 10
@@ -1051,7 +1049,7 @@ def test_conditional_with_args() -> None:
 
 def test_else_if_without_if_raises_error() -> None:
     """Test that else_if_ raises error when called without if_."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return True
@@ -1062,7 +1060,7 @@ def test_else_if_without_if_raises_error() -> None:
 
 def test_else_without_if_raises_error() -> None:
     """Test that else_ raises error when called without if_."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     with pytest.raises(PlanBuilderError, match="else_ must be called from a conditional block"):
         builder.else_()
@@ -1070,7 +1068,7 @@ def test_else_without_if_raises_error() -> None:
 
 def test_endif_without_if_raises_error() -> None:
     """Test that endif raises error when called without if_."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     with pytest.raises(PlanBuilderError, match="endif must be called from a conditional block"):
         builder.endif()
@@ -1078,7 +1076,7 @@ def test_endif_without_if_raises_error() -> None:
 
 def test_build_with_missing_endif_raises_error() -> None:
     """Test that build() raises error when endif is missing."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return True
@@ -1092,7 +1090,7 @@ def test_build_with_missing_endif_raises_error() -> None:
 
 def test_conditional_method_chaining() -> None:
     """Test that conditional methods return self for chaining."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def condition1() -> bool:
         return True
@@ -1120,10 +1118,10 @@ def test_conditional_method_chaining() -> None:
 
 def test_add_sub_plan_with_input_values_single_value() -> None:
     """Test add_sub_plan with input_values setting a single input value."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     sub_plan = (
-        PlanBuilderV2()
+        PlanBuilder()
         .input(name="sub_input", description="Input for sub plan")
         .llm_step(task="Sub task", step_name="sub_step")
         .build()
@@ -1138,10 +1136,10 @@ def test_add_sub_plan_with_input_values_single_value() -> None:
 
 def test_add_sub_plan_with_input_values_multiple_values_override_default() -> None:
     """Test add_sub_plan with input_values setting 2 out of 4 values, overriding default."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     sub_plan = (
-        PlanBuilderV2()
+        PlanBuilder()
         .input(name="input_no_default", description="Input without default")
         .input(
             name="input_with_default",
@@ -1177,10 +1175,10 @@ def test_add_sub_plan_with_input_values_multiple_values_override_default() -> No
 
 def test_add_sub_plan_with_input_values_invalid_input_name_error() -> None:
     """Test add_sub_plan raises error when input_values contains invalid input name."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     sub_plan = (
-        PlanBuilderV2()
+        PlanBuilder()
         .input(name="valid_input", description="Valid input")
         .llm_step(task="Sub task", step_name="sub_step")
         .build()
@@ -1195,7 +1193,7 @@ def test_add_sub_plan_with_input_values_invalid_input_name_error() -> None:
 
 def test_basic_loop_with_condition() -> None:
     """Test basic loop with condition."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return True
@@ -1211,7 +1209,7 @@ def test_basic_loop_with_condition() -> None:
 
 def test_basic_loop_over_condition() -> None:
     """Test basic loop with condition."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return True
@@ -1245,7 +1243,7 @@ def test_basic_loop_over_condition() -> None:
 
 def test_basic_loop_over_reference() -> None:
     """Test basic loop with over reference."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = (
         builder.function_step(function=lambda: [1, 2, 3], step_name="items")
@@ -1284,7 +1282,7 @@ def test_basic_loop_over_reference() -> None:
 
 def test_loop_with_args() -> None:
     """Test loop with args parameter."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition(x: int) -> bool:
         return x > 0
@@ -1310,7 +1308,7 @@ def test_loop_with_args() -> None:
 
 def test_loop_with_custom_step_name() -> None:
     """Test loop with custom step names."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = (
         builder.loop(while_=lambda: True, step_name="custom_loop")
@@ -1334,7 +1332,7 @@ def test_loop_with_custom_step_name() -> None:
 
 def test_nested_loops() -> None:
     """Test nested loops."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = (
         builder.loop(while_=lambda: True, step_name="outer_loop")
@@ -1374,7 +1372,7 @@ def test_nested_loops() -> None:
 
 def test_loop_inside_if_block() -> None:
     """Test loop inside if block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def test_condition() -> bool:
         return True
@@ -1415,7 +1413,7 @@ def test_loop_inside_if_block() -> None:
 
 def test_if_inside_loop_block() -> None:
     """Test if block inside loop."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def loop_condition() -> bool:
         return True
@@ -1460,7 +1458,7 @@ def test_if_inside_loop_block() -> None:
 
 def test_loop_inside_else_block() -> None:
     """Test loop inside else block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def if_condition() -> bool:
         return False
@@ -1502,7 +1500,7 @@ def test_loop_inside_else_block() -> None:
 
 def test_loop_inside_else_if_block() -> None:
     """Test loop inside else_if block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     def first_condition() -> bool:
         return False
@@ -1552,7 +1550,7 @@ def test_loop_inside_else_if_block() -> None:
 
 def test_loop_with_string_condition() -> None:
     """Test loop with string condition."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = builder.loop(while_="x > 0", args={"x": 5}).llm_step(task="Inside loop").end_loop()
 
@@ -1568,7 +1566,7 @@ def test_loop_with_string_condition() -> None:
 
 def test_loop_error_condition_and_over_both_set() -> None:
     """Test that loop raises error when both condition and over are set."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     with pytest.raises(PlanBuilderError, match="Only one of while_, do_while_, or over can be set"):
         builder.loop(while_=lambda: True, over=StepOutput("items"))
@@ -1576,7 +1574,7 @@ def test_loop_error_condition_and_over_both_set() -> None:
 
 def test_loop_error_neither_condition_nor_over_set() -> None:
     """Test that loop raises error when neither condition nor over is set."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     with pytest.raises(
         PlanBuilderError, match="Exactly one of while_, do_while_, or over must be set"
@@ -1586,7 +1584,7 @@ def test_loop_error_neither_condition_nor_over_set() -> None:
 
 def test_end_loop_without_loop_raises_error() -> None:
     """Test that end_loop raises error when called without a loop."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     with pytest.raises(PlanBuilderError, match="endloop must be called from a loop block"):
         builder.end_loop()
@@ -1594,7 +1592,7 @@ def test_end_loop_without_loop_raises_error() -> None:
 
 def test_end_loop_with_conditional_block_raises_error() -> None:
     """Test that end_loop raises error when called from conditional block."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.if_(lambda: True)
     with pytest.raises(PlanBuilderError, match="endloop must be called from a loop block"):
@@ -1603,7 +1601,7 @@ def test_end_loop_with_conditional_block_raises_error() -> None:
 
 def test_build_with_missing_end_loop_raises_error() -> None:
     """Test that build raises error when loop is not closed."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     builder.loop(while_=lambda: True)
     with pytest.raises(PlanBuilderError, match="All blocks must be closed"):
@@ -1612,7 +1610,7 @@ def test_build_with_missing_end_loop_raises_error() -> None:
 
 def test_loop_method_chaining() -> None:
     """Test that loop methods return self for chaining."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = (
         builder.loop(while_=lambda: True)
@@ -1628,7 +1626,7 @@ def test_loop_method_chaining() -> None:
 
 def test_complex_nested_structure() -> None:
     """Test complex nested structure with loops and conditionals."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     result = (
         builder.input(name="items", description="List of items")
@@ -1697,7 +1695,7 @@ def test_complex_nested_structure() -> None:
 
 def test_current_loop_block_property() -> None:
     """Test the _current_loop_block property."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     # Initially, no loop block should be current
     assert builder._current_loop_block is None
@@ -1743,7 +1741,7 @@ def test_current_loop_block_property() -> None:
 
 def test_end_loop_no_loop_block_error() -> None:
     """Test that end_loop raises PlanBuilderError when no loop block exists."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     # Try to end a loop without starting one
     with pytest.raises(
@@ -1754,7 +1752,7 @@ def test_end_loop_no_loop_block_error() -> None:
 
 def test_end_loop_non_loop_step_error() -> None:
     """Test that end_loop raises PlanBuilderError when start step is not a LoopStep."""
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
 
     # Add a non-loop step first
     builder.llm_step(task="Some step")

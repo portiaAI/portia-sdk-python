@@ -1,4 +1,4 @@
-"""Integration tests for PlanV2 examples."""
+"""Integration tests for Plan examples."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ import pytest
 from pydantic import BaseModel, Field
 
 from portia import Config, LogLevel, Portia
-from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
 from portia.clarification import UserVerificationClarification
 from portia.clarification_handler import ClarificationHandler
 from portia.config import StorageClass
 from portia.execution_hooks import ExecutionHooks
 from portia.model import LLMProvider
+from portia.plan import PlanBuilder, PlanBuilderError
 from portia.plan_run import PlanRun, PlanRunState
 from portia.tool import Tool, ToolRunContext
 
@@ -114,7 +114,7 @@ def test_simple_builder(is_async: bool) -> None:
     portia = Portia(config=config)
 
     plan = (
-        PlanBuilderV2("Calculate gold purchase cost and write a poem")
+        PlanBuilder("Calculate gold purchase cost and write a poem")
         .input(name="purchase_quantity", description="The quantity of gold to purchase in kilos")
         .invoke_tool_step(
             step_name="Search gold price",
@@ -165,7 +165,7 @@ def test_simple_builder(is_async: bool) -> None:
 
 
 def test_plan_v2_conditionals() -> None:
-    """Test PlanV2 Conditionals."""
+    """Test Plan Conditionals."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     portia = Portia(config=config)
     messages: list[str] = []
@@ -174,7 +174,7 @@ def test_plan_v2_conditionals() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: True)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -205,7 +205,7 @@ def test_plan_v2_conditionals() -> None:
 
 
 def test_plan_v2_conditionals_else_if() -> None:
-    """Test PlanV2 Conditionals."""
+    """Test Plan Conditionals."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     portia = Portia(config=config)
     messages: list[str] = []
@@ -214,7 +214,7 @@ def test_plan_v2_conditionals_else_if() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -245,7 +245,7 @@ def test_plan_v2_conditionals_else_if() -> None:
 
 
 def test_plan_v2_conditionals_else() -> None:
-    """Test PlanV2 Conditionals - Else branch."""
+    """Test Plan Conditionals - Else branch."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     portia = Portia(config=config)
     messages: list[str] = []
@@ -254,7 +254,7 @@ def test_plan_v2_conditionals_else() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -285,7 +285,7 @@ def test_plan_v2_conditionals_else() -> None:
 
 
 def test_plan_v2_conditionals_nested_branches() -> None:
-    """Test PlanV2 Conditionals - Else branch."""
+    """Test Plan Conditionals - Else branch."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     portia = Portia(config=config)
     messages: list[str] = []
@@ -294,7 +294,7 @@ def test_plan_v2_conditionals_nested_branches() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: True)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -333,7 +333,7 @@ def test_plan_v2_conditionals_nested_branches() -> None:
 
 
 def test_plan_v2_conditionals_nested_branches_else_if() -> None:
-    """Test PlanV2 Conditionals - Nested branches - Else if."""
+    """Test Plan Conditionals - Nested branches - Else if."""
     config = Config.from_default(storage_class=StorageClass.CLOUD)
     portia = Portia(config=config)
     messages: list[str] = []
@@ -342,7 +342,7 @@ def test_plan_v2_conditionals_nested_branches_else_if() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: True)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -392,7 +392,7 @@ def test_plan_v2_unclosed_conditionals() -> None:
     """Test that an unclosed conditional branch in a PlanBuilder raises an error."""
     with pytest.raises(PlanBuilderError):
         (
-            PlanBuilderV2(label="Evaluate arbitrary conditionals")
+            PlanBuilder(label="Evaluate arbitrary conditionals")
             .if_(condition=lambda: True)
             .function_step(
                 function=lambda: None,
@@ -405,7 +405,7 @@ def test_plan_v2_unclosed_conditionals_complex() -> None:
     """Test that an unclosed conditional branch in a PlanBuilder raises an error."""
     with pytest.raises(PlanBuilderError):
         (
-            PlanBuilderV2(label="Evaluate arbitrary conditionals")
+            PlanBuilder(label="Evaluate arbitrary conditionals")
             .if_(condition=lambda: True)
             .function_step(
                 function=lambda: None,
@@ -451,7 +451,7 @@ def test_plan_v2_else_if_before_if_raises_error() -> None:
     """Test that using else_if before if raises a PlanBuilderError."""
     with pytest.raises(PlanBuilderError):
         (
-            PlanBuilderV2(label="Invalid conditional order")
+            PlanBuilder(label="Invalid conditional order")
             .else_if_(condition=lambda: True)
             .function_step(function=lambda: None)
             .build()
@@ -462,7 +462,7 @@ def test_plan_v2_else_before_if_raises_error() -> None:
     """Test that using else before if raises a PlanBuilderError."""
     with pytest.raises(PlanBuilderError):
         (
-            PlanBuilderV2(label="Invalid conditional order")
+            PlanBuilder(label="Invalid conditional order")
             .else_()
             .function_step(function=lambda: None)
             .build()
@@ -473,7 +473,7 @@ def test_plan_v2_endif_before_if_raises_error() -> None:
     """Test that using endif before if raises a PlanBuilderError."""
     with pytest.raises(PlanBuilderError):
         (
-            PlanBuilderV2(label="Invalid conditional order")
+            PlanBuilder(label="Invalid conditional order")
             .endif()
             .function_step(function=lambda: None)
             .build()
@@ -490,7 +490,7 @@ def test_plan_v2_conditional_if_without_else_if() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -523,7 +523,7 @@ def test_plan_v2_conditional_if_without_else() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -556,7 +556,7 @@ def test_plan_v2_conditional_if_without_else_if_or_else() -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=lambda: False)
         .function_step(
             function=lambda: record_func("if_[0]"),
@@ -576,7 +576,7 @@ def test_plan_v2_conditional_if_without_else_if_or_else() -> None:
 
 
 def test_plan_v2_legacy_condition_string() -> None:
-    """Test PlanV2 Legacy Condition String."""
+    """Test Plan Legacy Condition String."""
 
     def dummy(message: str) -> None:
         pass
@@ -585,7 +585,7 @@ def test_plan_v2_legacy_condition_string() -> None:
         return True
 
     plan = (
-        PlanBuilderV2(label="Evaluate arbitrary conditionals")
+        PlanBuilder(label="Evaluate arbitrary conditionals")
         .if_(condition=evals_true)  # None
         .function_step(
             function=lambda: dummy("if_[0]"),
@@ -661,7 +661,7 @@ def test_conditional_plan_with_record_functions(input_value: int, expected_outpu
         return input_value - 1
 
     plan = (
-        PlanBuilderV2()
+        PlanBuilder()
         .input(name="number_input", description="An integer to process")
         .if_(
             condition=lambda number_input: number_input > 5,
@@ -718,7 +718,7 @@ class TestClarificationHandler(ClarificationHandler):
 
 
 def test_plan_v2_with_tool_clarification() -> None:
-    """Test PlanV2 with a tool that requires clarification handling."""
+    """Test Plan with a tool that requires clarification handling."""
     portia = Portia(
         config=Config.from_default(
             default_log_level=LogLevel.DEBUG,
@@ -727,7 +727,7 @@ def test_plan_v2_with_tool_clarification() -> None:
     )
 
     plan = (
-        PlanBuilderV2()
+        PlanBuilder()
         # This step will throw a clarification as there are two poem.txt in the repo
         .single_tool_agent_step(
             tool="file_reader_tool",
@@ -846,7 +846,7 @@ async def test_example_builder_plan_scenarios(
         return price * int(purchase_quantity)
 
     plan = (
-        PlanBuilderV2("Buy some gold")
+        PlanBuilder("Buy some gold")
         .input(
             name="country", description="The country to purchase the gold in", default_value="UK"
         )
@@ -967,7 +967,7 @@ def test_plan_v2_input_linking_with_add_sub_plan() -> None:
 
     # Create sub-plan with 4 inputs (2 with defaults, 2 without)
     sub_plan = (
-        PlanBuilderV2("Sub-plan with multiple inputs")
+        PlanBuilder("Sub-plan with multiple inputs")
         .input(name="sub_input_no_default_1", description="Sub input 1 without default")
         .input(name="sub_input_no_default_2", description="Sub input 2 without default")
         .input(
@@ -989,7 +989,7 @@ def test_plan_v2_input_linking_with_add_sub_plan() -> None:
 
     # Create top-level plan with 2 inputs (1 with default, 1 without)
     plan = (
-        PlanBuilderV2("Top-level plan with input linking")
+        PlanBuilder("Top-level plan with input linking")
         .input(name="top_input_no_default", description="Top input without default")
         .input(
             name="top_input_with_default",
@@ -1062,7 +1062,7 @@ def test_plan_v2_input_linking_with_add_sub_plan() -> None:
 
 
 def test_plan_v2_while_loop_conditional_simple(local_portia: Portia) -> None:
-    """Test PlanV2 conditional loop - simple case that runs once."""
+    """Test Plan conditional loop - simple case that runs once."""
     messages: list[str] = []
     counter = 0
 
@@ -1076,7 +1076,7 @@ def test_plan_v2_while_loop_conditional_simple(local_portia: Portia) -> None:
         return counter < 2  # Run once
 
     plan = (
-        PlanBuilderV2(label="Test while loop")
+        PlanBuilder(label="Test while loop")
         .function_step(
             function=lambda: record_func("before_loop"),
         )
@@ -1111,7 +1111,7 @@ def test_plan_v2_while_loop_conditional_simple(local_portia: Portia) -> None:
 
 
 def test_plan_v2_while_loop_conditional_false(local_portia: Portia) -> None:
-    """Test PlanV2 conditional loop - condition is false."""
+    """Test Plan conditional loop - condition is false."""
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1122,7 +1122,7 @@ def test_plan_v2_while_loop_conditional_false(local_portia: Portia) -> None:
         return False
 
     plan = (
-        PlanBuilderV2(label="Test while loop that is false")
+        PlanBuilder(label="Test while loop that is false")
         .function_step(
             function=lambda: record_func("before_loop"),
         )
@@ -1147,7 +1147,7 @@ def test_plan_v2_while_loop_conditional_false(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_for_each_simple(local_portia: Portia) -> None:
-    """Test PlanV2 for-each loop with simple list."""
+    """Test Plan for-each loop with simple list."""
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1157,7 +1157,7 @@ def test_plan_v2_loop_for_each_simple(local_portia: Portia) -> None:
         return ["apple", "banana", "cherry"]
 
     plan = (
-        PlanBuilderV2(label="Test for-each loop")
+        PlanBuilder(label="Test for-each loop")
         .function_step(
             function=generate_list,
             step_name="generate_items",
@@ -1191,7 +1191,7 @@ def test_plan_v2_loop_for_each_simple(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_for_each_empty_list(local_portia: Portia) -> None:
-    """Test PlanV2 for-each loop with empty list."""
+    """Test Plan for-each loop with empty list."""
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1201,7 +1201,7 @@ def test_plan_v2_loop_for_each_empty_list(local_portia: Portia) -> None:
         return []
 
     plan = (
-        PlanBuilderV2(label="Test for-each loop with empty list")
+        PlanBuilder(label="Test for-each loop with empty list")
         .function_step(
             function=generate_empty_list,
             step_name="generate_items",
@@ -1230,7 +1230,7 @@ def test_plan_v2_loop_for_each_empty_list(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
-    """Test PlanV2 nested conditional loops."""
+    """Test Plan nested conditional loops."""
     messages: list[str] = []
     outer_counter = 0
     inner_counter = 0
@@ -1251,7 +1251,7 @@ def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
         return inner_counter < 2  # Run once per outer iteration
 
     plan = (
-        PlanBuilderV2(label="Test nested conditional loops")
+        PlanBuilder(label="Test nested conditional loops")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1307,14 +1307,14 @@ def test_plan_v2_loop_nested_conditional(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_inside_conditional(local_portia: Portia) -> None:
-    """Test PlanV2 loop inside conditional block."""
+    """Test Plan loop inside conditional block."""
     messages: list[str] = []
 
     def record_func(message: str) -> None:
         messages.append(message)
 
     plan = (
-        PlanBuilderV2(label="Test loop inside conditional")
+        PlanBuilder(label="Test loop inside conditional")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1364,7 +1364,7 @@ def test_plan_v2_loop_inside_conditional(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
-    """Test PlanV2 conditional loop with arguments."""
+    """Test Plan conditional loop with arguments."""
     messages: list[str] = []
     counter = 0
 
@@ -1378,7 +1378,7 @@ def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
         return counter < 3  # Run twice
 
     plan = (
-        PlanBuilderV2(label="Test conditional loop with args")
+        PlanBuilder(label="Test conditional loop with args")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1410,7 +1410,7 @@ def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_with_all_step_outputs(local_portia: Portia) -> None:
-    """Test PlanV2 conditional loop with arguments."""
+    """Test Plan conditional loop with arguments."""
     messages: list[str] = []
     counter = 0
     final_items: list = []
@@ -1432,7 +1432,7 @@ def test_plan_v2_loop_with_all_step_outputs(local_portia: Portia) -> None:
         return counter < 3  # Run twice
 
     plan = (
-        PlanBuilderV2(label="Test conditional loop with args")
+        PlanBuilder(label="Test conditional loop with args")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1467,7 +1467,7 @@ def test_plan_v2_loop_with_all_step_outputs(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_with_all_step_outputs_path(local_portia: Portia) -> None:
-    """Test PlanV2 conditional loop with arguments."""
+    """Test Plan conditional loop with arguments."""
     messages: list[str] = []
     counter = 0
     final_items: list = []
@@ -1491,7 +1491,7 @@ def test_plan_v2_loop_with_all_step_outputs_path(local_portia: Portia) -> None:
         return counter < 3  # Run twice
 
     plan = (
-        PlanBuilderV2(label="Test conditional loop with args")
+        PlanBuilder(label="Test conditional loop with args")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1526,7 +1526,7 @@ def test_plan_v2_loop_with_all_step_outputs_path(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
-    """Test PlanV2 conditional loop with string condition."""
+    """Test Plan conditional loop with string condition."""
     messages: list[str] = []
     counter = 0
 
@@ -1540,7 +1540,7 @@ def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
         return counter
 
     plan = (
-        PlanBuilderV2(label="Test conditional loop with string condition")
+        PlanBuilder(label="Test conditional loop with string condition")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1565,7 +1565,7 @@ def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
 
 
 def test_plan_v2_loop_complex_nested_structure(local_portia: Portia) -> None:
-    """Test PlanV2 complex nested structure with loops and conditionals."""
+    """Test Plan complex nested structure with loops and conditionals."""
     messages: list[str] = []
 
     def record_func(message: str) -> None:
@@ -1581,7 +1581,7 @@ def test_plan_v2_loop_complex_nested_structure(local_portia: Portia) -> None:
         return num > 0
 
     plan = (
-        PlanBuilderV2(label="Test complex nested loops and conditionals")
+        PlanBuilder(label="Test complex nested loops and conditionals")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1652,7 +1652,7 @@ def test_plan_v2_while_loop_condition_checked_first(local_portia: Portia) -> Non
         return False  # Always false, so body should never execute
 
     plan = (
-        PlanBuilderV2(label="Test while loop - condition checked first")
+        PlanBuilder(label="Test while loop - condition checked first")
         .function_step(
             function=lambda: record_func("before_while"),
         )
@@ -1691,7 +1691,7 @@ def test_plan_v2_do_while_loop_condition_checked_after(local_portia: Portia) -> 
         return False  # False after first check, but body should execute once
 
     plan = (
-        PlanBuilderV2(label="Test do_while loop - body executes first")
+        PlanBuilder(label="Test do_while loop - body executes first")
         .function_step(
             function=lambda: record_func("before_do_while"),
         )
@@ -1735,7 +1735,7 @@ def test_plan_v2_while_loop_with_args(local_portia: Portia) -> None:
         return counter < 3  # Run twice
 
     plan = (
-        PlanBuilderV2(label="Test while loop with arguments")
+        PlanBuilder(label="Test while loop with arguments")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1781,7 +1781,7 @@ def test_plan_v2_do_while_loop_with_args(local_portia: Portia) -> None:
         return counter < 3  # Run twice
 
     plan = (
-        PlanBuilderV2(label="Test do_while loop with arguments")
+        PlanBuilder(label="Test do_while loop with arguments")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1828,7 +1828,7 @@ def test_plan_v2_do_while_loop_string_condition(local_portia: Portia) -> None:
         return counter
 
     plan = (
-        PlanBuilderV2(label="Test do_while loop with string condition")
+        PlanBuilder(label="Test do_while loop with string condition")
         .function_step(
             function=lambda: record_func("start"),
         )
@@ -1876,7 +1876,7 @@ async def test_react_agent_weather_research_and_poem(
         germany_capital_weather: str
 
     plan = (
-        PlanBuilderV2("Research weather in European capitals and write a poem")
+        PlanBuilder("Research weather in European capitals and write a poem")
         .react_agent_step(
             task=(
                 "Find the current weather in the capitals of the United Kingdom, France, "
@@ -1979,7 +1979,7 @@ async def test_react_agent_weather_with_clarifications() -> None:
     )
 
     plan = (
-        PlanBuilderV2("Get weather for capital city")
+        PlanBuilder("Get weather for capital city")
         .react_agent_step(
             task="Find the current weather in the capital of the provided country",
             tools=["search_tool", "weather_tool"],

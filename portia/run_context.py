@@ -1,14 +1,14 @@
-"""Context for a PlanV2 run."""
+"""Context for a Plan run."""
 
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.plan_v2 import PlanV2
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_hooks import ExecutionHooks
 from portia.plan import Plan
+from portia.plan import Plan as PlanV2
 from portia.plan_run import PlanRun
 from portia.storage import Storage
 from portia.telemetry.telemetry_service import BaseProductTelemetry

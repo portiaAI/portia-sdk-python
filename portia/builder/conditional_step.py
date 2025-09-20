@@ -12,7 +12,7 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.reference import Reference  # noqa: TC001
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as StepV2
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -26,7 +26,7 @@ from portia.execution_agents.conditional_evaluation_agent import ConditionalEval
 from portia.plan import Step
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.plan import Plan as PlanV2
     from portia.run_context import RunContext
 
 
