@@ -271,7 +271,7 @@ class BrowserTool(Tool[str | BaseModel]):
         if v is None:
             return v
         if not isinstance(v, list):
-            raise ValueError("allowed_domains must be a list of domain strings")
+            raise TypeError("allowed_domains must be a list of domain strings")
         validated = []
         for domain in v:
             if not isinstance(domain, str) or not domain.strip():
