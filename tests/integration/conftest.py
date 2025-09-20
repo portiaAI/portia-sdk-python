@@ -98,7 +98,7 @@ def integration_portia() -> Portia:
     # Create config with memory storage to avoid cloud dependencies
     config = Config.from_default(
         storage_class=StorageClass.MEMORY,
-        portia_api_key=None,  # Disable cloud features  
+        portia_api_key=None,  # Disable cloud features
         default_log_level="DEBUG",
         default_model="openai/gpt-4.1",  # Use valid OpenAI model
     )

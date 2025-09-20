@@ -43,7 +43,7 @@ CORE_PROVIDERS = [
     ),
 ]
 
-# Only test OpenAI to avoid API key issues in integration tests  
+# Only test OpenAI to avoid API key issues in integration tests
 PLANNING_PROVIDERS = [
     (
         LLMProvider.OPENAI,
