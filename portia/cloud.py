@@ -46,7 +46,7 @@ class PortiaCloudClient:
         return httpx.Client(
             base_url=config.must_get("portia_api_endpoint", str),
             headers=headers,
-            timeout=httpx.Timeout(60),
+            timeout=httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=120.0),
             limits=httpx.Limits(max_connections=10),
         )
 
@@ -75,6 +75,6 @@ class PortiaCloudClient:
         return httpx.AsyncClient(
             base_url=self.config.must_get("portia_api_endpoint", str),
             headers=headers,
-            timeout=httpx.Timeout(60),
+            timeout=httpx.Timeout(connect=10.0, read=60.0, write=60.0, pool=120.0),
             limits=httpx.Limits(max_connections=10),
         )

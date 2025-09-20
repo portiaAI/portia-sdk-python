@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Literal
+from typing import Any, Literal, cast
 
-from google.genai import types
+try:  # Optional dependency for runtime
+    from google.genai import types  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover
+    types = cast(Any, object())
 from langsmith import run_helpers
 
 from portia.logger import logger
-
-if TYPE_CHECKING:
-    from google import genai
 
 
 def _get_ls_params(model_name: str, _: dict) -> dict[str, str]:
@@ -24,7 +24,7 @@ def _get_ls_params(model_name: str, _: dict) -> dict[str, str]:
 
 
 def _process_outputs(
-    outputs: types.GenerateContentResponse,
+    outputs: Any,
 ) -> dict[str, list[dict[str, str]]]:
     """Process outputs for tracing."""
     try:
@@ -43,7 +43,7 @@ def _process_outputs(
         return {"messages": []}  # pragma: no cover
 
 
-def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) -> list[str]:  # noqa: C901, PLR0911
+def _extract_parts(content_item: Any) -> list[str]:  # noqa: C901, PLR0911
     """Handle extracting content from response."""
     # Case 1: list of parts (Part, PartDict-like dict, or str)
     if isinstance(content_item, list):
@@ -51,24 +51,24 @@ def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) ->
         for p in content_item:
             if isinstance(p, str):
                 result.append(p)
-            elif isinstance(p, types.Part):
+            elif hasattr(types, "Part") and isinstance(p, types.Part):
                 result.append(p.text or "")
             elif isinstance(p, dict) and "text" in p:
                 result.append(str(p["text"]) or "")
         return result
 
     # Case 2: Content object with .parts
-    if isinstance(content_item, types.Content):
+    if hasattr(types, "Content") and isinstance(content_item, types.Content):
         result = []
         if not content_item.parts:
             return []
         for p in content_item.parts:
-            if isinstance(p, types.Part):
+            if hasattr(types, "Part") and isinstance(p, types.Part):
                 result.append(p.text or "")
         return result
 
     # Case 3: single Part or dict
-    if isinstance(content_item, types.Part):
+    if hasattr(types, "Part") and isinstance(content_item, types.Part):
         return [content_item.text or ""]
     if isinstance(content_item, dict) and "parts" in content_item:
         return [str(content_item["parts"]) or ""]
@@ -81,7 +81,7 @@ def _extract_parts(content_item: types.ContentUnion | types.ContentUnionDict) ->
 
 
 def _process_inputs(
-    inputs: dict[Literal["contents"], types.ContentListUnion | types.ContentListUnionDict],
+    inputs: dict[Literal["contents"], Any],
 ) -> dict[str, list[dict[str, str]]]:
     """Process inputs for tracing compatible with the genai package."""
     try:
@@ -102,11 +102,11 @@ def _process_inputs(
 
         return {"messages": [{"content": part} for part in parts]}
 
-    except Exception:  # pragma: no cover  # noqa: BLE001
+    except Exception:  # pragma: no cover
         return {"messages": []}  # pragma: no cover
 
 
-def wrap_gemini(client: genai.Client) -> genai.Client:  # pyright: ignore[reportPrivateImportUsage]
+def wrap_gemini(client: Any) -> Any:  # pyright: ignore[reportPrivateImportUsage,reportMissingTypeStubs]
     """Wrap a Google Generative AI model to enable LangSmith tracing."""
     original_generate_content = client.models.generate_content
 
@@ -127,7 +127,7 @@ def wrap_gemini(client: genai.Client) -> genai.Client:  # pyright: ignore[report
         )
         try:
             return decorator(original_generate_content)(model, contents, config)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # We should never fail because of tracing, so fall back to calling the original method
             logger().error(f"Error tracing Google Generative AI: {e}")
             return original_generate_content(model, contents, config)  # type: ignore  # noqa: PGH003

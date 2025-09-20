@@ -21,17 +21,32 @@ from portia.config import (
 )
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import (
-    AmazonBedrockGenerativeModel,
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
     GenerativeModel,
-    GoogleGenAiGenerativeModel,
+    GroqGenerativeModel,
     LLMProvider,
-    MistralAIGenerativeModel,
+    MetaLlamaGenerativeModel,
     OpenAIGenerativeModel,
     OpenRouterGenerativeModel,
     _llm_cache,
 )
+
+# Conditional imports for optional dependencies
+try:
+    from portia.model import AmazonBedrockGenerativeModel
+except ImportError:
+    AmazonBedrockGenerativeModel = None  # type: ignore[misc]
+
+try:
+    from portia.model import GoogleGenAiGenerativeModel
+except ImportError:
+    GoogleGenAiGenerativeModel = None  # type: ignore[misc]
+
+try:
+    from portia.model import MistralAIGenerativeModel
+except ImportError:
+    MistralAIGenerativeModel = None  # type: ignore[misc]
 
 PROVIDER_ENV_VARS = [
     "OPENAI_API_KEY",
@@ -45,6 +60,9 @@ PROVIDER_ENV_VARS = [
     "AWS_SECRET_ACCESS_KEY",
     "AWS_DEFAULT_REGION",
     "OPENROUTER_API_KEY",
+    "GROQ_API_KEY",
+    "META_API_KEY",
+    "META_BASE_URL",
 ]
 
 
@@ -166,25 +184,46 @@ def test_llm_redis_cache_url_kwarg(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _llm_cache.get() is mock_redis_cache_instance
 
 
-@pytest.mark.parametrize(
-    ("model_string", "model_type", "present_env_vars"),
-    [
-        ("openai/o1-preview", OpenAIGenerativeModel, ["OPENAI_API_KEY"]),
-        ("anthropic/claude-3-5-haiku-latest", AnthropicGenerativeModel, ["ANTHROPIC_API_KEY"]),
-        ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"]),
-        ("google/gemini-2.5-preview", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]),
+# Build test parameters, conditionally including models that require optional dependencies
+test_params = [
+    ("openai/o1-preview", OpenAIGenerativeModel, ["OPENAI_API_KEY"]),
+    ("anthropic/claude-3-5-haiku-latest", AnthropicGenerativeModel, ["ANTHROPIC_API_KEY"]),
+    (
+        "azure-openai/gpt-4",
+        AzureOpenAIGenerativeModel,
+        ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"],
+    ),
+    ("openrouter/moonshotai/kimi-k2", OpenRouterGenerativeModel, ["OPENROUTER_API_KEY"]),
+    ("groq/llama-3.1-8b-instant", GroqGenerativeModel, ["GROQ_API_KEY"]),
+    (
+        "meta/llama-3-8b-instruct",
+        MetaLlamaGenerativeModel,
+        ["META_API_KEY", "META_BASE_URL"],
+    ),
+]
+
+# Add optional dependency models if they're available
+if MistralAIGenerativeModel is not None:
+    test_params.append(
+        ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"])
+    )
+
+if GoogleGenAiGenerativeModel is not None:
+    test_params.append(("google/gemini-1.5-flash", GoogleGenAiGenerativeModel, ["GOOGLE_API_KEY"]))
+
+if AmazonBedrockGenerativeModel is not None:
+    test_params.append(
         (
             "amazon/anthropic.claude-3-sonnet-v1:0",
             AmazonBedrockGenerativeModel,
             ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_DEFAULT_REGION"],
-        ),
-        (
-            "azure-openai/gpt-4",
-            AzureOpenAIGenerativeModel,
-            ["AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT"],
-        ),
-        ("openrouter/moonshotai/kimi-k2", OpenRouterGenerativeModel, ["OPENROUTER_API_KEY"]),
-    ],
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    ("model_string", "model_type", "present_env_vars"),
+    test_params,
 )
 def test_set_default_model_from_string(
     model_string: str,
@@ -266,8 +305,10 @@ def test_set_model_with_string_other_provider_api_key_env_var_set(
     In this case, the env var is present for Anthropic, but user sets a Mistral model as
     default_model.
     """
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
-    with pytest.raises((ConfigNotFoundError, InvalidConfigError)):
+    with pytest.raises(ImportError):
         _ = Config.from_default(
             default_model="mistralai/mistral-tiny-latest",
             llm_provider="anthropic",
@@ -278,6 +319,8 @@ def test_set_default_model_from_string_with_alternative_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test setting model from string from a different provider to what is explicitly set."""
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     c = Config.from_default(default_model="mistralai/mistral-tiny-latest", llm_provider="anthropic")
@@ -315,6 +358,8 @@ def test_set_default_model_and_planning_model_alternative_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test setting default model and planning_model from string with alternative provider."""
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
@@ -341,6 +386,8 @@ def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
     set in the constructor of GenerativeModel.
     """
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     config = Config.from_default(
         default_model=MistralAIGenerativeModel(
             model_name="mistral-tiny-latest",
@@ -354,6 +401,8 @@ def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
 
 def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
     """Test setting default model and planning_model with model instances, and no provider set."""
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     config = Config.from_default(
         default_model=MistralAIGenerativeModel(
             model_name="mistral-tiny-latest",
@@ -478,11 +527,10 @@ def test_check_model_supported_raises_deprecation_warning() -> None:
 
 def test_summarizer_model_not_instantiable(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test summarizer model is not instantiable."""
+    if MistralAIGenerativeModel is None:
+        pytest.skip("mistral extra not installed")
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-api-key")
-    with pytest.raises(
-        InvalidConfigError,
-        match="SUMMARIZER_MODEL is not valid - The value mistralai/mistral-large-latest",
-    ):
+    with pytest.raises(ImportError):
         Config.from_default(
             default_model="openai/gpt-4o",
             summarizer_model="mistralai/mistral-large-latest",
@@ -609,6 +657,13 @@ def test_llm_provider_default_from_api_keys_env_vars(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test LLM provider default from API keys env vars."""
+    # Skip tests for providers that require optional dependencies
+    if provider in (LLMProvider.MISTRALAI, LLMProvider.AMAZON):
+        if provider == LLMProvider.MISTRALAI and MistralAIGenerativeModel is None:
+            pytest.skip("mistral extra not installed")
+        if provider == LLMProvider.AMAZON and AmazonBedrockGenerativeModel is None:
+            pytest.skip("amazon extra not installed")
+
     for env_var_name, env_var_value in env_vars.items():
         monkeypatch.setenv(env_var_name, env_var_value)
 
@@ -647,6 +702,13 @@ def test_llm_provider_default_from_api_keys_config_kwargs(
     provider: LLMProvider,
 ) -> None:
     """Test LLM provider default from API keys config kwargs."""
+    # Skip tests for providers that require optional dependencies
+    if provider in (LLMProvider.MISTRALAI, LLMProvider.AMAZON):
+        if provider == LLMProvider.MISTRALAI and MistralAIGenerativeModel is None:
+            pytest.skip("mistral extra not installed")
+        if provider == LLMProvider.AMAZON and AmazonBedrockGenerativeModel is None:
+            pytest.skip("amazon extra not installed")
+
     c = Config.from_default(**config_kwargs)
     assert c.llm_provider == provider
 

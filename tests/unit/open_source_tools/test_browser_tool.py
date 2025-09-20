@@ -6,11 +6,17 @@ import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from browser_use import Browser
+
+try:
+    from browser_use import Browser  # pyright: ignore[reportMissingImports]
+except Exception:  # pragma: no cover
+    Browser = object  # type: ignore[assignment]
 from pydantic import BaseModel, Field, HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
 from portia.end_user import EndUser
+
+# BrowserInfrastructureProviderBrowserBase is only available when browserbase is installed
 from portia.open_source_tools.browser_tool import (
     BrowserInfrastructureOption,
     BrowserInfrastructureProvider,
