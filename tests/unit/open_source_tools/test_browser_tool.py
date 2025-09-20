@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from portia import ActionClarification, ToolHardError, ToolRunContext
 from portia.end_user import EndUser
+
+# BrowserInfrastructureProviderBrowserBase is only available when browserbase is installed
 from portia.open_source_tools.browser_tool import (
     BrowserInfrastructureOption,
     BrowserInfrastructureProvider,

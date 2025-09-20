@@ -42,6 +42,10 @@ dependencies = [
     "google-genai>=1.18.0",
     "pydash>=8.0.0,<9",
     "langchain-redis>=0.2.3",
+    "groq>=0.31.0",
+    "mistralai>=1.9.6",
+    "browserbase>=1.4.0",
+    "browser-use==0.1.40",
 ]
 
 [project.optional-dependencies]
