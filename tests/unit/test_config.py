@@ -205,7 +205,7 @@ test_params = [
 # Add optional dependency models if they're available
 if MistralAIGenerativeModel is not None:
     test_params.append(
-        ("mistralai/mistral-tiny-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"])
+        ("mistralai/mistral-large-latest", MistralAIGenerativeModel, ["MISTRAL_API_KEY"])
     )
 
 if GoogleGenAiGenerativeModel is not None:
@@ -310,7 +310,7 @@ def test_set_model_with_string_other_provider_api_key_env_var_set(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     with pytest.raises(ImportError):
         _ = Config.from_default(
-            default_model="mistralai/mistral-tiny-latest",
+            default_model="mistralai/mistral-large-latest",
             llm_provider="anthropic",
         )
 
@@ -323,10 +323,10 @@ def test_set_default_model_from_string_with_alternative_provider(
         pytest.skip("mistral extra not installed")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
-    c = Config.from_default(default_model="mistralai/mistral-tiny-latest", llm_provider="anthropic")
+    c = Config.from_default(default_model="mistralai/mistral-large-latest", llm_provider="anthropic")
     model = c.get_default_model()
     assert isinstance(model, MistralAIGenerativeModel)
-    assert str(model) == "mistralai/mistral-tiny-latest"
+    assert str(model) == "mistralai/mistral-large-latest"
 
     model = c.get_planning_model()
     assert isinstance(model, AnthropicGenerativeModel)
@@ -364,13 +364,13 @@ def test_set_default_model_and_planning_model_alternative_provider(
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
     monkeypatch.setenv("GOOGLE_API_KEY", "test-google-key")
     c = Config.from_default(
-        default_model="mistralai/mistral-tiny-latest",
+        default_model="mistralai/mistral-large-latest",
         planning_model="google/gemini-1.5-flash",
         llm_provider="anthropic",
     )
     model = c.get_default_model()
     assert isinstance(model, MistralAIGenerativeModel)
-    assert str(model) == "mistralai/mistral-tiny-latest"
+    assert str(model) == "mistralai/mistral-large-latest"
 
     model = c.get_planning_model()
     assert isinstance(model, GoogleGenAiGenerativeModel)
@@ -390,13 +390,13 @@ def test_set_default_model_alternative_provider_missing_api_key_explicit_model(
         pytest.skip("mistral extra not installed")
     config = Config.from_default(
         default_model=MistralAIGenerativeModel(
-            model_name="mistral-tiny-latest",
+            model_name="mistral-large-latest",
             api_key=SecretStr("test-mistral-key"),
         ),
         llm_provider="anthropic",
     )
     assert isinstance(config.get_default_model(), MistralAIGenerativeModel)
-    assert str(config.get_default_model()) == "mistralai/mistral-tiny-latest"
+    assert str(config.get_default_model()) == "mistralai/mistral-large-latest"
 
 
 def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
@@ -405,7 +405,7 @@ def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
         pytest.skip("mistral extra not installed")
     config = Config.from_default(
         default_model=MistralAIGenerativeModel(
-            model_name="mistral-tiny-latest",
+            model_name="mistral-large-latest",
             api_key=SecretStr("test-mistral-key"),
         ),
         planning_model=OpenAIGenerativeModel(
@@ -414,7 +414,7 @@ def test_set_default_and_planner_model_with_instances_no_provider_set() -> None:
         ),
     )
     assert isinstance(config.get_default_model(), MistralAIGenerativeModel)
-    assert str(config.get_default_model()) == "mistralai/mistral-tiny-latest"
+    assert str(config.get_default_model()) == "mistralai/mistral-large-latest"
     assert isinstance(config.get_planning_model(), OpenAIGenerativeModel)
     assert str(config.get_planning_model()) == "openai/gpt-4o"
 
@@ -562,7 +562,7 @@ def test_config_model_in_kwargs_and_models_raises_error(monkeypatch: pytest.Monk
     with pytest.raises(InvalidConfigError):
         Config.from_default(
             default_model="openai/gpt-4o",
-            models={"default_model": "mistralai/mistral-tiny-latest"},
+            models={"default_model": "mistralai/mistral-large-latest"},
         )
 
 

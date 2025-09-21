@@ -31,7 +31,7 @@ class Response(BaseModel):
 
 # Only test OpenAI to avoid API key and dependency issues in integration tests
 MODELS = [
-    "openai/gpt-4.1",
+    "openai/gpt-4",
 ]
 
 # Skip low capability models that require optional dependencies
@@ -42,7 +42,11 @@ LOW_CAPABILITY_MODELS: list[str] = []
 def ollama_model() -> None:
     """Ensure Ollama model is available."""
     if ollama is not None:
-        ollama.pull("qwen2.5:0.5b")
+        try:
+            ollama.pull("qwen2.5:0.5b")
+        except Exception:
+            # Skip if Ollama is not running or model pull fails
+            pytest.skip("Ollama not available or model pull failed")
 
 
 @pytest.fixture(autouse=True)

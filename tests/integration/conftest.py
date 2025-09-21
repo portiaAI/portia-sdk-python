@@ -100,7 +100,7 @@ def integration_portia() -> Portia:
         storage_class=StorageClass.MEMORY,
         portia_api_key=None,  # Disable cloud features
         default_log_level="DEBUG",
-        default_model="openai/gpt-4.1",  # Use valid OpenAI model
+        default_model="openai/gpt-4",  # Use valid OpenAI model
     )
 
     # Create Portia instance
@@ -127,7 +127,7 @@ def mock_openai_globally() -> Any:  # noqa: ANN401
         def __init__(self, content: str = "Mock response from OpenAI") -> None:
             self.content = content
             self.id = "mock-123"
-            self.model = "gpt-4.1"
+            self.model = "gpt-4"
             self.object = "chat.completion"
 
         @property
@@ -156,6 +156,7 @@ def mock_openai_globally() -> Any:  # noqa: ANN401
                     return MockOpenAIResponse("Mock response from integration test")
 
                 async def acreate(self, **kwargs: Any) -> MockOpenAIResponse:  # noqa: ARG002
+                    # Return the mock response for async calls
                     return MockOpenAIResponse("Mock async response from integration test")
 
         chat = Chat()
@@ -170,6 +171,15 @@ def mock_openai_globally() -> Any:  # noqa: ANN401
         mock_instance = MagicMock()
         mock_instance.invoke.return_value.content = "Mock LangChain response"
         mock_instance.ainvoke.return_value.content = "Mock async LangChain response"
+
+        # Mock the async client to avoid the await issue
+        async def mock_async_create(**kwargs):
+            # Return a coroutine that returns the mock response
+            return MockOpenAIResponse("Mock async response from integration test")
+
+        mock_instance.async_client = MagicMock()
+        mock_instance.async_client.create = mock_async_create
+
         mock_chat_openai.return_value = mock_instance
 
         yield
