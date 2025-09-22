@@ -94,7 +94,8 @@ from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Ste
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
-from portia.portia import ExecutionHooks, Portia
+from portia.client import PortiaClient as Portia
+from portia.portia import ExecutionHooks
 
 # Tool related classes
 from portia.tool import Tool, ToolRunContext
