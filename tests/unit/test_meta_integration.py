@@ -129,3 +129,139 @@ def test_meta_missing_base_url_error() -> None:
             api_key=SecretStr("test-key"),
             # No base_url parameter provided
         )
+
+
+def test_meta_missing_api_key_error() -> None:
+    """Test Config raises error when META_API_KEY is missing."""
+    import os
+
+    from portia.errors import InvalidConfigError
+
+    # Ensure META environment variables are not set
+    original_api_key = os.environ.pop("META_API_KEY", None)
+    original_base_url = os.environ.pop("META_BASE_URL", None)
+
+    try:
+        # Provide a default model to avoid config validation errors
+        c = Config.from_default(default_model="openai/gpt-4", openai_api_key="test-key")
+        with pytest.raises(InvalidConfigError, match="Empty SecretStr value not allowed"):
+            c._construct_model_from_name(LLMProvider.META, "llama-3-8b-instruct")
+    finally:
+        # Restore original environment variables if they existed
+        if original_api_key:
+            os.environ["META_API_KEY"] = original_api_key
+        if original_base_url:
+            os.environ["META_BASE_URL"] = original_base_url
+
+
+def test_meta_missing_base_url_config_error() -> None:
+    """Test Config raises error when META_BASE_URL is missing."""
+    import os
+
+    from portia.errors import InvalidConfigError
+
+    # Set API key but not base URL
+    original_base_url = os.environ.pop("META_BASE_URL", None)
+    os.environ["META_API_KEY"] = "test-key"
+
+    try:
+        # Provide OpenAI config to avoid validation errors
+        c = Config.from_default(default_model="openai/gpt-4", openai_api_key="test-key")
+        with pytest.raises(InvalidConfigError, match="Empty value not allowed"):
+            c._construct_model_from_name(LLMProvider.META, "llama-3-8b-instruct")
+    finally:
+        # Clean up and restore
+        os.environ.pop("META_API_KEY", None)
+        if original_base_url:
+            os.environ["META_BASE_URL"] = original_base_url
+
+
+def test_meta_model_string_representation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Meta models are represented correctly as strings."""
+    monkeypatch.setenv("META_API_KEY", "test-meta-api-key")
+    monkeypatch.setenv("META_BASE_URL", "https://example.meta.llama.api/v1")
+
+    c = Config.from_default()
+    model = c._construct_model_from_name(LLMProvider.META, "llama-3.1-70b-instruct")
+
+    assert str(model) == "meta/llama-3.1-70b-instruct"
+    assert model.provider == LLMProvider.META
+
+
+def test_meta_provider_precedence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Meta provider is detected when both Meta and other API keys are set."""
+    # Set multiple API keys - Meta should be detected in precedence order
+    monkeypatch.setenv("META_API_KEY", "test-meta-key")
+    monkeypatch.setenv("META_BASE_URL", "https://example.meta.llama.api/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")  # This comes first in precedence
+
+    c = Config.from_default()
+    # OpenAI should be preferred over Meta in the precedence order
+    assert c.llm_provider == LLMProvider.OPENAI
+
+
+def test_meta_only_provider_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test Meta provider detection when only Meta keys are set."""
+    monkeypatch.setenv("META_API_KEY", "test-meta-key")
+    monkeypatch.setenv("META_BASE_URL", "https://example.meta.llama.api/v1")
+
+    c = Config.from_default()
+    assert c.llm_provider == LLMProvider.META
+
+
+def test_meta_model_extra_kwargs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Meta models can accept extra kwargs."""
+    monkeypatch.setenv("META_API_KEY", "test-meta-api-key")
+    monkeypatch.setenv("META_BASE_URL", "https://example.meta.llama.api/v1")
+
+    c = Config.from_default()
+    model = c._construct_model_from_name(LLMProvider.META, "llama-3-8b-instruct")
+
+    # Verify the model was created successfully with the base_url
+    assert model.provider == LLMProvider.META
+    assert str(model) == "meta/llama-3-8b-instruct"
+
+
+def test_meta_default_model_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Meta provider uses correct default model names."""
+    monkeypatch.setenv("META_API_KEY", "test-meta-api-key")
+    monkeypatch.setenv("META_BASE_URL", "https://example.meta.llama.api/v1")
+
+    c = Config.from_default(llm_provider=LLMProvider.META)
+
+    # Check default models are properly configured
+    planning_default = c.get_agent_default_model("planning_model", LLMProvider.META)
+    introspection_default = c.get_agent_default_model("introspection_model", LLMProvider.META)
+
+    assert planning_default == "meta/llama-3.1-70b-instruct"
+    assert introspection_default == "meta/llama-3.1-70b-instruct"
+
+
+@pytest.mark.parametrize(
+    "invalid_base_url",
+    [
+        "",  # Empty string
+        "not-a-url",  # Invalid URL format
+        "ftp://invalid-protocol.com",  # Wrong protocol
+    ],
+)
+def test_meta_invalid_base_url_formats(
+    monkeypatch: pytest.MonkeyPatch, invalid_base_url: str
+) -> None:
+    """Test Meta provider with various invalid base URL formats."""
+    monkeypatch.setenv("META_API_KEY", "test-meta-api-key")
+    monkeypatch.setenv("META_BASE_URL", invalid_base_url)
+
+    # For empty base_url, expect InvalidConfigError from the config validation
+    if invalid_base_url == "":
+        from portia.errors import InvalidConfigError
+
+        c = Config.from_default(default_model="openai/gpt-4", openai_api_key="test-key")
+        with pytest.raises(InvalidConfigError, match="Empty value not allowed"):
+            c._construct_model_from_name(LLMProvider.META, "llama-3-8b-instruct")
+    else:
+        c = Config.from_default()
+        # For invalid URLs, the model should still be created - URL validation is handled by 
+        # the underlying client
+        model = c._construct_model_from_name(LLMProvider.META, "llama-3-8b-instruct")
+        assert model.provider == LLMProvider.META

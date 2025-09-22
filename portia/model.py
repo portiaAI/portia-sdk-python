@@ -905,7 +905,9 @@ class GrokGenerativeModel(OpenAIGenerativeModel):
         # Initialize async instructor client with error handling
         try:
             self._instructor_client_async = instructor.from_openai(
-                client=AsyncOpenAI(api_key=api_key.get_secret_value(), base_url="https://api.x.ai/v1"),
+                client=AsyncOpenAI(
+                    api_key=api_key.get_secret_value(), base_url="https://api.x.ai/v1"
+                ),
                 mode=instructor.Mode.JSON,
             )
         except TypeError:

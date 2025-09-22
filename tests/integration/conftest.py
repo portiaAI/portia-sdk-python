@@ -173,7 +173,7 @@ def mock_openai_globally() -> Any:  # noqa: ANN401
         mock_instance.ainvoke.return_value.content = "Mock async LangChain response"
 
         # Mock the async client to avoid the await issue
-        async def mock_async_create(**kwargs):
+        async def mock_async_create(**kwargs: Any) -> MockOpenAIResponse:  # noqa: ARG001
             # Return a coroutine that returns the mock response
             return MockOpenAIResponse("Mock async response from integration test")
 

@@ -667,7 +667,7 @@ class Config(BaseModel):
                     case LLMProvider.GROQ:
                         return "groq/llama3-70b-8192"
                     case LLMProvider.META:
-                        return "meta/llama-3-40b-8192"
+                        return "meta/llama-3.1-70b-instruct"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -688,7 +688,7 @@ class Config(BaseModel):
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
                     case LLMProvider.META:
-                        return "meta/llama-3-40b-8192"
+                        return "meta/llama-3.1-70b-instruct"
                 return None
             case "default_model":
                 match llm_provider:
@@ -711,7 +711,7 @@ class Config(BaseModel):
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
                     case LLMProvider.META:
-                        return "meta/llama-3-40b-8192"
+                        return "meta/llama-3.1-70b-instruct"
                 return None
 
     @model_validator(mode="after")

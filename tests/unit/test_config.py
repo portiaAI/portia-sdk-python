@@ -323,7 +323,9 @@ def test_set_default_model_from_string_with_alternative_provider(
         pytest.skip("mistral extra not installed")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
     monkeypatch.setenv("MISTRAL_API_KEY", "test-mistral-key")
-    c = Config.from_default(default_model="mistralai/mistral-large-latest", llm_provider="anthropic")
+    c = Config.from_default(
+        default_model="mistralai/mistral-large-latest", llm_provider="anthropic"
+    )
     model = c.get_default_model()
     assert isinstance(model, MistralAIGenerativeModel)
     assert str(model) == "mistralai/mistral-large-latest"
