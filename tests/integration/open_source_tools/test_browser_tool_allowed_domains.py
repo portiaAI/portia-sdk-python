@@ -146,7 +146,7 @@ class TestBrowserToolAllowedDomainsIntegration:
 
         mock_agent_instance = AsyncMock()
         mock_agent_instance.run = AsyncMock()
-        
+
         # Create mock result with final_result that returns a string (not coroutine)
         mock_result = Mock()
         mock_result.final_result = Mock(return_value='{"task_output": "success"}')
@@ -222,8 +222,8 @@ class TestBrowserToolAllowedDomainsIntegration:
             mock_config.return_value = mock_config_instance
 
             # Fix: Ensure new_context_config doesn't exist initially
-            if hasattr(mock_config_instance, 'new_context_config'):
-                delattr(mock_config_instance, 'new_context_config')
+            if hasattr(mock_config_instance, "new_context_config"):
+                delattr(mock_config_instance, "new_context_config")
 
             provider.setup_browser(self.mock_ctx, None)
 
