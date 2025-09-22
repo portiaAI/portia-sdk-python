@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 
 from portia import Input, PlanBuilderV2, Portia, StepOutput
-from portia.cli import CLIExecutionHooks
 
 load_dotenv()
 
@@ -28,8 +27,8 @@ class FinalOutput(BaseModel):
     email_address: str
 
 
-# Initialize Portia with CLI hooks for interactive prompts and progress display
-portia = Portia(execution_hooks=CLIExecutionHooks())
+# Initialize Portia
+portia = Portia()
 
 # Build a multi-step plan using our plan builder
 plan = (

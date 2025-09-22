@@ -11,7 +11,6 @@ from portia import (
     Portia,
     example_tool_registry,
 )
-from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
 
 load_dotenv()
@@ -61,7 +60,6 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
 portia = Portia(
     Config.from_default(default_log_level=LogLevel.DEBUG),
     tools=example_tool_registry + InMemoryToolRegistry.from_local_tools([FileReaderTool()]),
-    execution_hooks=CLIExecutionHooks(),
 )
 plan_run = portia.run(
     "Read the poem.txt file and write a review of it",
