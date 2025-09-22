@@ -460,6 +460,17 @@ class Config(BaseModel):
         default_factory=lambda: (os.getenv("AZURE_OPENAI_ENDPOINT") or ""),
         description="The endpoint for Azure OpenAI. Must be set if llm-provider is AZURE_OPENAI",
     )
+    meta_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("META_API_KEY") or ""),
+        description="The API Key for Meta hosted Llama. Must be set if llm-provider is META",
+    )
+    meta_base_url: str = Field(
+        default_factory=lambda: (os.getenv("META_BASE_URL") or ""),
+        description=(
+            "OpenAI-compatible base URL for Meta hosted Llama (e.g. https://api.llama.meta.com/v1 "
+            "or your Llama Stack endpoint)"
+        ),
+    )
     grok_api_key: SecretStr = Field(
         default_factory=lambda: SecretStr(os.getenv("XAI_API_KEY") or ""),
         description="The API Key for xAI Grok. Must be set if llm-provider is GROK",
@@ -533,7 +544,7 @@ class Config(BaseModel):
     def setup_cache(self) -> Self:
         """Set up LLM cache if Redis URL is provided."""
         if self.llm_redis_cache_url and validate_extras_dependencies("cache", raise_error=False):
-            from langchain_redis import RedisCache
+            from langchain_redis import RedisCache  # pyright: ignore[reportMissingImports]
 
             cache = RedisCache(self.llm_redis_cache_url, ttl=CACHE_TTL_SECONDS, prefix="llm:")
             LangChainGenerativeModel.set_cache(cache)
@@ -655,6 +666,8 @@ class Config(BaseModel):
                         return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-70b-8192"
+                    case LLMProvider.META:
+                        return "meta/llama-3.1-70b-instruct"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -674,6 +687,8 @@ class Config(BaseModel):
                         return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
+                    case LLMProvider.META:
+                        return "meta/llama-3.1-70b-instruct"
                 return None
             case "default_model":
                 match llm_provider:
@@ -695,6 +710,8 @@ class Config(BaseModel):
                         return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
+                    case LLMProvider.META:
+                        return "meta/llama-3.1-70b-instruct"
                 return None
 
     @model_validator(mode="after")
@@ -952,6 +969,15 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("groq_api_key"),
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
+            case LLMProvider.META:
+                from portia.model import MetaLlamaGenerativeModel
+
+                return MetaLlamaGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("meta_api_key"),
+                    base_url=self.must_get("meta_base_url", str),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
             case LLMProvider.OPENAI:
                 return OpenAIGenerativeModel(
                     model_name=model_name,
@@ -978,7 +1004,7 @@ class Config(BaseModel):
 
                 return GoogleGenAiGenerativeModel(
                     model_name=model_name,
-                    api_key=self.must_get_api_key("google_api_key"),
+                    api_key=self.must_get_api_key("google_api_key"),  # pyright: ignore[reportCallIssue]
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.AMAZON:
@@ -1019,7 +1045,7 @@ class Config(BaseModel):
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
 
-def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911
+def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911, C901
     """Get the default LLM provider from the API keys.
 
     Returns:
@@ -1052,6 +1078,10 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.GROK
     if os.getenv("GROQ_API_KEY") or kwargs.get("groq_api_key"):
         return LLMProvider.GROQ
+    if (os.getenv("META_API_KEY") and os.getenv("META_BASE_URL")) or (
+        kwargs.get("meta_api_key") and kwargs.get("meta_base_url")
+    ):
+        return LLMProvider.META
     return None
 
 

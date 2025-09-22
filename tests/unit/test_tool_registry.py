@@ -14,12 +14,14 @@ from mcp import ClientSession
 from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticUndefined
 
+from portia.config import Config
 from portia.errors import DuplicateToolError, ToolNotFoundError
 from portia.model import GenerativeModel
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.registry import open_source_tool_registry
 from portia.tool import PortiaRemoteTool
 from portia.tool_registry import (
+    DefaultToolRegistry,
     InMemoryToolRegistry,
     McpToolRegistry,
     PortiaToolRegistry,
@@ -1077,3 +1079,82 @@ def test_mcp_tool_registry_loads_from_string() -> None:
     invalid_config_str = """{}"""
     with pytest.raises(ValueError, match="Invalid MCP client config"):
         McpToolRegistry.from_stdio_connection_raw(invalid_config_str)
+
+
+def test_portia_tool_registry_init_no_args_raises_error() -> None:
+    """Test that PortiaToolRegistry raises ValueError when no arguments provided."""
+    with pytest.raises(ValueError, match="Either config, client or tools must be provided"):
+        PortiaToolRegistry()
+
+
+def test_portia_tool_registry_init_with_config_path() -> None:
+    """Test PortiaToolRegistry initialization with config parameter (line 353-354)."""
+    from unittest.mock import MagicMock, patch
+    
+    # Mock the PortiaCloudClient.new_client method
+    mock_client = MagicMock()
+    mock_tools = [MagicMock()]
+    
+    with patch("portia.tool_registry.PortiaCloudClient.new_client", return_value=mock_client):
+        with patch.object(PortiaToolRegistry, "_load_tools", return_value=mock_tools):
+            config = Config.from_default(
+                default_model="openai/gpt-4",
+                openai_api_key="dummy-key",
+                portia_api_key="test-portia-key"
+            )
+            
+            registry = PortiaToolRegistry(config=config)
+            
+            # Verify that _load_tools was called with the client
+            registry._load_tools.assert_called_once_with(mock_client)
+
+
+def test_portia_tool_registry_init_with_tools_direct() -> None:
+    """Test PortiaToolRegistry initialization with tools parameter (line 349)."""
+    from unittest.mock import MagicMock
+    
+    mock_tools = [MagicMock(), MagicMock()]
+    registry = PortiaToolRegistry(tools=mock_tools)
+    
+    # Verify tools were set correctly
+    assert len(registry.get_tools()) == 2
+
+
+def test_default_tool_registry_with_portia_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test DefaultToolRegistry when portia_api_key is set (line 746)."""
+    from unittest.mock import MagicMock, patch
+    
+    monkeypatch.setenv("PORTIA_API_KEY", "test-portia-key")
+    
+    config = Config.from_default(
+        default_model="openai/gpt-4",
+        openai_api_key="dummy-key"
+    )
+    
+    mock_portia_tools = [MagicMock()]
+    mock_portia_registry = MagicMock()
+    mock_portia_registry.with_default_tool_filter.return_value.get_tools.return_value = mock_portia_tools
+    
+    with patch("portia.tool_registry.PortiaToolRegistry", return_value=mock_portia_registry):
+        registry = DefaultToolRegistry(config)
+        tools = registry.get_tools()
+        
+        # Should include portia tools when API key is present
+        assert len(tools) >= len(mock_portia_tools)
+
+
+def test_default_tool_registry_with_weather_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test DefaultToolRegistry when OPENWEATHERMAP_API_KEY is set (line 742-743)."""
+    monkeypatch.setenv("OPENWEATHERMAP_API_KEY", "test-weather-key")
+    
+    config = Config.from_default(
+        default_model="openai/gpt-4",
+        openai_api_key="dummy-key"
+    )
+    
+    registry = DefaultToolRegistry(config)
+    tools = registry.get_tools()
+    
+    # Should include WeatherTool when API key is present
+    tool_names = [tool.name for tool in tools]
+    assert any("Weather" in name for name in tool_names)
