@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -48,6 +49,7 @@ from portia.config import (
 from portia.end_user import EndUser
 from portia.errors import (
     InvalidPlanRunStateError,
+    LegacyPlanDeprecationError,
     PlanError,
     PlanNotFoundError,
     SkipExecutionError,
@@ -512,11 +514,46 @@ class Portia:
             f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
         )
 
+    def _is_legacy_plan(self, plan_uuid: PlanUUID) -> bool:
+        """Check if a plan UUID corresponds to a legacy plan.
+
+        This method checks for the presence of legacy plan files in the storage directory
+        to determine if a plan might be a legacy plan that's no longer supported.
+
+        Args:
+            plan_uuid: The UUID of the plan to check
+
+        Returns:
+            True if this appears to be a legacy plan, False otherwise
+        """
+        # Check if using disk-based storage and if a legacy plan file exists
+        from portia.storage import DiskFileStorage
+        if isinstance(self.storage, DiskFileStorage):
+            legacy_plan_path = Path(self.storage.storage_dir, f"{plan_uuid}.json")
+            if legacy_plan_path.exists():
+                # Try to determine if this is a legacy format by attempting to load it
+                # without going through the normal storage validation
+                try:
+                    import json
+                    with legacy_plan_path.open("r", encoding="utf-8") as f:
+                        plan_data = json.load(f)
+
+                    # Check for legacy format indicators (this is a heuristic)
+                    # Legacy plans might have different structure or missing required fields
+                    # For now, we'll assume any plan that fails normal validation might be legacy
+                    return True
+                except Exception:
+                    return False
+        return False
+
     def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
         """Load a plan from storage by UUID."""
         try:
             return self.storage.get_plan(plan_uuid)
         except Exception as e:
+            # Check if this might be a legacy plan before raising PlanNotFoundError
+            if self._is_legacy_plan(plan_uuid):
+                raise LegacyPlanDeprecationError(plan_uuid) from e
             raise PlanNotFoundError(plan_uuid) from e
 
     async def _aload_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
@@ -524,6 +561,9 @@ class Portia:
         try:
             return await self.storage.aget_plan(plan_uuid)
         except Exception as e:
+            # Check if this might be a legacy plan before raising PlanNotFoundError
+            if self._is_legacy_plan(plan_uuid):
+                raise LegacyPlanDeprecationError(plan_uuid) from e
             raise PlanNotFoundError(plan_uuid) from e
 
     def _resolve_string_example_plan(self, example_plan: str) -> Plan:

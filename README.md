@@ -157,6 +157,43 @@ Here is an example where we build a customer refund agent using Stripe's MCP ser
 Here is another example where we use our open browser tool. It uses clarifications when it encounters a login page to allow a human to enter their credentials directly into the session and allow it to progress.</br>
 [![Manage Linkedin connections](assets/linkedinbrowsertool.jpg)](https://youtu.be/hSq8Ww-hagg?si=8oQaXcTcAyrzEQty)
 
+## Legacy Plan Migration
+
+If you have legacy plans stored from previous versions of Portia, you can migrate them to the new format using the built-in migration script:
+
+### Running the Migration Script
+
+```bash
+# Basic migration - exports all legacy plans to ./legacy_plans_export/
+python -m portia migrate_legacy_plans
+
+# Custom storage and output directories
+python -m portia migrate_legacy_plans --storage-dir /path/to/.portia --output-dir /path/to/export
+
+# Dry run - see what would be migrated without actually exporting
+python -m portia migrate_legacy_plans --dry-run
+
+# Verbose output for debugging
+python -m portia migrate_legacy_plans --verbose
+```
+
+### Migration Process
+
+The migration script will:
+1. 🔍 Scan your storage directory for legacy plan files
+2. ✅ Parse and validate each legacy plan
+3. 📄 Export valid plans to JSON files with metadata
+4. 📊 Generate a detailed migration report
+
+### After Migration
+
+Once your legacy plans are exported:
+- Review the generated migration report for any errors
+- Use the exported JSON files as reference to recreate plans with the current Portia API
+- The exported files include original plan data and migration metadata for easy reconstruction
+
+**Note:** Legacy plan loading has been deprecated for security and compatibility reasons. All legacy plans must be migrated to continue using them.
+
 ## Learn more
 - Head over to our docs at <a href="https://docs.portialabs.ai" target="_blank">**docs.portialabs.ai (↗)**</a>.
 - Join the conversation on our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>.

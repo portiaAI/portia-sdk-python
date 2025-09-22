@@ -268,3 +268,27 @@ class PlanRunExitError(PortiaBaseError):
     def __init__(self, reason: str) -> None:
         """Set custom error message."""
         super().__init__(reason)
+
+
+class LegacyPlanDeprecationError(PortiaBaseError):
+    """Raised when attempting to load a legacy plan that is no longer supported.
+
+    This error provides guidance on how to migrate legacy plans to the new format.
+
+    Args:
+        plan_id (PlanUUID): The ID of the legacy plan that was attempted to be loaded.
+
+    """
+
+    def __init__(self, plan_id: PlanUUID) -> None:
+        """Set custom error message with migration instructions."""
+        migration_message = (
+            f"Legacy plan {plan_id} is no longer supported for loading. "
+            f"Legacy plan loading has been deprecated and removed for security and compatibility reasons.\n\n"
+            f"To migrate your legacy plans:\n"
+            f"1. Run the migration script: python -m portia.migrate_legacy_plans\n"
+            f"2. This will export your legacy plans to JSON files for archival\n"
+            f"3. You can then recreate the plans using the current Portia API\n\n"
+            f"For assistance with migration, please refer to the documentation or contact support."
+        )
+        super().__init__(migration_message)
