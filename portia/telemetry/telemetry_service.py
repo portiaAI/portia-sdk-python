@@ -67,6 +67,21 @@ class BaseProductTelemetry(ABC):
         """
 
 
+class NoOpProductTelemetry(BaseProductTelemetry):
+    """No-op implementation of telemetry service for core SDK execution.
+
+    This implementation maintains the interface but does not capture or emit any telemetry events.
+    """
+
+    def capture(self, event: BaseTelemetryEvent) -> None:
+        """No-op capture method - does nothing.
+
+        Args:
+            event (BaseTelemetryEvent): The telemetry event to capture (ignored)
+
+        """
+
+
 @singleton
 class ProductTelemetry(BaseProductTelemetry):
     """Service for capturing anonymized telemetry data.

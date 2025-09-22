@@ -619,10 +619,7 @@ def test_tool_calling_model_no_hallucinations() -> None:
         ReadOnlyPlanRun.from_plan_run(agent.plan_run),
         ReadOnlyStep.from_step(agent.step),
     )
-    # Verify telemetry was captured
-    mock_telemetry.capture.assert_called_once()
-    telemetry_call = mock_telemetry.capture.call_args[0][0]
-    assert telemetry_call.tool_id == "TOOL_ID"
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
 
 def test_tool_calling_model_with_hallucinations() -> None:
@@ -699,10 +696,7 @@ def test_tool_calling_model_with_hallucinations() -> None:
     assert "TOOL_NAME" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "TOOL_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
     assert "INPUT_DESCRIPTION" not in messages[1].content  # type: ignore  # noqa: PGH003
-    # Verify telemetry was captured
-    mock_telemetry.capture.assert_called_once()
-    telemetry_call = mock_telemetry.capture.call_args[0][0]
-    assert telemetry_call.tool_id == "TOOL_ID"
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
 
 def test_tool_calling_model_templates_inputs() -> None:
@@ -763,10 +757,7 @@ def test_tool_calling_model_templates_inputs() -> None:
     assert tool_call["args"]["$templated_arg"] == "1. templated value 2. templated value"
     assert tool_call["args"]["$normal_arg"] == "normal value"
 
-    # Verify telemetry was captured
-    mock_telemetry.capture.assert_called_once()
-    telemetry_call = mock_telemetry.capture.call_args[0][0]
-    assert telemetry_call.tool_id == addition_tool.id
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
 
 def test_tool_calling_model_handles_missing_args_gracefully() -> None:

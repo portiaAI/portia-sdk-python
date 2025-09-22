@@ -35,7 +35,6 @@ from portia.logger import logger
 from portia.model import GenerativeModel, Message
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -554,9 +553,6 @@ class ToolCallingModel:
 
         messages = state["messages"]
         past_errors = [msg for msg in messages if "ToolSoftError" in msg.content]
-        self.agent.telemetry.capture(
-            ToolCallTelemetryEvent(tool_id=self.agent.tool.id if self.agent.tool else None)
-        )
         logger().trace("LLM call: tool calling")
         response = model.invoke(
             self.tool_calling_prompt.format_messages(
@@ -712,18 +708,6 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
-        self.telemetry.capture(
-            ExecutionAgentUsageTelemetryEvent(
-                agent_type="default",
-                model=str(
-                    self.config.get_generative_model(self.model)
-                    or self.config.get_execution_model()
-                ),
-                sync=True,
-                tool_id=self.tool.id if self.tool else None,
-            )
-        )
-
         if not self.tool:
             raise InvalidAgentError("Tool is required for DefaultExecutionAgent")
 

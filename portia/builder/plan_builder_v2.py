@@ -26,8 +26,6 @@ from portia.builder.sub_plan_step import SubPlanStep
 from portia.builder.user_input import UserInputStep
 from portia.builder.user_verify import UserVerifyStep
 from portia.plan import PlanInput
-from portia.telemetry.telemetry_service import ProductTelemetry
-from portia.telemetry.views import PlanV2BuildTelemetryEvent
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
@@ -819,12 +817,5 @@ class PlanBuilderV2:
         for step in self.plan.steps:
             step_type = step.__class__.__name__
             step_type_counts[step_type] = step_type_counts.get(step_type, 0) + 1
-
-        telemetry = ProductTelemetry()
-        telemetry.capture(
-            PlanV2BuildTelemetryEvent(
-                plan_length=len(self.plan.steps), step_type_counts=step_type_counts
-            )
-        )
 
         return self.plan

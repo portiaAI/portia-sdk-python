@@ -35,7 +35,6 @@ from portia.logger import logger
 from portia.model import GenerativeModel
 from portia.plan import Plan, ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
-from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -196,11 +195,6 @@ class OneShotToolCallingModel:
             clarification_tool_args=clarification_tool.args_json_schema(),
             previous_errors=",".join(past_errors),
         )
-        self.agent.telemetry.capture(
-            ToolCallTelemetryEvent(
-                tool_id=self.agent.tool.id if self.agent.tool else None,
-            )
-        )
         return model, formatted_messages
 
     def _handle_execution_hooks(self, response: BaseMessage) -> dict[str, list] | None:
@@ -306,18 +300,6 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
-        exec_model = (
-            self.config.get_generative_model(self.model) or self.config.get_execution_model()
-        )
-        self.telemetry.capture(
-            ExecutionAgentUsageTelemetryEvent(
-                agent_type="one_shot",
-                model=str(exec_model),
-                sync=True,
-                tool_id=self.tool.id if self.tool else None,
-            )
-        )
-
         app = self._setup_graph(sync=True).compile()
         invocation_result = app.invoke({"messages": [], "step_inputs": []})
 
@@ -334,18 +316,6 @@ class OneShotAgent(BaseExecutionAgent):
             Output: The result of the agent's execution, containing the tool call result.
 
         """
-        exec_model = (
-            self.config.get_generative_model(self.model) or self.config.get_execution_model()
-        )
-        self.telemetry.capture(
-            ExecutionAgentUsageTelemetryEvent(
-                agent_type="one_shot",
-                model=str(exec_model),
-                sync=False,
-                tool_id=self.tool.id if self.tool else None,
-            )
-        )
-
         app = self._setup_graph(sync=False).compile()
         invocation_result = await app.ainvoke({"messages": [], "step_inputs": []})
         return process_output(

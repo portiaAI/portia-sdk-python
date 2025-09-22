@@ -22,7 +22,6 @@ from portia.execution_agents.output import LocalDataValue
 from portia.execution_agents.react_clarification_tool import ReActClarificationTool
 from portia.logger import logger, truncate_message
 from portia.model import GenerativeModel, Message
-from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 if TYPE_CHECKING:
@@ -296,18 +295,6 @@ class ReActAgent:
 
     async def execute(self) -> Output:
         """Run the ReAct agent."""
-        self.run_data.telemetry.capture(
-            ExecutionAgentUsageTelemetryEvent(
-                agent_type="react",
-                model=str(
-                    self.run_data.config.get_generative_model(self.model)
-                    or self.run_data.config.get_planning_model()
-                ),
-                sync=False,
-                tool_id=",".join([tool.id for tool in self.tools]),
-            )
-        )
-
         tool_run_ctx = self.run_data.get_tool_run_ctx()
         # We use the planning model rather than the execution model here as
         # ReAct agents have to both plan and execute, but the planning model

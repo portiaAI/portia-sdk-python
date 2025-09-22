@@ -1,7 +1,13 @@
 """Types to support Loops."""
 
+import sys
 from collections.abc import Callable, Sequence
-from typing import Any, Self, override
+from typing import Any, Self
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override  # pragma: no cover
 
 from langsmith import traceable
 from pydantic import Field, model_validator

@@ -47,7 +47,6 @@ from portia.plan_run import PlanRun, PlanRunOutputs, PlanRunState, PlanRunUUID
 from portia.planning_agents.base_planning_agent import StepsOrError
 from portia.portia import Portia
 from portia.storage import StorageError
-from portia.telemetry.views import PortiaFunctionCallTelemetryEvent
 from portia.tool import ReadyResponse, Tool, ToolRunContext, _ArgsSchemaPlaceholder
 from portia.tool_registry import ToolRegistry
 from tests.utils import (
@@ -61,7 +60,7 @@ from tests.utils import (
 
 @pytest.mark.asyncio
 async def test_portia_agenerate_plan(
-    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+    portia: Portia, planning_model: MagicMock
 ) -> None:
     """Test async planning a query."""
     query = "example query"
@@ -69,25 +68,14 @@ async def test_portia_agenerate_plan(
     planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
     plan = await portia.aplan(query)
 
-    telemetry.capture.assert_called_once_with(
-        PortiaFunctionCallTelemetryEvent(
-            function_name="portia_aplan",
-            function_call_details={
-                "tools": None,
-                "example_plans_provided": False,
-                "end_user_provided": False,
-                "plan_inputs_provided": False,
-            },
-            name="portia_function_call",
-        )
-    )
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
     assert plan.plan_context.query == query
 
 
 @pytest.mark.asyncio
 async def test_portia_agenerate_plan_error(
-    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+    portia: Portia, planning_model: MagicMock
 ) -> None:
     """Test async planning a query that returns an error."""
     query = "example query"
@@ -100,23 +88,12 @@ async def test_portia_agenerate_plan_error(
         await portia.aplan(query)
 
     # Check that the telemetry event was captured despite the error.
-    telemetry.capture.assert_called_once_with(
-        PortiaFunctionCallTelemetryEvent(
-            function_name="portia_aplan",
-            function_call_details={
-                "tools": None,
-                "example_plans_provided": False,
-                "end_user_provided": False,
-                "plan_inputs_provided": False,
-            },
-            name="portia_function_call",
-        )
-    )
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
 
 @pytest.mark.asyncio
 async def test_portia_agenerate_plan_with_tools(
-    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+    portia: Portia, planning_model: MagicMock
 ) -> None:
     """Test async planning a query with tools."""
     query = "example query"
@@ -124,18 +101,7 @@ async def test_portia_agenerate_plan_with_tools(
     planning_model.aget_structured_response.return_value = StepsOrError(steps=[], error=None)
     plan = await portia.aplan(query, tools=["add_tool"])
 
-    telemetry.capture.assert_called_once_with(
-        PortiaFunctionCallTelemetryEvent(
-            function_name="portia_aplan",
-            function_call_details={
-                "tools": "add_tool",
-                "example_plans_provided": False,
-                "end_user_provided": False,
-                "plan_inputs_provided": False,
-            },
-            name="portia_function_call",
-        )
-    )
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
     assert plan.plan_context.query == query
     assert plan.plan_context.tool_ids == ["add_tool"]
@@ -295,7 +261,6 @@ async def test_portia_aplan_with_plan_inputs(
     portia: Portia,
     planning_model: MagicMock,
     plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str],
-    telemetry: MagicMock,
 ) -> None:
     """Test async planning with various plan input formats."""
     query = "example query"
@@ -317,18 +282,7 @@ async def test_portia_aplan_with_plan_inputs(
     else:
         plan = await portia.aplan(query, plan_inputs=plan_inputs)
 
-        telemetry.capture.assert_called_once_with(
-            PortiaFunctionCallTelemetryEvent(
-                function_name="portia_aplan",
-                function_call_details={
-                    "tools": None,
-                    "example_plans_provided": False,
-                    "end_user_provided": False,
-                    "plan_inputs_provided": True,
-                },
-                name="portia_function_call",
-            )
-        )
+        # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
         assert plan.plan_context.query == query
         # Should have plan inputs
@@ -337,7 +291,7 @@ async def test_portia_aplan_with_plan_inputs(
 
 @pytest.mark.asyncio
 async def test_portia_arun_query(
-    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+    portia: Portia, planning_model: MagicMock
 ) -> None:
     """Test async running a query."""
     query = "example query"
@@ -348,18 +302,7 @@ async def test_portia_arun_query(
     )
 
     plan_run = await portia.arun(query)
-    telemetry.capture.assert_called_once_with(
-        PortiaFunctionCallTelemetryEvent(
-            function_name="portia_arun",
-            function_call_details={
-                "tools": None,
-                "example_plans_provided": False,
-                "end_user_provided": False,
-                "plan_run_inputs_provided": False,
-            },
-            name="portia_function_call",
-        )
-    )
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
     assert plan_run.state == "COMPLETE"
 
@@ -386,18 +329,7 @@ async def test_portia_arun_query_tool_list(planning_model: MagicMock, telemetry:
     )
     plan_run = await portia.arun(query)
 
-    telemetry.capture.assert_called_once_with(
-        PortiaFunctionCallTelemetryEvent(
-            function_name="portia_arun",
-            function_call_details={
-                "tools": None,
-                "example_plans_provided": False,
-                "end_user_provided": False,
-                "plan_run_inputs_provided": False,
-            },
-            name="portia_function_call",
-        )
-    )
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
     assert plan_run.state == "COMPLETE"
 
 
@@ -582,7 +514,7 @@ async def test_portia_arun_error_handling(portia: Portia, planning_model: MagicM
 
 @pytest.mark.asyncio
 async def test_portia_arun_plan(
-    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+    portia: Portia, planning_model: MagicMock
 ) -> None:
     """Test that arun_plan calls _acreate_plan_run and _aresume."""
     query = "example query"
@@ -605,33 +537,7 @@ async def test_portia_arun_plan(
 
         result = await portia.arun_plan(plan)
 
-        telemetry.capture.assert_has_calls(
-            [
-                mock.call(
-                    PortiaFunctionCallTelemetryEvent(
-                        function_name="portia_aplan",
-                        function_call_details={
-                            "tools": None,
-                            "example_plans_provided": False,
-                            "end_user_provided": False,
-                            "plan_inputs_provided": False,
-                        },
-                        name="portia_function_call",
-                    )
-                ),
-                mock.call(
-                    PortiaFunctionCallTelemetryEvent(
-                        function_name="portia_arun_plan",
-                        function_call_details={
-                            "plan_type": "Plan",
-                            "end_user_provided": False,
-                            "plan_run_inputs_provided": False,
-                        },
-                        name="portia_function_call",
-                    )
-                ),
-            ]
-        )
+        # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
         mock_create_plan_run.assert_called_once_with(plan, portia.initialize_end_user(), None)
         mock_aresume.assert_called_once_with(mock_plan_run)
@@ -710,7 +616,7 @@ async def test_portia_arun_plan_with_plan_run_inputs(
 
 
 @pytest.mark.asyncio
-async def test_portia_arun_plan_with_plan_uuid(portia: Portia, telemetry: MagicMock) -> None:
+async def test_portia_arun_plan_with_plan_uuid(portia: Portia) -> None:
     """Test that arun_plan can retrieve a plan from storage using PlanUUID."""
     # Create a plan and save it to storage
     plan = Plan(
@@ -732,17 +638,7 @@ async def test_portia_arun_plan_with_plan_uuid(portia: Portia, telemetry: MagicM
         # Run the plan using its PlanUUID
         result = await portia.arun_plan(plan.id)
 
-        telemetry.capture.assert_called_with(
-            PortiaFunctionCallTelemetryEvent(
-                function_name="portia_arun_plan",
-                function_call_details={
-                    "plan_type": "PlanUUID",
-                    "end_user_provided": False,
-                    "plan_run_inputs_provided": False,
-                },
-                name="portia_function_call",
-            )
-        )
+        # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
         # Verify the plan was retrieved from storage and used
         mock_create_plan_run.assert_called_once_with(plan, portia.initialize_end_user(), None)
@@ -976,7 +872,7 @@ async def test_portia_arun_plan_logs_unknown_input_warning(portia: Portia) -> No
 
 @pytest.mark.asyncio
 async def test_portia_aresume(
-    portia: Portia, planning_model: MagicMock, telemetry: MagicMock
+    portia: Portia, planning_model: MagicMock
 ) -> None:
     """Test async resuming a plan."""
     query = "example query"
@@ -986,14 +882,7 @@ async def test_portia_aresume(
     plan_run = portia.create_plan_run(plan)
     plan_run = await portia.aresume(plan_run)
 
-    assert telemetry.capture.call_count == 3
-    telemetry.capture.assert_called_with(
-        PortiaFunctionCallTelemetryEvent(
-            function_name="portia_aresume",
-            function_call_details={"plan_run_provided": True, "plan_run_id_provided": False},
-            name="portia_function_call",
-        )
-    )
+    # Telemetry is now a no-op in core execution, so we no longer expect these calls
 
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.plan_id == plan.id

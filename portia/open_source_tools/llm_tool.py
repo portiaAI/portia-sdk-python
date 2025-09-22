@@ -8,8 +8,6 @@ from pydantic import BaseModel, Field
 
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
-from portia.telemetry.telemetry_service import ProductTelemetry
-from portia.telemetry.views import LLMToolUsageTelemetryEvent
 from portia.tool import Tool, ToolRunContext
 
 
@@ -110,9 +108,6 @@ class LLMTool(Tool[str | BaseModel]):
         """Run the LLMTool."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
 
-        telemetry = ProductTelemetry()
-        telemetry.capture(LLMToolUsageTelemetryEvent(model=str(model), sync=True))
-
         messages = self._get_messages(task, task_data)
         logger().trace("LLM call: llm-tool")
         if self.structured_output_schema:
@@ -129,9 +124,6 @@ class LLMTool(Tool[str | BaseModel]):
     ) -> str | BaseModel:
         """Run the LLMTool asynchronously."""
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
-
-        telemetry = ProductTelemetry()
-        telemetry.capture(LLMToolUsageTelemetryEvent(model=str(model), sync=False))
 
         messages = self._get_messages(task, task_data)
         logger().trace("LLM call: llm-tool")
