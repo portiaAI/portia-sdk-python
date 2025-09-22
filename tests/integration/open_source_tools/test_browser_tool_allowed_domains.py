@@ -4,7 +4,7 @@ This module contains integration tests that verify the allowed_domains feature
 works correctly across the entire BrowserTool system.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch, AsyncMock
 
 import pytest
 from pydantic import BaseModel
@@ -35,6 +35,7 @@ class TestBrowserToolAllowedDomainsIntegration:
         """Set up test fixtures."""
         self.mock_config = Mock(spec=Config)
         self.mock_end_user = Mock(spec=EndUser)
+        self.mock_end_user.external_id = None  # Fix AttributeError
         self.mock_plan = Mock(spec=Plan)
         self.mock_plan_run = Mock(spec=PlanRun)
 
@@ -49,8 +50,7 @@ class TestBrowserToolAllowedDomainsIntegration:
         allowed_domains = ["example.com", "trusted-site.org"]
 
         tool = BrowserTool(
-            allowed_domains=allowed_domains,
-            infrastructure_option=BrowserInfrastructureOption.LOCAL
+            allowed_domains=allowed_domains, infrastructure_option=BrowserInfrastructureOption.LOCAL
         )
 
         assert tool.allowed_domains == allowed_domains
@@ -62,10 +62,7 @@ class TestBrowserToolAllowedDomainsIntegration:
         url = "https://example.com"
         allowed_domains = ["example.com"]
 
-        tool = BrowserToolForUrl(
-            url=url,
-            infrastructure_option=BrowserInfrastructureOption.LOCAL
-        )
+        tool = BrowserToolForUrl(url=url, infrastructure_option=BrowserInfrastructureOption.LOCAL)
         # Set allowed_domains after initialization since it's not in the constructor
         tool.allowed_domains = allowed_domains
 
@@ -86,7 +83,7 @@ class TestBrowserToolAllowedDomainsIntegration:
 
         # Test invalid input type
         with pytest.raises(ValueError, match="must be a list"):
-            BrowserTool(allowed_domains="not a list")  # type: ignore[arg-type][arg-type][arg-type][arg-type][arg-type][arg-type]
+            BrowserTool(allowed_domains="not a list")  # type: ignore[arg-type]
 
         # Test empty domain
         with pytest.raises(ValueError, match="Invalid domain value"):
@@ -126,14 +123,15 @@ class TestBrowserToolAllowedDomainsIntegration:
     @patch("portia.open_source_tools.browser_tool.Browser")
     @patch("portia.open_source_tools.browser_tool.Agent")
     def test_allowed_domains_passed_to_infrastructure_provider(
-        self, mock_agent: MagicMock, mock_browser: MagicMock  # noqa: ARG002
+        self,
+        mock_agent: MagicMock,
+        mock_browser: MagicMock,  # noqa: ARG002
     ) -> None:
         """Test that allowed_domains are passed through to the infrastructure provider."""
         allowed_domains = ["example.com", "trusted-site.org"]
 
         tool = BrowserTool(
-            allowed_domains=allowed_domains,
-            infrastructure_option=BrowserInfrastructureOption.LOCAL
+            allowed_domains=allowed_domains, infrastructure_option=BrowserInfrastructureOption.LOCAL
         )
 
         # Mock the infrastructure provider's setup_browser method
@@ -146,25 +144,23 @@ class TestBrowserToolAllowedDomainsIntegration:
         self.mock_config.get_generative_model.return_value = mock_model
         self.mock_config.get_default_model.return_value = mock_model
 
-        mock_agent_instance = Mock()
-        mock_agent_instance.run.return_value = Mock()
-        success_result = '{"task_output": "success"}'
-        mock_agent_instance.run.return_value.final_result.return_value = success_result
+        mock_agent_instance = AsyncMock()
+        mock_agent_instance.run = AsyncMock()
+        
+        # Create mock result with final_result that returns a string (not coroutine)
+        mock_result = Mock()
+        mock_result.final_result = Mock(return_value='{"task_output": "success"}')
+        mock_agent_instance.run.return_value = mock_result
         mock_agent.return_value = mock_agent_instance
 
-        # Test async method
         import asyncio
+
         async def test_async() -> None:
-            await tool._run_agent_task(
-                self.mock_ctx,
-                "test task",
-                TestOutputModel
-            )
+            await tool._run_agent_task(self.mock_ctx, "test task", TestOutputModel)
 
             # Verify setup_browser was called with allowed_domains
             mock_infrastructure.setup_browser.assert_called_once_with(
-                self.mock_ctx,
-                allowed_domains
+                self.mock_ctx, allowed_domains
             )
 
         # Run the async test
@@ -183,7 +179,6 @@ class TestBrowserToolAllowedDomainsIntegration:
                 "portia.open_source_tools.browser_tool.BrowserContextConfig"
             ) as mock_context_config,
         ):
-
             mock_config_instance = Mock()
             mock_config.return_value = mock_config_instance
             mock_context_config_instance = Mock()
@@ -223,9 +218,12 @@ class TestBrowserToolAllowedDomainsIntegration:
                 "portia.open_source_tools.browser_tool.BrowserContextConfig"
             ) as mock_context_config,
         ):
-
             mock_config_instance = Mock()
             mock_config.return_value = mock_config_instance
+
+            # Fix: Ensure new_context_config doesn't exist initially
+            if hasattr(mock_config_instance, 'new_context_config'):
+                delattr(mock_config_instance, 'new_context_config')
 
             provider.setup_browser(self.mock_ctx, None)
 
@@ -236,8 +234,7 @@ class TestBrowserToolAllowedDomainsIntegration:
             mock_context_config.assert_not_called()
 
             # Verify that new_context_config was not set
-            assert not hasattr(mock_config_instance, "new_context_config") or \
-                   mock_config_instance.new_context_config is None
+            assert not hasattr(mock_config_instance, "new_context_config")
 
     def test_multiple_domain_types(self) -> None:
         """Test various domain formats are handled correctly."""
@@ -246,7 +243,7 @@ class TestBrowserToolAllowedDomainsIntegration:
             "subdomain.example.com",
             "another-site.org",
             "site-with-dashes.net",
-            "numeric123.com"
+            "numeric123.com",
         ]
 
         tool = BrowserTool(allowed_domains=domains)
@@ -259,8 +256,7 @@ class TestBrowserToolAllowedDomainsIntegration:
         """Test that the tool works correctly within a full ToolRunContext."""
         allowed_domains = ["example.com"]
         tool = BrowserTool(
-            allowed_domains=allowed_domains,
-            infrastructure_option=BrowserInfrastructureOption.LOCAL
+            allowed_domains=allowed_domains, infrastructure_option=BrowserInfrastructureOption.LOCAL
         )
 
         # Verify the tool maintains its configuration
