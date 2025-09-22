@@ -1270,3 +1270,17 @@ def test_structured_output_schema_coercion_error(add_tool: AdditionTool) -> None
     assert output is not None
     assert isinstance(output, LocalDataValue)
     assert output.value == {"result": "not an int"}
+
+
+def test_tool_run_with_artifacts() -> None:
+    """Test the _run_with_artifacts method (lines 331-332)."""
+    # Use existing calculator tool that's already properly configured
+    tool = CalculatorTool()
+    ctx = get_test_tool_context()
+    
+    # Test _run_with_artifacts which returns tuple of (value, Output)
+    result_value, result_output = tool._run_with_artifacts(ctx, expression="2 + 3")
+    
+    assert result_value == 5
+    assert isinstance(result_output, LocalDataValue)
+    assert result_output.get_value() == 5
