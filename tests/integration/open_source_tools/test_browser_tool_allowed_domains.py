@@ -4,7 +4,8 @@ This module contains integration tests that verify the allowed_domains feature
 works correctly across the entire BrowserTool system.
 """
 
-from unittest.mock import MagicMock, Mock, patch, AsyncMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 from pydantic import BaseModel
@@ -153,8 +154,6 @@ class TestBrowserToolAllowedDomainsIntegration:
         mock_agent_instance.run.return_value = mock_result
         mock_agent.return_value = mock_agent_instance
 
-        import asyncio
-
         async def test_async() -> None:
             await tool._run_agent_task(self.mock_ctx, "test task", TestOutputModel)
 
@@ -163,7 +162,6 @@ class TestBrowserToolAllowedDomainsIntegration:
                 self.mock_ctx, allowed_domains
             )
 
-        # Run the async test
         asyncio.run(test_async())
 
     def test_infrastructure_provider_local_with_allowed_domains(self) -> None:
@@ -221,7 +219,7 @@ class TestBrowserToolAllowedDomainsIntegration:
             mock_config_instance = Mock()
             mock_config.return_value = mock_config_instance
 
-            # Fix: Ensure new_context_config doesn't exist initially
+            # Ensure new_context_config doesn't exist initially
             if hasattr(mock_config_instance, "new_context_config"):
                 delattr(mock_config_instance, "new_context_config")
 
