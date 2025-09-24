@@ -69,8 +69,8 @@ class TestCostEstimator:
 
     def test_estimate_v2_step_with_condition_coverage(self) -> None:
         """Test V2 step estimation with condition to cover introspection cost line 263."""
-        from portia.builder.llm_step import LLMStep
         from portia.builder.conditionals import ConditionalBlock
+        from portia.builder.llm_step import LLMStep
 
         step = LLMStep(step_name="test_step", task="Test task")
         step.conditional_block = ConditionalBlock(clause_step_indexes=[0, 1])
@@ -236,14 +236,13 @@ class TestCostEstimator:
     @patch("portia.cost_estimator.LLMTool.run")
     def test_llm_estimation_malformed_json_fallback(self, mock_llm_run: MagicMock) -> None:
         """Test LLM estimation with malformed JSON response triggers fallback."""
-    
         mock_llm_run.return_value = "This is not JSON at all"
 
         result = self.estimator._get_llm_estimation(
             "LLMStep", "Test task", "gpt-4o", "Test tools", 1000
         )
-       
-        assert result["estimated_input_tokens"] == 1000  
+
+        assert result["estimated_input_tokens"] == 1000
         assert result["estimated_output_tokens"] == 300
         assert result["number_of_llm_calls"] == 1
 
@@ -405,6 +404,22 @@ class TestCostEstimator:
         limitations = self.estimator._get_limitations_explanation()
         assert "Limitations and assumptions" in limitations
         assert "Only includes LLM costs" in limitations
+
+    def test_v1_plan_path_explicit_ci_coverage(self) -> None:
+        """Explicitly test V1 plan path to ensure CI coverage of line 148."""
+        from portia.plan import Plan, PlanContext, PlanInput, Step
+
+        v1_plan = Plan(
+            plan_context=PlanContext(query="V1 explicit test", tool_ids=[]),
+            plan_inputs=[PlanInput(name="test", description="Test input")],
+            steps=[Step(task="V1 test task", inputs=[], output="v1_output")],
+        )
+
+        estimate = self.estimator.plan_estimate(v1_plan)
+
+        assert isinstance(estimate, PlanCostEstimate)
+        assert len(estimate.step_estimates) == 1
+        assert "v1_output" in estimate.step_estimates[0].step_name
 
 
 class TestStepCostEstimate:
