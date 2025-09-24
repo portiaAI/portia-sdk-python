@@ -67,6 +67,27 @@ class TestCostEstimator:
         expected = (800 / 1_000_000) * 5.00 + (100 / 1_000_000) * 15.00
         assert cost == expected
 
+    def test_estimate_v2_step_with_condition_coverage(self) -> None:
+        """Test V2 step estimation with condition to cover introspection cost line 263."""
+        from portia.builder.llm_step import LLMStep
+        from portia.builder.conditionals import ConditionalBlock
+
+        step = LLMStep(step_name="test_step", task="Test task")
+        step.conditional_block = ConditionalBlock(clause_step_indexes=[0, 1])
+
+        with patch.object(self.estimator, "_get_llm_estimation") as mock_estimation:
+            mock_estimation.return_value = {
+                "estimated_input_tokens": 1000,
+                "estimated_output_tokens": 300,
+                "number_of_llm_calls": 1,
+                "reasoning": "Test reasoning",
+            }
+
+            result = self.estimator._estimate_v2_step_cost(step, "gpt-4o")
+
+            assert result.has_condition is True
+            assert result.introspection_cost > 0
+
     def test_extract_step_task(self) -> None:
         """Test task extraction from different step types."""
         llm_step = LLMStep(step_name="test", task="Test task")
@@ -174,6 +195,58 @@ class TestCostEstimator:
         assert result["estimated_input_tokens"] == 1000
         assert result["number_of_llm_calls"] == 1
 
+    def test_get_fallback_estimation_all_types(self) -> None:
+        """Test fallback estimation for all step types."""
+        llm_result = self.estimator._get_fallback_estimation("LLMStep")
+        assert llm_result["estimated_input_tokens"] == 1000
+        assert llm_result["estimated_output_tokens"] == 300
+        assert llm_result["number_of_llm_calls"] == 1
+
+        react_result = self.estimator._get_fallback_estimation("ReActAgentStep")
+        assert react_result["estimated_input_tokens"] == 2000
+        assert react_result["estimated_output_tokens"] == 800
+        assert react_result["number_of_llm_calls"] == 4
+
+        tool_result = self.estimator._get_fallback_estimation("SingleToolAgentStep")
+        assert tool_result["estimated_input_tokens"] == 1500
+        assert tool_result["estimated_output_tokens"] == 400
+        assert tool_result["number_of_llm_calls"] == 2
+
+        unknown_result = self.estimator._get_fallback_estimation("UnknownStep")
+        assert unknown_result["estimated_input_tokens"] == 1000
+        assert unknown_result["estimated_output_tokens"] == 300
+        assert unknown_result["number_of_llm_calls"] == 2
+
+    def test_get_step_tools_with_tool_objects(self) -> None:
+        """Test _get_step_tools with actual Tool objects to cover tool.id access."""
+        from portia.builder.react_agent_step import ReActAgentStep
+        from portia.tool import Tool
+
+        mock_tool1 = MagicMock(spec=Tool)
+        mock_tool1.id = "tool1_id"
+        mock_tool2 = MagicMock(spec=Tool)
+        mock_tool2.id = "tool2_id"
+
+        mock_step = MagicMock(spec=ReActAgentStep)
+        mock_step.tools = [mock_tool1, "string_tool", mock_tool2]
+
+        result = self.estimator._get_step_tools(mock_step)
+        assert result == "Tools: tool1_id, string_tool, tool2_id"
+
+    @patch("portia.cost_estimator.LLMTool.run")
+    def test_llm_estimation_malformed_json_fallback(self, mock_llm_run: MagicMock) -> None:
+        """Test LLM estimation with malformed JSON response triggers fallback."""
+    
+        mock_llm_run.return_value = "This is not JSON at all"
+
+        result = self.estimator._get_llm_estimation(
+            "LLMStep", "Test task", "gpt-4o", "Test tools", 1000
+        )
+       
+        assert result["estimated_input_tokens"] == 1000  
+        assert result["estimated_output_tokens"] == 300
+        assert result["number_of_llm_calls"] == 1
+
     def test_estimate_v1_step_cost(self) -> None:
         """Test V1 step cost estimation."""
         mock_step = MagicMock()
@@ -278,6 +351,22 @@ class TestCostEstimator:
         estimate = self.estimator.plan_estimate(plan)
         assert isinstance(estimate, PlanCostEstimate)
         assert len(estimate.step_estimates) == 1
+
+    def test_plan_estimate_v1_coverage_path(self) -> None:
+        """Ensure V1 plan estimation path is fully covered."""
+        from portia.plan import Plan
+
+        plan = Plan(
+            plan_context=PlanContext(query="V1 coverage test", tool_ids=[]),
+            plan_inputs=[PlanInput(name="test_input", description="Coverage input")],
+            steps=[
+                Step(task="Coverage task", inputs=[], output="coverage_output"),
+            ],
+        )
+
+        estimate = self.estimator.plan_estimate(plan)
+        assert isinstance(estimate, PlanCostEstimate)
+        assert estimate.total_estimated_cost > 0
 
     def test_plan_estimate_v2(self) -> None:
         """Test main plan_estimate method with V2 plan."""
