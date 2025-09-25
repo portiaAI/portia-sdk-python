@@ -5,15 +5,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.builder.plan_v2 import PlanV2
-from portia.config import Config
+from portia.core.context import PortiaContext
 from portia.end_user import EndUser
-from portia.execution_hooks import ExecutionHooks
 from portia.plan import Plan
 from portia.plan_run import PlanRun
-from portia.storage import Storage
-from portia.telemetry.telemetry_service import BaseProductTelemetry
 from portia.tool import ToolRunContext
-from portia.tool_registry import ToolRegistry
 
 
 class StepOutputValue(BaseModel):
@@ -37,11 +33,7 @@ class RunContext(BaseModel):
     step_output_values: list[StepOutputValue] = Field(
         default_factory=list, description="Outputs set by the step."
     )
-    config: Config = Field(description="The Portia config.")
-    storage: Storage = Field(description="The Portia storage.")
-    tool_registry: ToolRegistry = Field(description="The Portia tool registry.")
-    execution_hooks: ExecutionHooks = Field(description="The Portia execution hooks.")
-    telemetry: BaseProductTelemetry = Field(description="The Portia telemetry service.")
+    context: PortiaContext = Field(description="The immutable Portia context.")
 
     def get_tool_run_ctx(self) -> ToolRunContext:
         """Get the tool run context."""
@@ -49,6 +41,6 @@ class RunContext(BaseModel):
             end_user=self.end_user,
             plan_run=self.plan_run,
             plan=self.legacy_plan,
-            config=self.config,
+            config=self.context.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )

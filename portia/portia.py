@@ -45,6 +45,7 @@ from portia.config import (
     PlanningAgentType,
     StorageClass,
 )
+from portia.core.context import PortiaContext
 from portia.end_user import EndUser
 from portia.errors import (
     InvalidPlanRunStateError,
@@ -132,6 +133,7 @@ class Portia:
             telemetry (BaseProductTelemetry | None): Anonymous telemetry service.
 
         """
+        # Initialize individual components as before
         self.config = config if config else Config.from_default()
         logger_manager.configure_from_config(self.config)
         logger().info(f"Starting Portia v{get_version()}")
@@ -159,6 +161,25 @@ class Portia:
                 self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
+
+        # Create the PortiaContext with all initialized dependencies
+        self._context = PortiaContext.from_portia_init_params(
+            config=self.config,
+            logger_manager=logger_manager,
+            storage=self.storage,
+            tool_registry=self.tool_registry,
+            telemetry=self.telemetry,
+            execution_hooks=self.execution_hooks,
+        )
+
+    @property
+    def context(self) -> PortiaContext:
+        """Access the immutable Portia context.
+
+        Returns:
+            The PortiaContext containing all core dependencies.
+        """
+        return self._context
 
     def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
         """Handle initializing the end_user based on the provided type."""
@@ -2704,11 +2725,7 @@ class Portia:
             legacy_plan=legacy_plan,
             plan_run=plan_run,
             end_user=end_user or await self.ainitialize_end_user(plan_run.end_user_id),
-            config=self.config,
-            tool_registry=self.tool_registry,
-            storage=self.storage,
-            execution_hooks=self.execution_hooks,
-            telemetry=self.telemetry,
+            context=self._context,
         )
 
         try:
