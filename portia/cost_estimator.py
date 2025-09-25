@@ -10,52 +10,46 @@ for each step in a plan, providing detailed breakdowns and explanations.
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import TYPE_CHECKING, Any, ClassVar
 
+import litellm
 from pydantic import BaseModel, Field
 
 from portia.builder.llm_step import LLMStep
+from portia.builder.plan_v2 import PlanV2
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.single_tool_agent_step import SingleToolAgentStep
 from portia.config import Config
+from portia.end_user import EndUser
 from portia.logger import logger
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan
+from portia.plan import Plan, PlanContext, Step
+from portia.plan_run import PlanRun, PlanRunState
 from portia.token_check import estimate_tokens
+from portia.tool import ToolRunContext
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
     from portia.builder.step_v2 import StepV2
 
 
-MODEL_PRICING = {
-    # OpenAI
-    "gpt-4o": {"input": 5.00, "output": 15.00},
-    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-    "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
-    "o3-mini": {"input": 2.50, "output": 10.00},
-    "gpt-4.1": {"input": 5.00, "output": 15.00},
-    # Anthropic
-    "claude-3-5-sonnet-latest": {"input": 3.00, "output": 15.00},
-    "claude-3-5-haiku-latest": {"input": 0.25, "output": 1.25},
-    "claude-3-opus-latest": {"input": 15.00, "output": 75.00},
-    "claude-3-7-sonnet-latest": {"input": 3.00, "output": 15.00},
-    # Google
-    "gemini-2.5-flash-preview-04-17": {"input": 0.037, "output": 0.15},
-    "gemini-2.5-pro": {"input": 1.25, "output": 5.00},
-    "gemini-2.0-flash": {"input": 0.037, "output": 0.15},
-    "gemini-2.0-flash-lite": {"input": 0.075, "output": 0.30},
-    "gemini-1.5-flash": {"input": 0.037, "output": 0.15},
-    # MistralAI
-    "mistral-large-latest": {"input": 3.00, "output": 9.00},
-    # Grok
-    "grok-4-0709": {"input": 10.00, "output": 30.00},
-    "grok-3": {"input": 5.00, "output": 15.00},
-    "grok-3-mini": {"input": 1.00, "output": 3.00},
-}
+LITELLM_PRICING_URL = (
+    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
+)
 
 DEFAULT_MODEL_PRICING = {"input": 5.00, "output": 15.00}
+
+
+class LLMEstimationResult(BaseModel):
+    """Structured output for LLM token usage estimation."""
+
+    estimated_input_tokens: int = Field(
+        description="Estimated number of input tokens for this step"
+    )
+    estimated_output_tokens: int = Field(
+        description="Estimated number of output tokens for this step"
+    )
+    number_of_llm_calls: int = Field(description="Number of LLM calls this step will make")
+    reasoning: str = Field(description="Brief explanation of the estimation logic")
 
 
 class StepCostEstimate(BaseModel):
@@ -106,20 +100,14 @@ Please estimate:
 3. Number of LLM calls this step will make (some steps make multiple calls)
 
 Consider these factors:
-- Execution agents typically make 2-3 LLM calls: argument parsing, verification, and tool calling
+- Execution agents (default one-shot) make 1 LLM call, plus 1 more if summarization is enabled
 - ReAct agents make multiple calls for reasoning and tool selection (typically 3-5 calls)
-- Single tool agents make 1-2 calls for tool argument determination
+- Single tool agents make 1 call for tool argument determination and execution
 - LLM steps make 1 direct call
 - Complex tasks require longer responses
 - Tool-calling steps have additional overhead for tool schemas
 
-Provide your estimate as JSON with this exact structure:
-{{
-    "estimated_input_tokens": <number>,
-    "estimated_output_tokens": <number>,
-    "number_of_llm_calls": <number>,
-    "reasoning": "<explanation of your estimation>"
-}}
+Please provide your estimate with a brief explanation of your reasoning.
 """
 
     def __init__(self, config: Config | None = None) -> None:
@@ -130,7 +118,7 @@ Provide your estimate as JSON with this exact structure:
 
         """
         self.config = config or Config.from_default()
-        self.estimation_tool = LLMTool()
+        self.estimation_tool = LLMTool(structured_output_schema=LLMEstimationResult)
 
     def plan_estimate(self, plan: Plan | PlanV2) -> PlanCostEstimate:
         """Estimate the cost of running a plan.
@@ -202,34 +190,49 @@ Provide your estimate as JSON with this exact structure:
             limitations=self._get_limitations_explanation(),
         )
 
-    def _estimate_v1_step_cost(self, step: object, model_name: str) -> StepCostEstimate:
+    def _estimate_v1_step_cost(self, step: Step, model_name: str) -> StepCostEstimate:
         """Estimate cost for a V1 plan step."""
-        step_name = f"Step {getattr(step, 'output', 'unnamed')}"
+        step_name = f"Step {step.output}"
         step_type = "V1Step"
-        task = getattr(step, "task", "No task description")
+        task = step.task
 
-        input_tokens = estimate_tokens(task) + 500
-        output_tokens = 200
+        tools = step.tool_id or ""
+        input_context_tokens = estimate_tokens(task) + 500  # Base context estimation
 
-        has_condition = hasattr(step, "condition") and getattr(step, "condition", None) is not None
+        estimation_result = self._get_llm_estimation(
+            "ExecutionAgentStep", task, model_name, tools, input_context_tokens
+        )
+
+        base_cost = self._calculate_cost(
+            estimation_result["estimated_input_tokens"] * estimation_result["number_of_llm_calls"],
+            estimation_result["estimated_output_tokens"] * estimation_result["number_of_llm_calls"],
+            model_name,
+        )
+
+        has_condition = step.condition is not None
         introspection_cost = 0.0
 
         if has_condition:
-            introspection_cost = self._calculate_introspection_cost(model_name)
+            introspection_model_name = self.config.get_introspection_model().model_name
+            introspection_cost = self._calculate_introspection_cost(introspection_model_name)
 
-        cost = self._calculate_cost(input_tokens, output_tokens, model_name)
-        total_cost = cost + introspection_cost
+        total_cost = base_cost + introspection_cost
 
         return StepCostEstimate(
             step_name=step_name,
             step_type=step_type,
-            estimated_input_tokens=input_tokens,
-            estimated_output_tokens=output_tokens,
+            estimated_input_tokens=estimation_result["estimated_input_tokens"]
+            * estimation_result["number_of_llm_calls"],
+            estimated_output_tokens=estimation_result["estimated_output_tokens"]
+            * estimation_result["number_of_llm_calls"],
             estimated_cost=total_cost,
-            cost_breakdown={"execution": cost, "introspection": introspection_cost},
+            cost_breakdown={"execution": base_cost, "introspection": introspection_cost},
             explanation=(
-                f"Basic estimation for V1 step: {input_tokens} input + "
-                f"{output_tokens} output tokens"
+                f"LLM-driven estimation for V1 step: "
+                f"{estimation_result['estimated_input_tokens']} input x "
+                f"{estimation_result['number_of_llm_calls']} calls + "
+                f"{estimation_result['estimated_output_tokens']} output x "
+                f"{estimation_result['number_of_llm_calls']} calls"
             ),
             has_condition=has_condition,
             introspection_cost=introspection_cost,
@@ -237,12 +240,16 @@ Provide your estimate as JSON with this exact structure:
 
     def _estimate_v2_step_cost(self, step: StepV2, model_name: str) -> StepCostEstimate:
         """Estimate cost for a V2 plan step using LLM-driven estimation."""
-        step_name = step.step_name
         step_type = type(step).__name__
 
         task = self._extract_step_task(step)
 
-        tools = self._get_step_tools(step)
+        try:
+            dummy_plan = PlanV2(steps=[step])
+            tools = step.to_legacy_step(dummy_plan).tool_id or ""
+        except (ValueError, AttributeError) as e:
+            logger().debug(f"Failed to convert step to legacy format: {e}")
+            tools = ""
 
         input_context_tokens = self._estimate_input_context(step)
 
@@ -260,12 +267,13 @@ Provide your estimate as JSON with this exact structure:
         introspection_cost = 0.0
 
         if has_condition:
-            introspection_cost = self._calculate_introspection_cost(model_name)
+            introspection_model_name = self.config.get_introspection_model().model_name
+            introspection_cost = self._calculate_introspection_cost(introspection_model_name)
 
         total_cost = base_cost + introspection_cost
 
         return StepCostEstimate(
-            step_name=step_name,
+            step_name=step.step_name,
             step_type=step_type,
             estimated_input_tokens=estimation_result["estimated_input_tokens"]
             * estimation_result["number_of_llm_calls"],
@@ -287,29 +295,12 @@ Provide your estimate as JSON with this exact structure:
             return step.task
         return f"Execute {type(step).__name__}"
 
-    def _get_step_tools(self, step: StepV2) -> str:
-        """Get tool information for a step."""
-        if isinstance(step, ReActAgentStep):
-            if step.tools:
-                tool_names = []
-                for tool in step.tools:
-                    if isinstance(tool, str):
-                        tool_names.append(tool)
-                    else:
-                        tool_names.append(tool.id)
-                return f"Tools: {', '.join(tool_names)}"
-            return "Tools: None"
-        if isinstance(step, SingleToolAgentStep):
-            tool_name = step.tool if isinstance(step.tool, str) else step.tool.id
-            return f"Tool: {tool_name}"
-        return "No tools"
-
     def _estimate_input_context(self, step: StepV2) -> int:
         """Estimate the input context size for a step."""
         base_context = 1000
 
-        if hasattr(step, "inputs") and getattr(step, "inputs", None):
-            inputs = getattr(step, "inputs", [])
+        inputs = getattr(step, "inputs", None)
+        if inputs:
             for _inp in inputs:
                 base_context += 200
 
@@ -319,11 +310,6 @@ Provide your estimate as JSON with this exact structure:
         self, step_type: str, task: str, model_name: str, tools: str, input_context_tokens: int
     ) -> dict[str, Any]:
         """Use LLM to estimate token usage for a step."""
-        from portia.end_user import EndUser
-        from portia.plan import Plan, PlanContext
-        from portia.plan_run import PlanRun, PlanRunState
-        from portia.tool import ToolRunContext
-
         plan = Plan(
             plan_context=PlanContext(query="cost_estimation", tool_ids=[]),
             plan_inputs=[],
@@ -356,16 +342,17 @@ Provide your estimate as JSON with this exact structure:
         try:
             response = self.estimation_tool.run(context, prompt)
 
-            if isinstance(response, str):
-                start_idx = response.find("{")
-                end_idx = response.rfind("}") + 1
-                if start_idx != -1 and end_idx != 0:
-                    json_str = response[start_idx:end_idx]
-                    return json.loads(json_str)
+            if isinstance(response, LLMEstimationResult):
+                return {
+                    "estimated_input_tokens": response.estimated_input_tokens,
+                    "estimated_output_tokens": response.estimated_output_tokens,
+                    "number_of_llm_calls": response.number_of_llm_calls,
+                    "reasoning": response.reasoning,
+                }
 
             return self._get_fallback_estimation(step_type)
 
-        except (json.JSONDecodeError, ValueError, KeyError, Exception) as e:
+        except Exception as e:
             logger().warning(f"LLM estimation failed: {e}, using fallback")
             return self._get_fallback_estimation(step_type)
 
@@ -387,8 +374,14 @@ Provide your estimate as JSON with this exact structure:
             "SingleToolAgentStep": {
                 "estimated_input_tokens": 1500,
                 "estimated_output_tokens": 400,
-                "number_of_llm_calls": 2,
-                "reasoning": "Fallback: Tool agent with argument parsing",
+                "number_of_llm_calls": 1,
+                "reasoning": "Fallback: One-shot tool agent with single call",
+            },
+            "ExecutionAgentStep": {
+                "estimated_input_tokens": 1200,
+                "estimated_output_tokens": 350,
+                "number_of_llm_calls": 1,
+                "reasoning": "Fallback: One-shot execution agent with single call",
             },
         }
 
@@ -397,8 +390,8 @@ Provide your estimate as JSON with this exact structure:
             {
                 "estimated_input_tokens": 1000,
                 "estimated_output_tokens": 300,
-                "number_of_llm_calls": 2,
-                "reasoning": f"Fallback: Unknown step type {step_type}",
+                "number_of_llm_calls": 1,
+                "reasoning": f"Fallback: Unknown step type {step_type}, assuming one-shot",
             },
         )
 
@@ -411,12 +404,29 @@ Provide your estimate as JSON with this exact structure:
 
     def _calculate_cost(self, input_tokens: int, output_tokens: int, model_name: str) -> float:
         """Calculate the cost in USD for the given token usage."""
-        pricing = MODEL_PRICING.get(model_name, DEFAULT_MODEL_PRICING)
+        pricing = self._get_model_pricing(model_name)
 
         input_cost = (input_tokens / 1_000_000) * pricing["input"]
         output_cost = (output_tokens / 1_000_000) * pricing["output"]
 
         return input_cost + output_cost
+
+    def _get_model_pricing(self, model_name: str) -> dict[str, float]:
+        """Get pricing information for a model from LiteLLM or fallback to defaults."""
+        try:
+            cost_map = litellm.get_model_cost_map(LITELLM_PRICING_URL)
+
+            if model_name in cost_map:
+                model_data = cost_map[model_name]
+                return {
+                    "input": model_data.get("input_cost_per_token", 5.00e-6) * 1_000_000,
+                    "output": model_data.get("output_cost_per_token", 15.00e-6) * 1_000_000,
+                }
+
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            logger().warning(f"Failed to fetch LiteLLM pricing data: {e}, using default pricing")
+
+        return DEFAULT_MODEL_PRICING
 
     def _get_methodology_explanation(self) -> str:
         """Get explanation of the cost estimation methodology."""
@@ -426,11 +436,12 @@ Cost estimation methodology:
 2. Uses LLM-driven estimation to predict token usage based on step complexity
 3. Accounts for multiple LLM calls per step (execution agents make 2-3 calls)
 4. Includes introspection agent costs for conditional steps
-5. Applies current model pricing per million tokens
+5. Applies current model pricing from LiteLLM's maintained pricing data
 6. Estimates both input (prompts) and output (responses) token usage
 
 This approach adapts to changes in the SDK without requiring manual updates
-to complex calculation methods.
+to complex calculation methods. Pricing data is sourced from LiteLLM's
+centralized pricing database for accuracy and up-to-date information.
         """.strip()
 
     def _get_limitations_explanation(self) -> str:
