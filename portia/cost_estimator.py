@@ -213,8 +213,14 @@ Please provide your estimate with a brief explanation of your reasoning.
         introspection_cost = 0.0
 
         if has_condition:
-            introspection_model_name = self.config.get_introspection_model().model_name
-            introspection_cost = self._calculate_introspection_cost(introspection_model_name)
+            introspection_model = self.config.get_introspection_model()
+            if introspection_model is not None:
+                introspection_model_name = introspection_model.model_name
+                introspection_cost = self._calculate_introspection_cost(introspection_model_name)
+            else:
+                default_model = self.config.get_default_model()
+                introspection_model_name = default_model.model_name if default_model else "gpt-4o"
+                introspection_cost = self._calculate_introspection_cost(introspection_model_name)
 
         total_cost = base_cost + introspection_cost
 
@@ -267,8 +273,14 @@ Please provide your estimate with a brief explanation of your reasoning.
         introspection_cost = 0.0
 
         if has_condition:
-            introspection_model_name = self.config.get_introspection_model().model_name
-            introspection_cost = self._calculate_introspection_cost(introspection_model_name)
+            introspection_model = self.config.get_introspection_model()
+            if introspection_model is not None:
+                introspection_model_name = introspection_model.model_name
+                introspection_cost = self._calculate_introspection_cost(introspection_model_name)
+            else:
+                default_model = self.config.get_default_model()
+                introspection_model_name = default_model.model_name if default_model else "gpt-4o"
+                introspection_cost = self._calculate_introspection_cost(introspection_model_name)
 
         total_cost = base_cost + introspection_cost
 
@@ -352,7 +364,7 @@ Please provide your estimate with a brief explanation of your reasoning.
 
             return self._get_fallback_estimation(step_type)
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             logger().warning(f"LLM estimation failed: {e}, using fallback")
             return self._get_fallback_estimation(step_type)
 

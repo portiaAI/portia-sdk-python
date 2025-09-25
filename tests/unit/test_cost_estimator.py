@@ -104,7 +104,11 @@ def test_extract_step_task(estimator: CostEstimator) -> None:
 
     mock_step = MagicMock()
     mock_step.__class__.__name__ = "MockStep"
-    del mock_step.task
+    type(mock_step).task = property(
+        lambda _: (_ for _ in ()).throw(
+            AttributeError("'MockStep' object has no attribute 'task'")
+        )
+    )
     result = estimator._extract_step_task(mock_step)
     assert result == "Execute MockStep"
 
@@ -113,7 +117,11 @@ def test_extract_step_task_coverage(estimator: CostEstimator) -> None:
     """Test additional coverage of step task extraction."""
     mock_step = MagicMock()
     mock_step.__class__.__name__ = "CustomStep"
-    delattr(mock_step, "task") 
+    type(mock_step).task = property(
+        lambda _: (_ for _ in ()).throw(
+            AttributeError("'CustomStep' object has no attribute 'task'")
+        )
+    )
 
     result = estimator._extract_step_task(mock_step)
     assert result == "Execute CustomStep"
@@ -141,7 +149,7 @@ def test_get_fallback_estimation(estimator: CostEstimator) -> None:
     assert react_estimation["estimated_input_tokens"] == 2000
 
     unknown_estimation = estimator._get_fallback_estimation("UnknownStep")
-    assert unknown_estimation["number_of_llm_calls"] == 1 
+    assert unknown_estimation["number_of_llm_calls"] == 1
     assert "Unknown step type" in unknown_estimation["reasoning"]
 
 
@@ -225,7 +233,7 @@ def test_estimate_input_context_additional_coverage(estimator: CostEstimator) ->
     step_many_inputs = LLMStep(
         step_name="test",
         task="Test",
-        inputs=[f"input{i}" for i in range(10)],  
+        inputs=[f"input{i}" for i in range(10)],
     )
     context_many_inputs = estimator._estimate_input_context(step_many_inputs)
     expected = 1000 + (10 * 200)  # Base + (number_of_inputs * 200)
@@ -292,8 +300,8 @@ def test_estimate_v2_step_cost(mock_llm_estimation: MagicMock, estimator: CostEs
     assert isinstance(estimate, StepCostEstimate)
     assert estimate.step_name == "test_step"
     assert estimate.step_type == "LLMStep"
-    assert estimate.estimated_input_tokens == 2000 
-    assert estimate.estimated_output_tokens == 600  
+    assert estimate.estimated_input_tokens == 2000
+    assert estimate.estimated_output_tokens == 600
     assert estimate.estimated_cost > 0
     assert "Test reasoning" in estimate.explanation
 
