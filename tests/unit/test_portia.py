@@ -3137,3 +3137,37 @@ def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia
             "run_plan should be called outside of an async context: Use arun_plan instead"
             in str(exc_info.value)
         )
+
+
+def test_portia_context_integration() -> None:
+    """Test that Portia properly creates and uses PortiaContext."""
+    from portia.core.context import PortiaContext
+
+    with mock.patch.dict(
+        "os.environ",
+        {
+            "PORTIA_API_KEY": "",
+            "PORTIA_API_ENDPOINT": "",
+            "OPENAI_API_KEY": "123",
+        },
+    ):
+        portia = Portia()
+
+        # Verify that the PortiaContext was created
+        assert hasattr(portia, 'context')
+        assert isinstance(portia.context, PortiaContext)
+
+        # Verify that context has all required attributes
+        assert portia.context.config is not None
+        assert portia.context.logger_manager is not None
+        assert portia.context.storage is not None
+        assert portia.context.tool_registry is not None
+        assert portia.context.telemetry is not None
+        assert portia.context.execution_hooks is not None
+
+        # Verify backward compatibility - attributes should be accessible directly on portia
+        assert portia.config is portia.context.config
+        assert portia.storage is portia.context.storage
+        assert portia.tool_registry is portia.context.tool_registry
+        assert portia.telemetry is portia.context.telemetry
+        assert portia.execution_hooks is portia.context.execution_hooks

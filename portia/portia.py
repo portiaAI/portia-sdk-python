@@ -41,10 +41,11 @@ from portia.cloud import PortiaCloudClient
 from portia.config import (
     Config,
     ExecutionAgentType,
-    GenerativeModelsConfig,
     PlanningAgentType,
     StorageClass,
 )
+from portia.core.context import PortiaContext
+from portia.core.logging import log_models
 from portia.end_user import EndUser
 from portia.errors import (
     InvalidPlanRunStateError,
@@ -132,33 +133,53 @@ class Portia:
             telemetry (BaseProductTelemetry | None): Anonymous telemetry service.
 
         """
-        self.config = config if config else Config.from_default()
-        logger_manager.configure_from_config(self.config)
+        # Initialize individual components
+        config = config if config else Config.from_default()
+        logger_manager.configure_from_config(config)
         logger().info(f"Starting Portia v{get_version()}")
-        if self.config.portia_api_key and self.config.portia_api_endpoint:
-            logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
-        self._log_models(self.config)
-        self.telemetry = telemetry if telemetry else ProductTelemetry()
-        self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
-        if not self.config.has_api_key("portia_api_key"):
+        if config.portia_api_key and config.portia_api_endpoint:
+            logger().info(f"Using Portia cloud API endpoint: {config.portia_api_endpoint}")
+        log_models(config)
+
+        telemetry = telemetry if telemetry else ProductTelemetry()
+        execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
+
+        if not config.has_api_key("portia_api_key"):
             logger().warning(
                 "No Portia API key found, Portia cloud tools and storage will not be available.",
             )
 
         if isinstance(tools, ToolRegistry):
-            self.tool_registry = tools
+            tool_registry = tools
         elif isinstance(tools, list):
-            self.tool_registry = ToolRegistry(tools)
+            tool_registry = ToolRegistry(tools)
         else:
-            self.tool_registry = DefaultToolRegistry(self.config)
+            tool_registry = DefaultToolRegistry(config)
 
-        match self.config.storage_class:
+        match config.storage_class:
             case StorageClass.MEMORY:
-                self.storage = InMemoryStorage()
+                storage = InMemoryStorage()
             case StorageClass.DISK:
-                self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
+                storage = DiskFileStorage(storage_dir=config.storage_dir)
             case StorageClass.CLOUD:
-                self.storage = PortiaCloudStorage(config=self.config)
+                storage = PortiaCloudStorage(config=config)
+
+        # Create the PortiaContext with all components
+        self.context = PortiaContext(
+            config=config,
+            logger_manager=logger_manager,
+            storage=storage,
+            tool_registry=tool_registry,
+            telemetry=telemetry,
+            execution_hooks=execution_hooks,
+        )
+
+        # Keep backward compatibility by exposing context attributes directly
+        self.config = self.context.config
+        self.storage = self.context.storage
+        self.tool_registry = self.context.tool_registry
+        self.telemetry = self.context.telemetry
+        self.execution_hooks = self.context.execution_hooks
 
     def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
         """Handle initializing the end_user based on the provided type."""
@@ -2893,10 +2914,3 @@ class Portia:
                 branch_stack.pop()
         return None
 
-    @staticmethod
-    def _log_models(config: Config) -> None:
-        """Log the models set in the configuration."""
-        logger().debug("Portia Generative Models")
-        for model in GenerativeModelsConfig.model_fields:
-            getter = getattr(config, f"get_{model}")
-            logger().debug(f"{model}: {getter()}")
