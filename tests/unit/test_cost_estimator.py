@@ -17,6 +17,7 @@ from portia.cost_estimator import (
     StepCostEstimate,
 )
 from portia.plan import Plan, PlanContext, PlanInput, Step
+from portia.builder.conditionals import ConditionalBlock
 
 
 @pytest.fixture
@@ -105,9 +106,7 @@ def test_extract_step_task(estimator: CostEstimator) -> None:
     mock_step = MagicMock()
     mock_step.__class__.__name__ = "MockStep"
     type(mock_step).task = property(
-        lambda _: (_ for _ in ()).throw(
-            AttributeError("'MockStep' object has no attribute 'task'")
-        )
+        lambda _: (_ for _ in ()).throw(AttributeError("'MockStep' object has no attribute 'task'"))
     )
     result = estimator._extract_step_task(mock_step)
     assert result == "Execute MockStep"
@@ -530,18 +529,20 @@ def test_pricing_reasonableness() -> None:
 
 def test_additional_step_types_coverage(estimator: CostEstimator) -> None:
     """Test coverage for different step types and edge cases."""
+    from portia.builder.conditionals import ConditionalBlock
     from portia.builder.llm_step import LLMStep
     from portia.builder.react_agent_step import ReActAgentStep
-    from portia.builder.conditionals import ConditionalBlock
-    
+
     step_with_conditional = LLMStep(step_name="conditional_step", task="Test conditional task")
     step_with_conditional.conditional_block = ConditionalBlock(clause_step_indexes=[0, 1])
-    
+
     estimate = estimator._estimate_v2_step_cost(step_with_conditional, "gpt-4o")
     assert estimate.has_condition
-    assert estimate.introspection_cost >= 0 
-    
-    react_step = ReActAgentStep(step_name="react_step", task="Test ReAct task", tools=["search_tool"])
+    assert estimate.introspection_cost >= 0
+
+    react_step = ReActAgentStep(
+        step_name="react_step", task="Test ReAct task", tools=["search_tool"]
+    )
     estimate = estimator._estimate_v2_step_cost(react_step, "gpt-4o")
     assert estimate.step_type == "ReActAgentStep"
     assert estimate.estimated_cost > 0
@@ -550,21 +551,21 @@ def test_additional_step_types_coverage(estimator: CostEstimator) -> None:
 def test_llm_estimation_fallback_paths(estimator: CostEstimator) -> None:
     """Test various fallback scenarios in LLM estimation."""
     from unittest.mock import patch
-    
-    with patch('portia.open_source_tools.llm_tool.LLMTool.run') as mock_run:
+
+    with patch("portia.open_source_tools.llm_tool.LLMTool.run") as mock_run:
         mock_run.return_value = "Just a string response, not structured"
-        
+
         result = estimator._get_llm_estimation("LLMStep", "test task", "gpt-4o", "test_tool", 1000)
-        
+
         assert "estimated_input_tokens" in result
         assert "estimated_output_tokens" in result
         assert result["number_of_llm_calls"] == 1
-    
-    with patch('portia.open_source_tools.llm_tool.LLMTool.run') as mock_run:
+
+    with patch("portia.open_source_tools.llm_tool.LLMTool.run") as mock_run:
         mock_run.side_effect = ValueError("API error")
-        
+
         result = estimator._get_llm_estimation("LLMStep", "test task", "gpt-4o", "test_tool", 1000)
-        
+
         assert "estimated_input_tokens" in result
         assert "estimated_output_tokens" in result
         assert result["number_of_llm_calls"] == 1
@@ -573,12 +574,11 @@ def test_llm_estimation_fallback_paths(estimator: CostEstimator) -> None:
 def test_model_pricing_exception_handling(estimator: CostEstimator) -> None:
     """Test exception handling in model pricing lookup."""
     from unittest.mock import patch
-    
-    with patch('litellm.get_model_cost_map') as mock_get_cost:
-       
+
+    with patch("litellm.get_model_cost_map") as mock_get_cost:
         mock_get_cost.side_effect = AttributeError("LiteLLM error")
         pricing = estimator._get_model_pricing("some-model")
-        
+
         assert "input" in pricing
         assert "output" in pricing
         assert pricing["input"] > 0
@@ -587,18 +587,19 @@ def test_model_pricing_exception_handling(estimator: CostEstimator) -> None:
 
 def test_step_conversion_failure_coverage(estimator: CostEstimator) -> None:
     """Test coverage for step conversion failure scenario."""
-    from unittest.mock import Mock, patch
+    from unittest.mock import Mock
+
     from portia.builder.llm_step import LLMStep
-    
+
     mock_step = Mock(spec=LLMStep)
     mock_step.step_name = "failing_step"
     mock_step.__class__.__name__ = "LLMStep"
     mock_step.task = "Test task"
-    
+
     mock_step.to_legacy_step = Mock(side_effect=ValueError("Conversion failed"))
-    
+
     result = estimator._estimate_v2_step_cost(mock_step, "gpt-4o")
-    
+
     assert result.estimated_cost > 0
     assert result.step_name == "failing_step"
 
@@ -606,22 +607,20 @@ def test_step_conversion_failure_coverage(estimator: CostEstimator) -> None:
 def test_edge_case_coverage_final() -> None:
     """Final test to push coverage to 100% - test edge cases."""
     import os
+
     if not os.getenv("OPENAI_API_KEY"):
         import pytest
+
         pytest.skip("OPENAI_API_KEY not set")
-    
-    from portia import Config
-    from portia.builder.llm_step import LLMStep  
-    from portia.builder.conditionals import ConditionalBlock
-    from portia.plan import Step
-    
+
+
     config = Config.from_default(default_model="openai/gpt-4o")
     estimator = CostEstimator(config)
-    
+
     v1_step = Step(task="Test task", output="$result", condition="len($result) > 0")
     estimate = estimator._estimate_v1_step_cost(v1_step, "gpt-4o")
     assert estimate.has_condition
-    
+
     v2_step = LLMStep(step_name="test", task="Test task")
     v2_step.conditional_block = ConditionalBlock(clause_step_indexes=[0])
     estimate = estimator._estimate_v2_step_cost(v2_step, "gpt-4o")

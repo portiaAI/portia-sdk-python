@@ -337,27 +337,28 @@ def test_v1_plan_estimation(estimator: CostEstimator) -> None:
             .step(task="Analyze market trends", output="$analysis")
             .step(
                 task="Generate investment recommendations based on $analysis",
-                output="$recommendations", 
-                condition="len($analysis) > 100"
+                output="$recommendations",
+                condition="len($analysis) > 100",
             )
             .build()
         )
-    
+
     estimate = estimator.plan_estimate(plan)
-    
+
     assert estimate.total_estimated_cost > 0
     assert len(estimate.step_estimates) == 2
     assert estimate.model_used == "gpt-4o"
     assert "V1Step" in [step.step_type for step in estimate.step_estimates]
-    
+
     conditional_steps = [step for step in estimate.step_estimates if step.has_condition]
     assert len(conditional_steps) == 1
     assert conditional_steps[0].introspection_cost > 0
-    
-    async def test_async_v1():
+
+    async def test_async_v1() -> None:
         async_estimate = await estimator.aplan_estimate(plan)
         assert async_estimate.total_estimated_cost > 0
         assert len(async_estimate.step_estimates) == 2
-    
+
     import asyncio
+
     asyncio.run(test_async_v1())
