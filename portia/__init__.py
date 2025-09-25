@@ -43,6 +43,9 @@ from portia.config import (
     default_config,
 )
 
+# Cost estimation
+from portia.cost_estimator import CostEstimator, PlanCostEstimate, StepCostEstimate
+
 # Error classes
 from portia.errors import (
     ConfigNotFoundError,
@@ -121,6 +124,7 @@ __all__ = [
     "ConditionalStep",
     "Config",
     "ConfigNotFoundError",
+    "CostEstimator",
     "CrawlTool",
     "CustomClarification",
     "DefaultToolRegistry",
@@ -157,6 +161,7 @@ __all__ = [
     "PlanBuilder",
     "PlanBuilderV2",
     "PlanContext",
+    "PlanCostEstimate",
     "PlanError",
     "PlanInput",
     "PlanNotFoundError",
@@ -175,6 +180,7 @@ __all__ = [
     "SseMcpClientConfig",
     "StdioMcpClientConfig",
     "Step",
+    "StepCostEstimate",
     "StepOutput",
     "StepV2",
     "StorageClass",
