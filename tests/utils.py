@@ -25,6 +25,7 @@ from portia.execution_agents.output import LocalDataValue
 from portia.model import GenerativeModel, LangChainGenerativeModel
 from portia.plan import Plan, PlanContext, Step, Variable
 from portia.plan_run import PlanRun
+from portia.execution_state import PlanTestBundle
 from portia.tool import Tool, ToolRunContext
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
@@ -45,9 +46,10 @@ def get_test_tool_context(
 ) -> ToolRunContext:
     """Return a test tool context for pytest fixtures."""
     if plan_run is None:
-        (plan, plan_run) = get_test_plan_run()
+        test_bundle = get_test_plan_run()
+        plan, plan_run = test_bundle.plan, test_bundle.plan_run
     else:
-        plan = get_test_plan_run()[0]
+        plan = get_test_plan_run().plan
     return ToolRunContext(
         plan_run=plan_run,
         config=config or get_test_config(),
@@ -57,7 +59,7 @@ def get_test_tool_context(
     )
 
 
-def get_test_plan_run() -> tuple[Plan, PlanRun]:
+def get_test_plan_run() -> PlanTestBundle:
     """Generate a simple test plan_run."""
     step1 = Step(
         task="Add $a + 2",
@@ -77,7 +79,7 @@ def get_test_plan_run() -> tuple[Plan, PlanRun]:
     plan_run.outputs.step_outputs = {
         "$a": LocalDataValue(value="3"),
     }
-    return plan, plan_run
+    return PlanTestBundle(plan=plan, plan_run=plan_run)
 
 
 def get_test_tool_call(plan_run: PlanRun) -> ToolCallRecord:

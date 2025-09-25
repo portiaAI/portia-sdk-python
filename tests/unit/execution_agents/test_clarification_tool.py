@@ -11,7 +11,8 @@ from tests.utils import get_test_config, get_test_plan_run
 
 def test_clarification_tool_raises_clarification() -> None:
     """Test that the clarification tool raises a clarification."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     tool = ClarificationTool(step=plan_run.current_step_index)
     ctx = ToolRunContext(
         end_user=EndUser(external_id="123"),

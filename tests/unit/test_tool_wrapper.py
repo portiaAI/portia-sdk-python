@@ -85,7 +85,8 @@ def mock_storage() -> MockStorage:
 
 def test_tool_call_wrapper_initialization(mock_tool: Tool, mock_storage: MockStorage) -> None:
     """Test initialization of the ToolCallWrapper."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(child_tool=mock_tool, storage=mock_storage, plan_run=plan_run)
     assert wrapper.name == mock_tool.name
     assert wrapper.description == mock_tool.description
@@ -93,7 +94,8 @@ def test_tool_call_wrapper_initialization(mock_tool: Tool, mock_storage: MockSto
 
 def test_tool_call_wrapper_run_success(mock_tool: Tool, mock_storage: MockStorage) -> None:
     """Test successful run of the ToolCallWrapper."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(mock_tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     result = wrapper.run(ctx, 1, 2)
@@ -106,7 +108,8 @@ def test_tool_call_wrapper_run_with_exception(
 ) -> None:
     """Test run of the ToolCallWrapper when the child tool raises an exception."""
     tool = ErrorTool()
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError, match="Test error"):
@@ -118,7 +121,8 @@ def test_tool_call_wrapper_run_with_clarification(
     mock_storage: MockStorage,
 ) -> None:
     """Test run of the ToolCallWrapper when the child tool returns a Clarification."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     tool = ClarificationTool()
     wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
@@ -130,7 +134,8 @@ def test_tool_call_wrapper_run_with_clarification(
 
 def test_tool_call_wrapper_run_records_latency(mock_tool: Tool, mock_storage: MockStorage) -> None:
     """Test that the ToolCallWrapper records latency correctly."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(mock_tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     wrapper.run(ctx, 1, 2)
@@ -139,7 +144,8 @@ def test_tool_call_wrapper_run_records_latency(mock_tool: Tool, mock_storage: Mo
 
 def test_tool_call_wrapper_run_returns_none(mock_storage: MockStorage) -> None:
     """Test that the ToolCallWrapper records latency correctly."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(NoneTool(), mock_storage, plan_run)
     ctx = get_test_tool_context()
     wrapper.run(ctx)
@@ -151,7 +157,8 @@ def test_tool_call_wrapper_run_returns_none(mock_storage: MockStorage) -> None:
 @pytest.mark.asyncio
 async def test_tool_call_wrapper_arun_success(mock_tool: Tool, mock_storage: MockStorage) -> None:
     """Test successful async run of the ToolCallWrapper."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(mock_tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     result = await wrapper.arun(ctx, 1, 2)
@@ -172,7 +179,8 @@ async def test_tool_call_wrapper_arun_success(mock_tool: Tool, mock_storage: Moc
 async def test_tool_call_wrapper_arun_with_exception(mock_storage: MockStorage) -> None:
     """Test async run of the ToolCallWrapper when the child tool raises an exception."""
     tool = ErrorTool()
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     with pytest.raises(ToolHardError, match="Test error"):
@@ -192,7 +200,8 @@ async def test_tool_call_wrapper_arun_with_exception(mock_storage: MockStorage) 
 @pytest.mark.asyncio
 async def test_tool_call_wrapper_arun_with_clarification(mock_storage: MockStorage) -> None:
     """Test async run of the ToolCallWrapper when the child tool returns a Clarification."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     tool = ClarificationTool()
     wrapper = ToolCallWrapper(tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
@@ -216,7 +225,8 @@ async def test_tool_call_wrapper_arun_records_latency(
     mock_tool: Tool, mock_storage: MockStorage
 ) -> None:
     """Test that the ToolCallWrapper records latency correctly in async mode."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(mock_tool, mock_storage, plan_run)
     ctx = get_test_tool_context()
     await wrapper.arun(ctx, 1, 2)
@@ -235,7 +245,8 @@ async def test_tool_call_wrapper_arun_records_latency(
 @pytest.mark.asyncio
 async def test_tool_call_wrapper_arun_returns_none(mock_storage: MockStorage) -> None:
     """Test that the ToolCallWrapper handles None returns correctly in async mode."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     wrapper = ToolCallWrapper(NoneTool(), mock_storage, plan_run)
     ctx = get_test_tool_context()
     await wrapper.arun(ctx)
@@ -255,7 +266,8 @@ async def test_tool_call_wrapper_arun_returns_none(mock_storage: MockStorage) ->
 
 def test_get_tool_in_registry() -> None:
     """Test retrieval of a tool in a registry."""
-    _, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     tool = ToolCallWrapper.from_tool_id(
         CalculatorTool().id,
         DefaultToolRegistry(get_test_config()),
@@ -268,7 +280,8 @@ def test_get_tool_in_registry() -> None:
 
 def test_portia_get_tool_for_step_none_tool_id() -> None:
     """Test that when step.tool_id is None, LLMTool is used as fallback."""
-    _, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     tool = ToolCallWrapper.from_tool_id(
         None, DefaultToolRegistry(get_test_config()), InMemoryStorage(), plan_run
     )
@@ -277,7 +290,8 @@ def test_portia_get_tool_for_step_none_tool_id() -> None:
 
 def test_get_llm_tool_not_in_registry() -> None:
     """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
-    _, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     tool = ToolCallWrapper.from_tool_id(
         LLMTool.LLM_TOOL_ID, InMemoryToolRegistry.from_local_tools([]), InMemoryStorage(), plan_run
     )
@@ -287,7 +301,8 @@ def test_get_llm_tool_not_in_registry() -> None:
 
 def test_get_tool_not_in_registry() -> None:
     """Test special case retrieval of LLMTool as it isn't explicitly in most tool registries."""
-    _, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     with pytest.raises(ToolNotFoundError):
         ToolCallWrapper.from_tool_id(
             "not_in_registry",

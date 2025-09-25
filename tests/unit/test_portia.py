@@ -919,7 +919,8 @@ def test_portia_run_query_with_summary(portia: Portia, planning_model: MagicMock
 
 def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
     """Test that final output is set with correct summary."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.steps = [
         Step(
             task="Get weather in London",
@@ -963,7 +964,8 @@ def test_portia_sets_final_output_with_summary(portia: Portia) -> None:
 
 def test_portia_sets_final_output_with_structured_summary(portia: Portia) -> None:
     """Test that final output is set with correct structured summary."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.steps = [
         Step(
             task="Get weather in London",
@@ -1110,7 +1112,8 @@ def test_portia_run_query_with_memory(
 
 def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
     """Test that final output is set even if summary generation fails."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # Mock the SummarizerAgent to raise an exception
     mock_agent = mock.MagicMock()
@@ -1131,7 +1134,8 @@ def test_portia_get_final_output_handles_summary_error(portia: Portia) -> None:
 
 def test_portia_wait_for_ready_max_retries(portia: Portia) -> None:
     """Test wait for ready with max retries."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan_run.state = PlanRunState.NEED_CLARIFICATION
     portia.storage.save_plan(plan)
     portia.storage.save_plan_run(plan_run)
@@ -1141,7 +1145,8 @@ def test_portia_wait_for_ready_max_retries(portia: Portia) -> None:
 
 def test_portia_wait_for_ready_backoff_period(portia: Portia) -> None:
     """Test wait for ready with backoff period."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan_run.state = PlanRunState.NEED_CLARIFICATION
     portia.storage.save_plan(plan)
     portia.storage.get_plan_run = mock.MagicMock(return_value=plan_run)
@@ -1153,7 +1158,8 @@ def test_portia_wait_for_ready_backoff_period(portia: Portia) -> None:
 
 def test_portia_resolve_clarification_error(portia: Portia) -> None:
     """Test resolve error."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan2, plan_run2 = get_test_plan_run()
     clarification = InputClarification(
         user_guidance="",
@@ -1174,7 +1180,8 @@ def test_portia_resolve_clarification_error(portia: Portia) -> None:
 
 def test_portia_resolve_clarification(portia: Portia, telemetry: MagicMock) -> None:
     """Test resolve success."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     clarification = InputClarification(
         user_guidance="",
         argument_name="",
@@ -3094,7 +3101,8 @@ def test_portia_execute_plan_run_and_handle_clarifications_keyboard_interrupt(
     portia: Portia,
 ) -> None:
     """Test that KeyboardInterrupt is handled correctly."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     with (
         mock.patch.object(portia, "_execute_plan_run", side_effect=KeyboardInterrupt()),

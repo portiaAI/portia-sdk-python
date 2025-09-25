@@ -1841,7 +1841,8 @@ async def test_portia_aexecute_plan_run_and_handle_clarifications_keyboard_inter
     portia: Portia,
 ) -> None:
     """Test that KeyboardInterrupt is handled correctly in async version."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     with (
         mock.patch.object(portia, "_aexecute_plan_run", side_effect=KeyboardInterrupt()),

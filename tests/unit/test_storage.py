@@ -121,7 +121,8 @@ def test_storage_base_classes() -> None:
 def test_in_memory_storage() -> None:
     """Test in memory storage."""
     storage = InMemoryStorage()
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     storage.save_plan(plan)
     assert storage.get_plan(plan.id) == plan
     storage.save_plan_run(plan_run)
@@ -182,7 +183,8 @@ def test_in_memory_storage() -> None:
 def test_disk_storage(tmp_path: Path) -> None:
     """Test disk storage."""
     storage = DiskFileStorage(storage_dir=str(tmp_path))
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     storage.save_plan(plan)
     assert storage.get_plan(plan.id) == plan
     storage.save_plan_run(plan_run)

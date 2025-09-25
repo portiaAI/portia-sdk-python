@@ -56,7 +56,8 @@ class MultiplyTool(AdditionTool):
 @pytest.fixture
 def mock_run_context() -> RunContext:
     """Create a mock run context for testing."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     config = get_test_config()
 
     # Create mock run context

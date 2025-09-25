@@ -18,7 +18,8 @@ from tests.utils import get_test_config, get_test_plan_run
 
 def test_memory_extraction_step_no_inputs() -> None:
     """Test MemoryExtractionStep with no step inputs."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     agent = BaseExecutionAgent(
         plan=PlanBuilder().step(task="DESCRIPTION_STRING", output="$out").build(),
         plan_run=plan_run,
@@ -36,7 +37,8 @@ def test_memory_extraction_step_no_inputs() -> None:
 
 def test_memory_extraction_step_with_inputs() -> None:
     """Test MemoryExtractionStep with step inputs (one local, one from agent memory)."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
 
     storage = InMemoryStorage()
     saved_output = storage.save_plan_run_output(
@@ -81,7 +83,8 @@ def test_memory_extraction_step_with_inputs() -> None:
 
 def test_memory_extraction_step_errors_with_missing_input() -> None:
     """Test MemoryExtractionStep ignores step inputs that aren't in previous outputs."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     agent = BaseExecutionAgent(
         plan=PlanBuilder()
         .step(
@@ -107,7 +110,8 @@ def test_memory_extraction_step_errors_with_missing_input() -> None:
 
 def test_memory_extraction_step_with_plan_run_inputs() -> None:
     """Test MemoryExtractionStep with inputs from plan_run_inputs."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     plan_run.plan_run_inputs = {
         "$plan_run_input": LocalDataValue(value="plan_run_input_value"),
     }
@@ -140,7 +144,8 @@ def test_memory_extraction_step_with_plan_run_inputs() -> None:
 
 def test_memory_extraction_step_uses_summary_when_value_too_large() -> None:
     """Test MemoryExtractionStep uses summary when value exceeds context threshold."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
 
     plan_run.outputs.step_outputs = {
         "$large_output": LocalDataValue(
@@ -180,7 +185,8 @@ def test_memory_extraction_step_uses_summary_when_value_too_large() -> None:
 
 def test_memory_extraction_step_uses_summaries_when_multiple_values_too_large() -> None:
     """Test MemoryExtractionStep handles multiple large inputs."""
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
 
     plan_run.outputs.step_outputs = {
         "$large_output_1": LocalDataValue(value="x" * 10000, summary="Summary of largest value"),

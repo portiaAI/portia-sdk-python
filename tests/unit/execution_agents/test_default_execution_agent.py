@@ -578,7 +578,8 @@ def test_tool_calling_model_no_hallucinations() -> None:
         ),
     )
 
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     mock_before_tool_call = mock.MagicMock(return_value=None)
     mock_telemetry = mock.MagicMock()
     agent = SimpleNamespace(
@@ -643,7 +644,8 @@ def test_tool_calling_model_with_hallucinations() -> None:
         ),
     )
 
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     mock_telemetry = mock.MagicMock()
 
     clarification = InputClarification(
@@ -721,7 +723,8 @@ def test_tool_calling_model_templates_inputs() -> None:
         },
     ]
 
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     mock_model = get_mock_generative_model(templated_response)
     mock_telemetry = mock.MagicMock()
     step_inputs = [
@@ -781,7 +784,8 @@ def test_tool_calling_model_handles_missing_args_gracefully() -> None:
         },
     ]
 
-    (_, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan_run = test_bundle.plan_run
     mock_model = get_mock_generative_model(invalid_response)
     mock_telemetry = mock.MagicMock()
     verified_tool_inputs = VerifiedToolInputs(
@@ -878,7 +882,8 @@ def test_basic_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
     mock_after_tool_call = mock.MagicMock(return_value=None)
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = DefaultExecutionAgent(
         plan=plan,
         plan_run=plan_run,
@@ -945,7 +950,8 @@ def test_basic_agent_task_with_verified_args(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = DefaultExecutionAgent(
         plan=plan,
         plan_run=plan_run,
@@ -988,7 +994,8 @@ def test_default_execution_agent_edge_cases() -> None:
 
 def test_get_last_resolved_clarification() -> None:
     """Test get_last_resolved_clarification."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     resolved_clarification1 = InputClarification(
         plan_run_id=plan_run.id,
         argument_name="arg",
@@ -1034,7 +1041,8 @@ def test_get_last_resolved_clarification() -> None:
 
 def test_clarifications_or_continue() -> None:
     """Test clarifications_or_continue."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     clarification = InputClarification(
         plan_run_id=plan_run.id,
         argument_name="arg",
@@ -1084,7 +1092,8 @@ def test_clarifications_or_continue() -> None:
         source="Test clarifications or continue",
     )
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan_run.outputs.clarifications = [clarification]
     agent = DefaultExecutionAgent(
         plan=plan,
@@ -1118,7 +1127,8 @@ def test_clarifications_or_continue() -> None:
 
 def test_default_execution_agent_none_tool_execute_sync() -> None:
     """Test that executing DefaultExecutionAgent with None tool raises an exception."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     agent = DefaultExecutionAgent(
         plan=plan,
@@ -1173,7 +1183,8 @@ def test_optional_args_with_none_values() -> None:
     Required args with None values should always be marked made_up.
     Optional args with None values should be marked not made_up.
     """
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = DefaultExecutionAgent(
         plan=plan,
         plan_run=plan_run,
@@ -1241,7 +1252,8 @@ class ListTool(Tool):
 
 def test_list_args_with_str_values() -> None:
     """Test that list args with str values are handled correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = DefaultExecutionAgent(
         plan=plan,
         plan_run=plan_run,
@@ -1330,7 +1342,8 @@ def test_before_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) ->
             )
         return None
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # First execution - should return clarification
     agent = DefaultExecutionAgent(
@@ -1414,7 +1427,8 @@ def test_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPatch) -> 
             )
         return None
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # First execution - should return clarification after tool call
     agent = DefaultExecutionAgent(
