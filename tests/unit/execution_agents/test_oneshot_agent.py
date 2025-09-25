@@ -79,7 +79,8 @@ def test_oneshot_agent_task(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     mock_before_tool_call = mock.MagicMock(return_value=None)
     mock_after_tool_call = mock.MagicMock(return_value=None)
     tool = AdditionTool()
@@ -174,7 +175,8 @@ async def test_oneshot_agent_task_async(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     mock_before_tool_call = mock.MagicMock(return_value=None)
     mock_after_tool_call = mock.MagicMock(return_value=None)
     tool = AdditionTool()
@@ -221,7 +223,8 @@ async def test_oneshot_agent_task_async(monkeypatch: pytest.MonkeyPatch) -> None
 
 def test_oneshot_agent_without_tool_raises() -> None:
     """Test oneshot agent without tool raises."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     with pytest.raises(InvalidAgentError):
         OneShotAgent(
             plan=plan,
@@ -236,7 +239,8 @@ def test_oneshot_agent_without_tool_raises() -> None:
 @pytest.mark.asyncio
 async def test_oneshot_agent_without_tool_raises_async() -> None:
     """Test oneshot agent without tool raises (async version)."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     with pytest.raises(InvalidAgentError):
         await OneShotAgent(
             plan=plan,
@@ -332,7 +336,8 @@ def test_oneshot_before_tool_call_with_clarifications(monkeypatch: pytest.Monkey
             )
         return None
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # First execution - should return clarification
     agent = OneShotAgent(
@@ -461,7 +466,8 @@ async def test_oneshot_before_tool_call_with_clarifications_async(
             )
         return None
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # First execution - should return clarification
     agent = OneShotAgent(
@@ -550,7 +556,8 @@ def test_oneshot_after_tool_call_with_clarification(monkeypatch: pytest.MonkeyPa
             )
         return None
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # First execution - should return clarification after tool call
     agent = OneShotAgent(
@@ -632,7 +639,8 @@ async def test_oneshot_after_tool_call_with_clarification_async(
             )
         return None
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # First execution - should return clarification after tool call
     agent = OneShotAgent(
@@ -700,7 +708,8 @@ def test_oneshot_agent_calls_clarification_tool(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = OneShotAgent(
         plan=plan,
         plan_run=plan_run,
@@ -760,7 +769,8 @@ async def test_oneshot_agent_calls_clarification_tool_async(
 
     monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = OneShotAgent(
         plan=plan,
         plan_run=plan_run,
@@ -816,7 +826,8 @@ def test_oneshot_agent_templates_values(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr(ToolNode, "invoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
     step.inputs = [
         Variable(name="$email", description="User's email"),
@@ -884,7 +895,8 @@ async def test_oneshot_agent_templates_values_async(
 
     monkeypatch.setattr(ToolNode, "ainvoke", tool_call)
 
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
     step.inputs = [
         Variable(name="$email", description="User's email"),
@@ -916,7 +928,8 @@ async def test_oneshot_agent_templates_values_async(
 
 def test_oneshot_model_fails_without_tool() -> None:
     """Test that the oneshot model fails without a tool."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = OneShotAgent(
         plan=plan,
         plan_run=plan_run,
@@ -942,7 +955,8 @@ def test_oneshot_model_fails_without_tool() -> None:
 @pytest.mark.asyncio
 async def test_oneshot_model_fails_without_tool_async() -> None:
     """Test that the oneshot model fails without a tool (async version)."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = OneShotAgent(
         plan=plan,
         plan_run=plan_run,
@@ -969,7 +983,8 @@ async def test_oneshot_model_fails_without_tool_async() -> None:
 @pytest.mark.asyncio
 async def test_oneshot_tool_calling_model_ainvoke_success() -> None:
     """Test that OneShotToolCallingModel.ainvoke works correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = OneShotAgent(
         plan=plan,
         plan_run=plan_run,
@@ -1016,7 +1031,8 @@ async def test_oneshot_tool_calling_model_ainvoke_success() -> None:
 @pytest.mark.asyncio
 async def test_oneshot_tool_calling_model_ainvoke_with_execution_hooks() -> None:
     """Test that OneShotToolCallingModel.ainvoke handles execution hooks correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     mock_before_tool_call = mock.MagicMock(return_value=None)
     agent = OneShotAgent(
@@ -1065,7 +1081,8 @@ async def test_oneshot_tool_calling_model_ainvoke_with_execution_hooks() -> None
 @pytest.mark.asyncio
 async def test_oneshot_tool_calling_model_ainvoke_with_clarification_return() -> None:
     """Test OneShotToolCallingModel.ainvoke with clarification return."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     def before_tool_call(tool, args, plan_run, step) -> InputClarification:  # noqa: ANN001, ARG001
         return InputClarification(

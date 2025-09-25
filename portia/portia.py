@@ -76,6 +76,11 @@ from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, Re
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
+from portia.execution_state import (
+    IntrospectionResult,
+    PlanRunReadinessResult,
+    PlanRunSession,
+)
 from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
@@ -1172,13 +1177,13 @@ class Portia:
 
         plan = self.storage.get_plan(plan_id=plan_run.plan_id)
 
-        ready, plan_run = self._check_initial_readiness(plan, plan_run)
-        if not ready:
-            return plan_run
+        readiness_result = self._check_initial_readiness(plan, plan_run)
+        if not readiness_result.is_ready:
+            return readiness_result.plan_run
 
-        return self.execute_plan_run_and_handle_clarifications(plan, plan_run)
+        return self.execute_plan_run_and_handle_clarifications(plan, readiness_result.plan_run)
 
-    def _check_initial_readiness(self, plan: Plan, plan_run: PlanRun) -> tuple[bool, PlanRun]:
+    def _check_initial_readiness(self, plan: Plan, plan_run: PlanRun) -> PlanRunReadinessResult:
         """Check the initial readiness of the plan run."""
         if plan_run.state not in [
             PlanRunState.NOT_STARTED,
@@ -1189,7 +1194,7 @@ class Portia:
             logger().warning(
                 f"Plan run {plan_run.id} is in state {plan_run.state} so it can't be run - aborting"
             )
-            return False, plan_run
+            return PlanRunReadinessResult(is_ready=False, plan_run=plan_run)
 
         outstanding_clarifications = plan_run.get_outstanding_clarifications()
         ready_clarifications = self._check_remaining_tool_readiness(plan, plan_run)
@@ -1197,8 +1202,8 @@ class Portia:
             plan_run = self._raise_clarifications(clarifications_to_raise, plan_run)
             plan_run = self._handle_clarifications(plan_run)
             if len(plan_run.get_outstanding_clarifications()) > 0:
-                return False, plan_run
-        return True, plan_run
+                return PlanRunReadinessResult(is_ready=False, plan_run=plan_run)
+        return PlanRunReadinessResult(is_ready=True, plan_run=plan_run)
 
     async def _aresume(
         self,
@@ -1239,11 +1244,11 @@ class Portia:
 
         plan = await self.storage.aget_plan(plan_id=plan_run.plan_id)
 
-        ready, plan_run = self._check_initial_readiness(plan, plan_run)
-        if not ready:
-            return plan_run
+        readiness_result = self._check_initial_readiness(plan, plan_run)
+        if not readiness_result.is_ready:
+            return readiness_result.plan_run
 
-        return await self.aexecute_plan_run_and_handle_clarifications(plan, plan_run)
+        return await self.aexecute_plan_run_and_handle_clarifications(plan, readiness_result.plan_run)
 
     def _process_plan_input_values(  # noqa: C901
         self,
@@ -1920,12 +1925,13 @@ class Portia:
 
         """
         # Handle the introspection outcome
-        (plan_run, pre_step_outcome) = self._generate_introspection_outcome(
+        introspection_result = self._generate_introspection_outcome(
             introspection_agent=introspection_agent,
             plan=plan,
             plan_run=plan_run,
             last_executed_step_output=last_executed_step_output,
         )
+        plan_run, pre_step_outcome = introspection_result.plan_run, introspection_result.introspection
         self._handle_pre_step_outcome(plan, plan_run, pre_step_outcome)
         self._handle_before_step_execution_hook(plan, plan_run, step)
 
@@ -1963,12 +1969,13 @@ class Portia:
 
         """
         # Handle the introspection outcome
-        (plan_run, pre_step_outcome) = await self._agenerate_introspection_outcome(
+        introspection_result = await self._agenerate_introspection_outcome(
             introspection_agent=introspection_agent,
             plan=plan,
             plan_run=plan_run,
             last_executed_step_output=last_executed_step_output,
         )
+        plan_run, pre_step_outcome = introspection_result.plan_run, introspection_result.introspection
         self._handle_pre_step_outcome(plan, plan_run, pre_step_outcome)
         self._handle_before_step_execution_hook(plan, plan_run, step)
 
@@ -2224,7 +2231,7 @@ class Portia:
         plan: Plan,
         plan_run: PlanRun,
         last_executed_step_output: Output | None,
-    ) -> tuple[PlanRun, PreStepIntrospection]:
+    ) -> IntrospectionResult:
         """Generate the outcome of the pre-step introspection.
 
         Args:
@@ -2239,9 +2246,9 @@ class Portia:
 
         """
         if not self._should_introspect(plan, plan_run):
-            return (
-                plan_run,
-                PreStepIntrospection(
+            return IntrospectionResult(
+                plan_run=plan_run,
+                introspection=PreStepIntrospection(
                     outcome=PreStepIntrospectionOutcome.CONTINUE,
                     reason="No condition to evaluate.",
                 ),
@@ -2257,7 +2264,7 @@ class Portia:
             plan.steps[plan_run.current_step_index],
             last_executed_step_output,
         )
-        return (plan_run, pre_step_outcome)
+        return IntrospectionResult(plan_run=plan_run, introspection=pre_step_outcome)
 
     async def _agenerate_introspection_outcome(
         self,
@@ -2265,7 +2272,7 @@ class Portia:
         plan: Plan,
         plan_run: PlanRun,
         last_executed_step_output: Output | None,
-    ) -> tuple[PlanRun, PreStepIntrospection]:
+    ) -> IntrospectionResult:
         """Generate the outcome of the pre-step introspection asynchronously.
 
         Args:
@@ -2280,9 +2287,9 @@ class Portia:
 
         """
         if not self._should_introspect(plan, plan_run):
-            return (
-                plan_run,
-                PreStepIntrospection(
+            return IntrospectionResult(
+                plan_run=plan_run,
+                introspection=PreStepIntrospection(
                     outcome=PreStepIntrospectionOutcome.CONTINUE,
                     reason="No condition to evaluate.",
                 ),
@@ -2298,7 +2305,7 @@ class Portia:
             plan.steps[plan_run.current_step_index],
             last_executed_step_output,
         )
-        return (plan_run, pre_step_outcome)
+        return IntrospectionResult(plan_run=plan_run, introspection=pre_step_outcome)
 
     def _should_introspect(self, plan: Plan, plan_run: PlanRun) -> bool:
         """Determine if the step should be introspected."""
@@ -2695,10 +2702,11 @@ class Portia:
         if not end_user:
             end_user = self.storage.get_end_user(plan_run.end_user_id)
 
-        ready, plan_run = self._check_initial_readiness(legacy_plan, plan_run)
-        if not ready:
-            return plan_run
+        readiness_result = self._check_initial_readiness(legacy_plan, plan_run)
+        if not readiness_result.is_ready:
+            return readiness_result.plan_run
 
+        plan_run = readiness_result.plan_run
         run_data = RunContext(
             plan=plan,
             legacy_plan=legacy_plan,

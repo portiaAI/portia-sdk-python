@@ -40,7 +40,8 @@ def outputs() -> dict[str, Output]:
 
 def test_context_empty() -> None:
     """Test that the context is set up correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan_run.outputs.step_outputs = {}
     context = build_context(
         ToolRunContext(
@@ -62,7 +63,8 @@ def test_context_empty() -> None:
 
 def test_context_execution_context() -> None:
     """Test that the context is set up correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     context = build_context(
         ToolRunContext(
@@ -86,7 +88,8 @@ def test_context_execution_context() -> None:
 
 def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with inputs and outputs."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.steps[0].inputs = inputs
     plan_run.outputs.step_outputs = outputs
     context = build_context(
@@ -115,7 +118,8 @@ def test_context_inputs_and_outputs(inputs: list[Variable], outputs: dict[str, O
 
 def test_all_contexts(inputs: list[Variable], outputs: dict[str, Output]) -> None:
     """Test that the context is set up correctly with all contexts."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.steps[0].inputs = inputs
     plan_run.outputs.step_outputs = outputs
     clarifications = [
@@ -221,7 +225,8 @@ def test_context_inputs_outputs_clarifications(
     outputs: dict[str, Output],
 ) -> None:
     """Test that the context is set up correctly with inputs, outputs, and missing args."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     clarifications = [
         InputClarification(
             plan_run_id=plan_run.id,

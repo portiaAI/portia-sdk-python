@@ -38,7 +38,8 @@ class TestBaseExecutionAgent(BaseExecutionAgent):
 
 def test_base_agent_default_context() -> None:
     """Test default context."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = BaseExecutionAgent(
         plan,
         plan_run,
@@ -58,7 +59,8 @@ def test_base_agent_default_context() -> None:
 @pytest.mark.asyncio
 async def test_base_agent_execute_async_calls_sync() -> None:
     """Test that execute_async calls execute_sync when no async override is provided."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = TestBaseExecutionAgent(
         plan,
         plan_run,
@@ -125,7 +127,8 @@ def test_next_state_after_tool_call_no_error() -> None:
     execution_hooks = ExecutionHooks(
         after_tool_call=MagicMock(),
     )
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     agent = BaseExecutionAgent(
         plan,
         plan_run,
@@ -154,7 +157,8 @@ def test_next_state_after_tool_call_no_error() -> None:
 
 def test_next_state_after_tool_call_with_summarize() -> None:
     """Test next state when tool call succeeds and should summarize."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     tool = AdditionTool()
     tool.should_summarize = True
 
@@ -184,7 +188,8 @@ def test_next_state_after_tool_call_with_summarize() -> None:
 
 def test_next_state_after_tool_call_with_large_output() -> None:
     """Test next state when tool call succeeds and should summarize."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     tool = AdditionTool()
 
     agent = BaseExecutionAgent(
@@ -216,7 +221,8 @@ def test_next_state_after_tool_call_with_large_output() -> None:
 
 def test_next_state_after_tool_call_with_error_retry() -> None:
     """Test next state when tool call fails and max retries reached."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     tool = AdditionTool()
 
     agent = BaseExecutionAgent(
@@ -248,7 +254,8 @@ def test_next_state_after_tool_call_with_error_retry() -> None:
 
 def test_next_state_after_tool_call_with_clarification_artifact() -> None:
     """Test next state when tool call succeeds with clarification artifact."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     tool = AdditionTool()
     tool.should_summarize = True
 
@@ -288,7 +295,8 @@ def test_next_state_after_tool_call_with_clarification_artifact() -> None:
 
 def test_next_state_after_tool_call_with_list_of_clarifications() -> None:
     """Test next state when tool call succeeds with a list of clarifications as artifact."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     tool = AdditionTool()
     tool.should_summarize = True
 

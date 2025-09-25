@@ -25,7 +25,8 @@ def test_clarify_before_tool_call_first_call() -> None:
     """Test the cli_user_verify_before_tool_call hook on first call."""
     tool = AdditionTool()
     args = {"a": 1, "b": 2}
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
 
     result = clarify_on_all_tool_calls(tool, args, plan_run, step)
@@ -37,7 +38,8 @@ def test_clarify_before_tool_call_with_previous_yes_response() -> None:
     """Test the cli_user_verify_before_tool_call hook with a previous 'yes' response."""
     tool = AdditionTool()
     args = {"a": 1, "b": 2}
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
 
     # Create a previous clarification with 'yes' response
@@ -60,7 +62,8 @@ def test_clarify_before_tool_call_with_previous_negative_response() -> None:
     """Test the cli_user_verify_before_tool_call hook with a previous 'no' response."""
     tool = AdditionTool()
     args = {"a": 1, "b": 2}
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
 
     # Create a previous clarification with 'no' response
@@ -83,7 +86,8 @@ def test_clarify_before_tool_call_with_previous_negative_response_bare_clarifica
     """Test the cli_user_verify_before_tool_call hook with a previous 'no' response."""
     tool = AdditionTool()
     args = {"a": 1, "b": 2}
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
 
     # Create a previous clarification with 'no' response
@@ -109,7 +113,8 @@ def test_clarify_before_tool_call_with_unresolved_clarification() -> None:
     """Test the cli_user_verify_before_tool_call hook with a previous unresolved clarification."""
     tool = AdditionTool()
     args = {"a": 1, "b": 2}
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
 
     prev_clarification = UserVerificationClarification(
@@ -128,7 +133,8 @@ def test_clarify_before_tool_call_with_unresolved_clarification() -> None:
 
 def test_log_step_outputs() -> None:
     """Test the log_step_outputs function."""
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = Step(task="Test task", tool_id="test_tool", output="$output")
     output = LocalDataValue(value="Test output", summary="Test summary")
 
@@ -162,7 +168,8 @@ def test_clarify_on_tool_calls_first_call(
     tool = AdditionTool()
     tool.id = tool_to_test
     args = {"a": 1, "b": 2}
-    plan, plan_run = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     step = plan.steps[0]
 
     hook = clarify_on_tool_calls(tool_id)

@@ -72,7 +72,8 @@ def test_value_multi_choice_validation() -> None:
 
 def test_custom_clarification_deserialize(tmp_path: Path) -> None:
     """Test clarifications error on invalid response."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     clarification_one = CustomClarification(
         plan_run_id=plan_run.id,

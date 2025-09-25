@@ -38,7 +38,8 @@ def test_summarizer_agent_execute_sync(
 ) -> None:
     """Test that the summarizer agent correctly executes and returns a summary."""
     # Set up test data
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.plan_context.query = "What's the weather in London and what can I do?"
     plan.steps = [
         Step(
@@ -90,7 +91,8 @@ def test_summarizer_agent_empty_plan_run(
     mock_summarizer_model: mock.MagicMock,
 ) -> None:
     """Test summarizer agent with empty plan run."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.plan_context.query = "Empty query"
     plan.steps = []
     plan_run.outputs.step_outputs = {}
@@ -119,7 +121,8 @@ def test_summarizer_agent_handles_empty_response(
     mock_summarizer_model: mock.MagicMock,
 ) -> None:
     """Test that the agent handles None response from LLM."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.plan_context.query = "Test query"
 
     mock_summarizer_model.get_response.return_value = Message(content="", role="assistant")
@@ -135,7 +138,8 @@ def test_build_tasks_and_outputs_context(
     summarizer_config: Config,
 ) -> None:
     """Test that the tasks and outputs context is built correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # Set up test data
     plan.plan_context.query = "What's the weather in London and what can I do?"
@@ -176,7 +180,8 @@ def test_build_tasks_and_outputs_context(
 
 def test_build_tasks_and_outputs_context_empty() -> None:
     """Test that the tasks and outputs context handles empty steps and outputs."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # Empty plan and run
     plan.plan_context.query = "Empty query"
@@ -195,7 +200,8 @@ def test_build_tasks_and_outputs_context_empty() -> None:
 
 def test_build_tasks_and_outputs_context_partial_outputs() -> None:
     """Test that the context builder handles steps with missing outputs."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     # Set up test data with missing output
     plan.plan_context.query = "What's the weather in London?"
@@ -233,7 +239,8 @@ def test_build_tasks_and_outputs_context_partial_outputs() -> None:
 
 def test_build_tasks_and_outputs_context_with_conditional_outcomes() -> None:
     """Test that the context builder correctly uses summary for conditional outcomes."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
 
     plan.plan_context.query = "Test query with conditional outcomes"
     plan.steps = [
@@ -290,7 +297,8 @@ def test_summarizer_agent_handles_structured_output_with_fo_summary(
 ) -> None:
     """Test that the summarizer agent correctly executes and returns a structured output."""
     # Set up test data
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.plan_context.query = "What's the weather in London and what can I do?"
     plan.steps = [
         Step(
@@ -352,7 +360,8 @@ def test_summarizer_agent_handles_large_response(
     mock_summarizer_model: mock.MagicMock,
 ) -> None:
     """Test that the agent handles large response from the tool correctly."""
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     plan.steps = [
         Step(
             task="Process very large dataset",

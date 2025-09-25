@@ -88,7 +88,8 @@ def test_portia_cloud_storage() -> None:
     """Test cloud storage."""
     config = Config.from_default()
     storage = PortiaCloudStorage(config)
-    (plan, plan_run) = get_test_plan_run()
+    test_bundle = get_test_plan_run()
+    plan, plan_run = test_bundle.plan, test_bundle.plan_run
     storage.save_plan(plan)
     assert storage.get_plan(plan.id) == plan
     storage.save_plan_run(plan_run)
