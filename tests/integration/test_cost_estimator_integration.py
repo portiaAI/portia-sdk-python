@@ -11,6 +11,7 @@ from portia import (
     Config,
     CostEstimator,
     Input,
+    PlanBuilder,
     PlanBuilderV2,
 )
 
@@ -326,3 +327,37 @@ def test_cost_breakdown_details(estimator: CostEstimator) -> None:
             assert step_estimate.introspection_cost > 0
             if "introspection" in step_estimate.cost_breakdown:
                 assert step_estimate.cost_breakdown["introspection"] > 0
+
+
+def test_v1_plan_estimation(estimator: CostEstimator) -> None:
+    """Test cost estimation for V1 legacy plans to improve coverage."""
+    with pytest.warns(DeprecationWarning, match="Use PlanBuilderV2 instead"):
+        plan = (
+            PlanBuilder("Legacy V1 plan for coverage testing")
+            .step(task="Analyze market trends", output="$analysis")
+            .step(
+                task="Generate investment recommendations based on $analysis",
+                output="$recommendations", 
+                condition="len($analysis) > 100"
+            )
+            .build()
+        )
+    
+    estimate = estimator.plan_estimate(plan)
+    
+    assert estimate.total_estimated_cost > 0
+    assert len(estimate.step_estimates) == 2
+    assert estimate.model_used == "gpt-4o"
+    assert "V1Step" in [step.step_type for step in estimate.step_estimates]
+    
+    conditional_steps = [step for step in estimate.step_estimates if step.has_condition]
+    assert len(conditional_steps) == 1
+    assert conditional_steps[0].introspection_cost > 0
+    
+    async def test_async_v1():
+        async_estimate = await estimator.aplan_estimate(plan)
+        assert async_estimate.total_estimated_cost > 0
+        assert len(async_estimate.step_estimates) == 2
+    
+    import asyncio
+    asyncio.run(test_async_v1())
