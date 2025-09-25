@@ -13,16 +13,14 @@ from portia.builder.exit_step import ExitStep
 from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.llm_step import LLMStep
 from portia.builder.loop_step import LoopStep
-from portia.builder.loops import LoopStepType, LoopType
+from portia.builder.loops import LoopBlock, LoopStepType, LoopType
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Input, StepOutput
 from portia.builder.single_tool_agent_step import SingleToolAgentStep
-from portia.builder.step_v2 import (
-    LoopBlock,
-    StepV2,
-)
+from portia.builder.step_v2 import StepV2
+from portia.builder.sub_plan_step import SubPlanStep
 from portia.builder.user_input import UserInputStep
 from portia.builder.user_verify import UserVerifyStep
 from portia.plan import PlanInput, Step
@@ -30,6 +28,7 @@ from portia.tool import Tool
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
+    from portia.plan import Step
     from portia.run_context import RunContext
 
 
@@ -712,8 +711,23 @@ def test_add_step_method_with_different_step_types() -> None:
     assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
 
-def test_add_steps_method_with_iterable() -> None:
-    """Test the add_steps() method with an iterable of steps."""
+def test_add_sub_plan_method() -> None:
+    """Test the add_sub_plan() method."""
+    builder = PlanBuilderV2()
+
+    sub_plan = PlanBuilderV2().llm_step(task="Task from subplan", step_name="inner").build()
+
+    result = builder.add_sub_plan(sub_plan, step_name="run_sub")
+
+    assert len(result.plan.steps) == 1
+    sub_step = result.plan.steps[0]
+    assert isinstance(sub_step, SubPlanStep)
+    sub_step_typed: SubPlanStep = sub_step
+    assert sub_step_typed.step_name == "run_sub"
+
+
+def test_add_sub_plan_method_with_iterable() -> None:
+    """Test the add_sub_plan() method with an iterable of steps."""
     builder = PlanBuilderV2()
 
     steps = [
@@ -726,45 +740,16 @@ def test_add_steps_method_with_iterable() -> None:
         ),
     ]
 
-    result = builder.add_steps(steps)
+    result = builder.add_sub_plan(steps)
 
-    assert len(result.plan.steps) == 3
-    assert result.plan.steps[0] is steps[0]
-    assert result.plan.steps[1] is steps[1]
-    assert result.plan.steps[2] is steps[2]
-
-
-def test_add_steps_method_with_plan_v2() -> None:
-    """Test the add_steps() method with a PlanV2 instance."""
-    builder = PlanBuilderV2()
-
-    other_plan = PlanV2(
-        label="Other plan",
-        steps=[
-            LLMStep(task="Task from other plan", step_name="other_step1"),
-            InvokeToolStep(tool="other_tool", args={}, step_name="other_step2"),
-        ],
-        plan_inputs=[
-            PlanInput(name="other_input", description="Input from other plan"),
-            PlanInput(name="another_input", description="Another input", value="default"),
-        ],
-    )
-
-    result = builder.input(name="input1").add_steps(other_plan)
-
-    assert len(result.plan.steps) == 2
-    assert len(result.plan.plan_inputs) == 3
-
-    assert result.plan.steps[0] is other_plan.steps[0]
-    assert result.plan.steps[1] is other_plan.steps[1]
-
-    assert result.plan.plan_inputs[0].name == "input1"
-    assert result.plan.plan_inputs[1].name == "other_input"
-    assert result.plan.plan_inputs[2].name == "another_input"
+    # The steps are all added to the sub-plan
+    assert len(result.plan.steps) == 1
+    assert isinstance(result.plan.steps[0], SubPlanStep)
+    assert result.plan.steps[0].plan.steps == steps
 
 
-def test_add_steps_method_with_plan_v2_duplicate_inputs_error() -> None:
-    """Test the add_steps() method raises error for duplicate plan inputs."""
+def test_add_sub_plan_method_with_plan_v2_duplicate_inputs_error() -> None:
+    """Test the add_sub_plan() method raises error for duplicate plan inputs."""
     builder = PlanBuilderV2()
 
     builder.input(name="shared_input", description="Shared input name")
@@ -780,28 +765,29 @@ def test_add_steps_method_with_plan_v2_duplicate_inputs_error() -> None:
 
     # Should raise PlanBuilderError due to duplicate input
     with pytest.raises(PlanBuilderError, match="Duplicate input shared_input found in plan"):
-        builder.add_steps(other_plan)
+        builder.add_sub_plan(other_plan)
 
 
-def test_add_steps_method_with_empty_iterable() -> None:
-    """Test the add_steps() method with an empty iterable."""
-    builder = PlanBuilderV2().llm_step(task="Initial step").add_steps([])
-    assert len(builder.plan.steps) == 1
+def test_add_sub_plan_method_with_empty_iterable() -> None:
+    """Test the add_sub_plan() method with an empty iterable."""
+    builder = PlanBuilderV2().llm_step(task="Initial step").add_sub_plan([])
+    # The add_sub_plan still adds a step - it just does nothing
+    assert len(builder.plan.steps) == 2
 
 
-def test_add_steps_method_with_empty_plan_v2() -> None:
-    """Test the add_steps() method with an empty PlanV2."""
+def test_add_sub_plan_method_with_empty_plan_v2() -> None:
+    """Test the add_sub_plan() method with an empty PlanV2."""
     builder = PlanBuilderV2().input(name="existing_input").llm_step(task="Initial step")
     empty_plan = PlanBuilderV2().build()
 
-    result = builder.add_steps(empty_plan)
+    result = builder.add_sub_plan(empty_plan)
 
-    assert len(result.plan.steps) == 1
+    assert len(result.plan.steps) == 2
     assert len(result.plan.plan_inputs) == 1
 
 
-def test_add_steps_method_chaining_with_different_sources() -> None:
-    """Test chaining add_steps() method with different sources."""
+def test_add_sub_plan_method_chaining_with_different_sources() -> None:
+    """Test chaining add_sub_plan() method with different sources."""
     builder = PlanBuilderV2()
 
     step_list = [LLMStep(task="List step", step_name="list_step")]
@@ -811,17 +797,27 @@ def test_add_steps_method_chaining_with_different_sources() -> None:
         plan_inputs=[PlanInput(name="plan_input", description="From plan")],
     )
 
-    result = builder.add_steps(step_list).add_steps(plan_with_steps)
+    result = builder.add_sub_plan(step_list).add_sub_plan(plan_with_steps)
 
     assert len(result.plan.steps) == 2
     assert len(result.plan.plan_inputs) == 1
-    assert result.plan.steps[0].step_name == "list_step"
-    assert result.plan.steps[1].step_name == "plan_step"
-    assert result.plan.plan_inputs[0].name == "plan_input"
+    assert isinstance(result.plan.steps[0], SubPlanStep)
+    assert result.plan.steps[0].plan.plan_inputs == []
+    assert isinstance(result.plan.steps[1], SubPlanStep)
+    assert result.plan.steps[1].plan.plan_inputs == plan_with_steps.plan_inputs
 
 
-def test_add_step_and_add_steps_integration() -> None:
-    """Test integration of add_step and add_steps methods together."""
+def test_add_sub_plan_with_invalid_input_name_error() -> None:
+    """Test add_sub_plan raises error for invalid input names."""
+    builder = PlanBuilderV2()
+    sub_plan = PlanBuilderV2().input(name="valid_input").llm_step(task="Task").build()
+
+    with pytest.raises(PlanBuilderError):
+        builder.add_sub_plan(sub_plan, input_values={"invalid": "value"})
+
+
+def test_add_step_and_add_sub_plan_integration() -> None:
+    """Test integration of add_step and add_sub_plan methods together."""
     step_batch = (
         PlanBuilderV2()
         .invoke_tool_step(tool="batch_tool", args={}, step_name="batch1")
@@ -832,20 +828,19 @@ def test_add_step_and_add_steps_integration() -> None:
     builder = (
         PlanBuilderV2()
         .add_step(LLMStep(task="Individual step", step_name="individual"))
-        .add_steps(step_batch)
-        .add_steps(
+        .add_sub_plan(step_batch)
+        .add_sub_plan(
             PlanBuilderV2().add_step(LLMStep(task="From plan", step_name="from_plan")).build()
         )
         .add_step(SingleToolAgentStep(tool="final_tool", task="Final step", step_name="final"))
     )
 
-    assert len(builder.plan.steps) == 5
+    assert len(builder.plan.steps) == 4
     assert len(builder.plan.plan_inputs) == 0
-    assert builder.plan.steps[0].step_name == "individual"
-    assert builder.plan.steps[1].step_name == "batch1"
-    assert builder.plan.steps[2].step_name == "batch2"
-    assert builder.plan.steps[3].step_name == "from_plan"
-    assert builder.plan.steps[4].step_name == "final"
+    assert isinstance(builder.plan.steps[0], LLMStep)
+    assert isinstance(builder.plan.steps[1], SubPlanStep)
+    assert isinstance(builder.plan.steps[2], SubPlanStep)
+    assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
 
 def test_basic_if_endif_block() -> None:
@@ -1124,8 +1119,8 @@ def test_conditional_method_chaining() -> None:
     assert len(plan.plan_inputs) == 1
 
 
-def test_add_steps_with_input_values_single_value() -> None:
-    """Test add_steps with input_values setting a single input value."""
+def test_add_sub_plan_with_input_values_single_value() -> None:
+    """Test add_sub_plan with input_values setting a single input value."""
     builder = PlanBuilderV2()
 
     sub_plan = (
@@ -1135,15 +1130,15 @@ def test_add_steps_with_input_values_single_value() -> None:
         .build()
     )
 
-    result = builder.add_steps(sub_plan, input_values={"sub_input": "provided_value"})
+    result = builder.add_sub_plan(sub_plan, input_values={"sub_input": "provided_value"})
 
     assert len(result.plan.plan_inputs) == 1
     assert result.plan.plan_inputs[0].name == "sub_input"
     assert result.plan.plan_inputs[0].value == "provided_value"
 
 
-def test_add_steps_with_input_values_multiple_values_override_default() -> None:
-    """Test add_steps with input_values setting 2 out of 4 values, overriding default."""
+def test_add_sub_plan_with_input_values_multiple_values_override_default() -> None:
+    """Test add_sub_plan with input_values setting 2 out of 4 values, overriding default."""
     builder = PlanBuilderV2()
 
     sub_plan = (
@@ -1164,7 +1159,7 @@ def test_add_steps_with_input_values_multiple_values_override_default() -> None:
         .build()
     )
 
-    result = builder.add_steps(
+    result = builder.add_sub_plan(
         sub_plan,
         input_values={
             "input_no_default": "new_value_no_default",
@@ -1181,8 +1176,8 @@ def test_add_steps_with_input_values_multiple_values_override_default() -> None:
     assert inputs["input_unchanged2"].value == "unchanged_default"
 
 
-def test_add_steps_with_input_values_invalid_input_name_error() -> None:
-    """Test add_steps raises error when input_values contains invalid input name."""
+def test_add_sub_plan_with_input_values_invalid_input_name_error() -> None:
+    """Test add_sub_plan raises error when input_values contains invalid input name."""
     builder = PlanBuilderV2()
 
     sub_plan = (
@@ -1193,7 +1188,7 @@ def test_add_steps_with_input_values_invalid_input_name_error() -> None:
     )
 
     with pytest.raises(PlanBuilderError):
-        builder.add_steps(sub_plan, input_values={"invalid_input": "some_value"})
+        builder.add_sub_plan(sub_plan, input_values={"invalid_input": "some_value"})
 
 
 # Loop tests
