@@ -104,6 +104,9 @@ if TYPE_CHECKING:
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
+# Import PortiaContext for dependency management
+from portia.context import PortiaContext
+
 
 class Portia:
     """Portia client is the top level abstraction and entrypoint for most programs using the SDK.
@@ -132,33 +135,31 @@ class Portia:
             telemetry (BaseProductTelemetry | None): Anonymous telemetry service.
 
         """
-        self.config = config if config else Config.from_default()
+        # Initialize with PortiaContext for dependency management
+        self._context = PortiaContext(
+            config=config,
+            tools=tools,
+            execution_hooks=execution_hooks,
+            telemetry=telemetry,
+        )
+
+        # Maintain backward compatibility by exposing context properties as instance attributes
+        self.config = self._context.config
+        self.tool_registry = self._context.tool_registry
+        self.execution_hooks = self._context.execution_hooks
+        self.telemetry = self._context.telemetry
+        self.storage = self._context.storage
+
+        # Initialize logger and logging for the existing functionality
         logger_manager.configure_from_config(self.config)
         logger().info(f"Starting Portia v{get_version()}")
         if self.config.portia_api_key and self.config.portia_api_endpoint:
             logger().info(f"Using Portia cloud API endpoint: {self.config.portia_api_endpoint}")
         self._log_models(self.config)
-        self.telemetry = telemetry if telemetry else ProductTelemetry()
-        self.execution_hooks = execution_hooks if execution_hooks else ExecutionHooks()
-        if not self.config.has_api_key("portia_api_key"):
+        if not self._context.has_portia_api_key:
             logger().warning(
                 "No Portia API key found, Portia cloud tools and storage will not be available.",
             )
-
-        if isinstance(tools, ToolRegistry):
-            self.tool_registry = tools
-        elif isinstance(tools, list):
-            self.tool_registry = ToolRegistry(tools)
-        else:
-            self.tool_registry = DefaultToolRegistry(self.config)
-
-        match self.config.storage_class:
-            case StorageClass.MEMORY:
-                self.storage = InMemoryStorage()
-            case StorageClass.DISK:
-                self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
-            case StorageClass.CLOUD:
-                self.storage = PortiaCloudStorage(config=self.config)
 
     def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
         """Handle initializing the end_user based on the provided type."""

@@ -94,6 +94,8 @@ from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Ste
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
+from portia.client import PortiaClient
+from portia.context import PortiaContext
 from portia.portia import ExecutionHooks, Portia
 
 # Tool related classes
@@ -168,6 +170,8 @@ __all__ = [
     "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
+    "PortiaClient",
+    "PortiaContext",
     "PortiaToolRegistry",
     "ReActAgentStep",
     "SearchTool",
