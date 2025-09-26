@@ -228,3 +228,197 @@ class ReadOnlyPlanRun(PlanRun):
             plan_run_inputs=plan_run.plan_run_inputs,
             structured_output_schema=plan_run.structured_output_schema,
         )
+
+
+class PlanRunV2(BaseModel):
+    """A V2 plan run represents a running instance of a PlanV2.
+
+    This is the successor to PlanRun and is designed to work specifically with PlanV2
+    instances created via PlanBuilderV2. It provides improved performance, better
+    structure, and enhanced functionality while maintaining backward compatibility.
+
+    Attributes:
+        id (PlanRunUUID): A unique ID for this plan_run.
+        plan_id (PlanUUID): The ID of the Plan this run uses.
+        current_step_index (int): The current step that is being executed.
+        state (PlanRunState): The current state of the PlanRun.
+        outputs (PlanRunOutputs): Outputs of the PlanRun including clarifications.
+        plan_run_inputs (dict[str, LocalDataValue]): Dict mapping plan input names to their values.
+        end_user_id (str): The id of the end user this plan was run for.
+
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: PlanRunUUID = Field(
+        default_factory=PlanRunUUID,
+        description="A unique ID for this plan_run.",
+    )
+    plan_id: PlanUUID = Field(
+        description="The ID of the Plan this run uses.",
+    )
+    current_step_index: int = Field(
+        default=0,
+        description="The current step that is being executed",
+    )
+    state: PlanRunState = Field(
+        default=PlanRunState.NOT_STARTED,
+        description="The current state of the PlanRun.",
+    )
+    end_user_id: str = Field(
+        ...,
+        description="The id of the end user this plan was run for",
+    )
+    outputs: PlanRunOutputs = Field(
+        default=PlanRunOutputs(),
+        description="Outputs of the run including clarifications.",
+    )
+    plan_run_inputs: dict[str, LocalDataValue] = Field(
+        default_factory=dict,
+        description="Dict mapping plan input names to their values.",
+    )
+
+    structured_output_schema: type[BaseModel] | None = Field(
+        default=None,
+        exclude=True,
+        description="The optional structured output schema for the plan run.",
+    )
+
+    def get_outstanding_clarifications(self) -> ClarificationListType:
+        """Return all outstanding clarifications.
+
+        Returns:
+            ClarificationListType: A list of outstanding clarifications that have not been resolved.
+
+        """
+        return [
+            clarification
+            for clarification in self.outputs.clarifications
+            if not clarification.resolved
+        ]
+
+    def get_clarifications_for_step(self, step: int | None = None) -> ClarificationListType:
+        """Return clarifications for the given step.
+
+        Args:
+            step (int | None): the step to get clarifications for. Defaults to current step.
+
+        Returns:
+            ClarificationListType: A list of clarifications for the given step.
+
+        """
+        if step is None:
+            step = self.current_step_index
+        return [
+            clarification
+            for clarification in self.outputs.clarifications
+            if clarification.step == step
+        ]
+
+    def get_clarification_for_step(
+        self, category: ClarificationCategory, step: int | None = None
+    ) -> Clarification | None:
+        """Return a clarification of the given category for the given step if it exists.
+
+        Args:
+            step (int | None): the step to get a clarification for. Defaults to current step.
+            category (ClarificationCategory | None): the category of the clarification to get.
+
+        """
+        if step is None:
+            step = self.current_step_index
+        return next(
+            (
+                clarification
+                for clarification in self.outputs.clarifications
+                if clarification.step == step and clarification.category == category
+            ),
+            None,
+        )
+
+    def get_potential_step_inputs(self) -> dict[str, Output]:
+        """Return a dictionary of potential step inputs for future steps."""
+        return self.outputs.step_outputs | self.plan_run_inputs
+
+    def __str__(self) -> str:
+        """Return the string representation of the PlanRunV2.
+
+        Returns:
+            str: A string representation containing key run attributes.
+
+        """
+        return (
+            f"RunV2(id={self.id}, plan_id={self.plan_id}, "
+            f"state={self.state}, current_step_index={self.current_step_index}, "
+            f"final_output={'set' if self.outputs.final_output else 'unset'})"
+        )
+
+    @classmethod
+    def from_plan_run(cls, plan_run: PlanRun) -> PlanRunV2:
+        """Create a PlanRunV2 from a legacy PlanRun.
+
+        Args:
+            plan_run (PlanRun): The original run instance to convert.
+
+        Returns:
+            PlanRunV2: A new PlanRunV2 instance with the same data.
+        """
+        return cls(
+            id=plan_run.id,
+            plan_id=plan_run.plan_id,
+            current_step_index=plan_run.current_step_index,
+            outputs=plan_run.outputs,
+            state=plan_run.state,
+            end_user_id=plan_run.end_user_id,
+            plan_run_inputs=plan_run.plan_run_inputs,
+            structured_output_schema=plan_run.structured_output_schema,
+        )
+
+    def to_legacy_plan_run(self) -> PlanRun:
+        """Convert this PlanRunV2 to a legacy PlanRun for backward compatibility.
+
+        Returns:
+            PlanRun: A legacy PlanRun instance with the same data.
+        """
+        return PlanRun(
+            id=self.id,
+            plan_id=self.plan_id,
+            current_step_index=self.current_step_index,
+            outputs=self.outputs,
+            state=self.state,
+            end_user_id=self.end_user_id,
+            plan_run_inputs=self.plan_run_inputs,
+            structured_output_schema=self.structured_output_schema,
+        )
+
+
+class ReadOnlyPlanRunV2(PlanRunV2):
+    """A read-only copy of a Plan Run V2 passed to agents for reference.
+
+    This class provides a non-modifiable view of a plan run instance,
+    ensuring that agents can access run details without altering them.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @classmethod
+    def from_plan_run_v2(cls, plan_run: PlanRunV2) -> ReadOnlyPlanRunV2:
+        """Create a read-only plan run from a normal PlanRunV2.
+
+        Args:
+            plan_run (PlanRunV2): The original run instance to create a read-only copy from.
+
+        Returns:
+            ReadOnlyPlanRunV2: A new read-only instance of the provided PlanRunV2.
+
+        """
+        return cls(
+            id=plan_run.id,
+            plan_id=plan_run.plan_id,
+            current_step_index=plan_run.current_step_index,
+            outputs=plan_run.outputs,
+            state=plan_run.state,
+            end_user_id=plan_run.end_user_id,
+            plan_run_inputs=plan_run.plan_run_inputs,
+            structured_output_schema=plan_run.structured_output_schema,
+        )

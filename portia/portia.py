@@ -73,7 +73,14 @@ from portia.introspection_agents.introspection_agent import (
 from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
-from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
+from portia.plan_run import (
+    PlanRun,
+    PlanRunState,
+    PlanRunUUID,
+    PlanRunV2,
+    ReadOnlyPlanRun,
+    ReadOnlyPlanRunV2,
+)
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
@@ -1040,10 +1047,10 @@ class Portia:
 
     def resume(
         self,
-        plan_run: PlanRun | None = None,
+        plan_run: PlanRun | PlanRunV2 | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
         plan: PlanV2 | None = None,
-    ) -> PlanRun:
+    ) -> PlanRun | PlanRunV2:
         """Resume a PlanRun.
 
         If a clarification handler was provided as part of the execution hooks, it will be used
@@ -1081,16 +1088,19 @@ class Portia:
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PlanV2"
                 )
+            # Convert PlanRun to PlanRunV2 if needed
+            if isinstance(plan_run, PlanRun):
+                plan_run = PlanRunV2.from_plan_run(plan_run)
             with asyncio.Runner() as runner:
                 return runner.run(self.resume_builder_plan(plan, plan_run=plan_run))
         return self._resume(plan_run, plan_run_id)
 
     async def aresume(
         self,
-        plan_run: PlanRun | None = None,
+        plan_run: PlanRun | PlanRunV2 | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
         plan: PlanV2 | None = None,
-    ) -> PlanRun:
+    ) -> PlanRun | PlanRunV2:
         """Resume a PlanRun.
 
         If a clarification handler was provided as part of the execution hooks, it will be used
@@ -1129,6 +1139,9 @@ class Portia:
                 raise NotImplementedError(
                     "We do not yet support retrieving plan runs by ID with PlanV2"
                 )
+            # Convert PlanRun to PlanRunV2 if needed
+            if isinstance(plan_run, PlanRun):
+                plan_run = PlanRunV2.from_plan_run(plan_run)
             return await self.resume_builder_plan(plan, plan_run=plan_run)
 
         return await self._aresume(plan_run, plan_run_id)
@@ -1616,10 +1629,13 @@ class Portia:
 
         return plan_run
 
-    def _set_plan_run_state(self, plan_run: PlanRun, state: PlanRunState) -> None:
+    def _set_plan_run_state(self, plan_run: PlanRun | PlanRunV2, state: PlanRunState) -> None:
         """Set the state of a plan run and persist it to storage."""
         plan_run.state = state
-        self.storage.save_plan_run(plan_run)
+        if isinstance(plan_run, PlanRunV2):
+            self.storage.save_plan_run(plan_run.to_legacy_plan_run())
+        else:
+            self.storage.save_plan_run(plan_run)
 
     def create_plan_run(
         self,
@@ -1708,6 +1724,103 @@ class Portia:
         # Ensure the plan is saved before the plan run
         self.storage.save_plan_run(plan_run)
         return plan_run
+
+    async def _create_plan_run_v2_from_plan_v2(
+        self,
+        plan: PlanV2,
+        end_user: str | EndUser | None = None,
+        plan_run_inputs: list[PlanInput]
+        | list[dict[str, Serializable]]
+        | dict[str, Serializable]
+        | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> PlanRunV2:
+        """Create a PlanRunV2 from a PlanV2.
+
+        Args:
+            plan (PlanV2): The plan to create a plan run from.
+            end_user (str | EndUser | None = None): The end user this plan run is for.
+            plan_run_inputs: The plan inputs for the plan run with their values.
+            structured_output_schema: Optional structured output schema.
+
+        Returns:
+            PlanRunV2: The created PlanRunV2 object.
+
+        """
+        end_user = self.initialize_end_user(end_user)
+        coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
+
+        plan_run_v2 = PlanRunV2(
+            plan_id=plan.id,
+            state=PlanRunState.NOT_STARTED,
+            end_user_id=end_user.external_id,
+            structured_output_schema=structured_output_schema or plan.final_output_schema,
+        )
+
+        # Process plan inputs for V2
+        await self._process_plan_input_values_v2(plan, plan_run_v2, coerced_plan_run_inputs)
+
+        # Save the plan run
+        self.storage.save_plan_run(plan_run_v2.to_legacy_plan_run())
+        return plan_run_v2
+
+    async def _process_plan_input_values_v2(
+        self,
+        plan: PlanV2,
+        plan_run: PlanRunV2,
+        plan_run_inputs: list[PlanInput] | None = None,
+    ) -> None:
+        """Process plan input values and add them to the plan run V2.
+
+        Args:
+            plan (PlanV2): The plan containing required inputs.
+            plan_run (PlanRunV2): The plan run to update with input values.
+            plan_run_inputs (list[PlanInput] | None): Values for plan inputs.
+
+        Raises:
+            ValueError: If required plan inputs are missing.
+
+        """
+        if plan.plan_inputs and not plan_run_inputs:
+            missing_inputs = [
+                input_obj.name for input_obj in plan.plan_inputs if input_obj.value is None
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.plan_inputs:
+                if plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
+            return
+
+        if plan_run_inputs and not plan.plan_inputs:
+            logger().warning(
+                "Inputs are not required for this plan but plan inputs were provided",
+            )
+
+        if plan_run_inputs and plan.plan_inputs:
+            input_values_by_name = {input_obj.name: input_obj for input_obj in plan_run_inputs}
+
+            # Validate all required inputs are provided or have default values
+            missing_inputs = [
+                input_obj.name
+                for input_obj in plan.plan_inputs
+                if input_obj.name not in input_values_by_name and input_obj.value is None
+            ]
+            if missing_inputs:
+                raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
+
+            for plan_input in plan.plan_inputs:
+                if plan_input.name in input_values_by_name:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=input_values_by_name[plan_input.name].value
+                    )
+                elif plan_input.value is not None:
+                    plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
+                        value=plan_input.value
+                    )
 
     async def _acreate_plan_run(
         self,
@@ -2109,7 +2222,7 @@ class Portia:
             combined_clarifications = new_clarifications + ready_clarifications
         return combined_clarifications
 
-    def _log_execute_start(self, plan_run: PlanRun, plan: Plan) -> None:
+    def _log_execute_start(self, plan_run: PlanRun | PlanRunV2, plan: Plan) -> None:
         dashboard_url = self.config.must_get("portia_dashboard_url", str)
         dashboard_message = (
             (
@@ -2195,7 +2308,7 @@ class Portia:
                 f"Final output: {truncate_message(summary)!s}",
             )
 
-    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun) -> Output | None:
+    def _get_last_executed_step_output(self, plan: Plan, plan_run: PlanRun | PlanRunV2) -> Output | None:
         """Get the output of the last executed step.
 
         Args:
@@ -2651,7 +2764,7 @@ class Portia:
         | dict[str, Serializable]
         | None = None,
         structured_output_schema: type[BaseModel] | None = None,
-    ) -> PlanRun:
+    ) -> PlanRunV2:
         """Run a Portia plan."""
         if structured_output_schema:
             if plan.final_output_schema:
@@ -2666,24 +2779,25 @@ class Portia:
                 tool_ids=[tool.id for tool in self.tool_registry.get_tools()],
             ),
         )
-        plan_run = await self._aget_plan_run_from_plan(
-            legacy_plan, end_user, plan_run_inputs, structured_output_schema
+        # Create PlanRunV2 directly instead of legacy PlanRun
+        plan_run_v2 = await self._create_plan_run_v2_from_plan_v2(
+            plan, end_user, plan_run_inputs, structured_output_schema
         )
-        plan_run = await self.resume_builder_plan(
-            plan, plan_run, end_user=end_user, legacy_plan=legacy_plan
+        plan_run_v2 = await self.resume_builder_plan(
+            plan, plan_run_v2, end_user=end_user, legacy_plan=legacy_plan
         )
         rt = get_current_run_tree()
         if rt:
-            rt.add_metadata({"plan_run_id": str(plan_run.id)})
-        return plan_run
+            rt.add_metadata({"plan_run_id": str(plan_run_v2.id)})
+        return plan_run_v2
 
     async def resume_builder_plan(
         self,
         plan: PlanV2,
-        plan_run: PlanRun,
+        plan_run: PlanRunV2,
         end_user: EndUser | None = None,
         legacy_plan: Plan | None = None,
-    ) -> PlanRun:
+    ) -> PlanRunV2:
         """Resume a Portia plan."""
         if not legacy_plan:
             legacy_plan = plan.to_legacy_plan(
@@ -2695,7 +2809,8 @@ class Portia:
         if not end_user:
             end_user = self.storage.get_end_user(plan_run.end_user_id)
 
-        ready, plan_run = self._check_initial_readiness(legacy_plan, plan_run)
+        ready, legacy_plan_run = self._check_initial_readiness(legacy_plan, plan_run.to_legacy_plan_run())
+        plan_run = PlanRunV2.from_plan_run(legacy_plan_run)
         if not ready:
             return plan_run
 
@@ -2718,7 +2833,8 @@ class Portia:
             ]:
                 plan_run = await self._execute_builder_plan(plan, run_data)
 
-                plan_run = self._handle_clarifications(plan_run)
+                legacy_plan_run = self._handle_clarifications(plan_run.to_legacy_plan_run())
+                plan_run = PlanRunV2.from_plan_run(legacy_plan_run)
                 if len(plan_run.get_outstanding_clarifications()) > 0:
                     return plan_run
 
@@ -2728,7 +2844,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912
+    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRunV2:  # noqa: C901, PLR0912
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
