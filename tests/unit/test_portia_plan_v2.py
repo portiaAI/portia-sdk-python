@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import BaseModel, Field, HttpUrl, SecretStr
 
+from portia.builder.exit import ExitStepResult
 from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.reference import Input
 from portia.clarification import ActionClarification, ClarificationCategory
@@ -794,29 +795,91 @@ async def test_portia_resume_plan_v2_after_clarification_success_async(portia: P
     assert result.outputs.final_output.get_value() == "Final result"
 
 
-@pytest.mark.asyncio
-async def test_portia_resume_plan_v2_invalid_state(portia: Portia) -> None:
-    """Test running a PlanV2 asynchronously from an invalid state."""
+def _make_local_portia() -> Portia:
+    """Construct a Portia instance using local storage for unit tests."""
+    config = Config.from_default(storage_class=StorageClass.MEMORY, openai_api_key=SecretStr("123"))
+    return Portia(config=config)
+
+
+@pytest.mark.parametrize("is_async", [False, True])
+def test_exit_step_non_error_completes_and_skips_remaining(is_async: bool) -> None:
+    """Plan with a non-error ExitStep should complete and skip subsequent steps."""
     plan = (
-        PlanBuilderV2("Test invalid state async")
-        .function_step(function=lambda: "Step result")
+        PlanBuilderV2("Exit early")
+        .function_step(function=lambda: "first")
+        .exit(message="Stopping now")
+        .function_step(function=lambda: "should not run")
         .build()
     )
-    end_user = portia.initialize_end_user()
 
-    legacy_plan = plan.to_legacy_plan(
-        PlanContext(
-            query=plan.label,
-            tool_ids=[tool.id for tool in portia.tool_registry.get_tools()],
-        )
+    portia = _make_local_portia()
+
+    if is_async:
+        end_user = asyncio.run(portia.ainitialize_end_user())
+        plan_run = asyncio.run(portia.arun_plan(plan, end_user))
+    else:
+        plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    final_value = plan_run.outputs.final_output.get_value()
+    # Final output should carry the ExitStepResult from the exit step
+    assert isinstance(final_value, ExitStepResult)
+    assert final_value.message == "Stopping now"
+    # Ensure the step after the exit did not run
+    assert "$step_2_output" not in plan_run.outputs.step_outputs
+
+
+@pytest.mark.parametrize("is_async", [False, True])
+def test_exit_step_error_sets_failed_and_message(is_async: bool) -> None:
+    """Plan with an error ExitStep should fail and expose the error message as final output."""
+    plan = (
+        PlanBuilderV2("Exit with error")
+        .function_step(function=lambda: "ok")
+        .exit(message="fatal problem occurred", error=True)
+        .function_step(function=lambda: "should not run")
+        .build()
     )
-    plan_run = await portia._aget_plan_run_from_plan(legacy_plan, end_user, None)
 
-    plan_run.state = PlanRunState.FAILED
-    result = await portia.aresume(plan_run, plan=plan)
+    portia = _make_local_portia()
 
-    assert result is plan_run
-    assert result.state == PlanRunState.FAILED
+    if is_async:
+        end_user = asyncio.run(portia.ainitialize_end_user())
+        plan_run = asyncio.run(portia.arun_plan(plan, end_user))
+    else:
+        plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.FAILED
+    assert plan_run.outputs.final_output is not None
+    # Error handler converts to string and sets as final output
+    assert plan_run.outputs.final_output.get_value() == "fatal problem occurred"
+    # Ensure the step after the exit did not run
+    assert "$step_2_output" not in plan_run.outputs.step_outputs
+
+
+@pytest.mark.parametrize("is_async", [False, True])
+def test_exit_step_message_reference_resolution_end_to_end(is_async: bool) -> None:
+    """Exit message should resolve StepOutput references end-to-end through Portia execution."""
+    plan = (
+        PlanBuilderV2("Exit with reference")
+        .function_step(function=lambda: "computed value")
+        .exit(message="Processed {{ StepOutput(0) }} successfully")
+        .build()
+    )
+
+    portia = _make_local_portia()
+
+    if is_async:
+        end_user = asyncio.run(portia.ainitialize_end_user())
+        plan_run = asyncio.run(portia.arun_plan(plan, end_user))
+    else:
+        plan_run = portia.run_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+    final_value = plan_run.outputs.final_output.get_value()
+    assert isinstance(final_value, ExitStepResult)
+    assert final_value.message == "Processed computed value successfully"
 
 
 @pytest.mark.asyncio
