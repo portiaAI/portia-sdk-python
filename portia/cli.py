@@ -12,7 +12,8 @@ import click
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
-from portia.clarification_handler import ClarificationHandler  
+from portia.clarification_handler import ClarificationHandler
+from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
 from portia.errors import InvalidConfigError
 from portia.logger import logger
@@ -28,7 +29,6 @@ from portia.config_loader import (
 )
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from portia.cli_clarification_handler import CLIClarificationHandler
     from pydantic.fields import FieldInfo
 
 
