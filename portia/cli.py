@@ -1,3 +1,4 @@
+"""CLI entrypoint for Portia SDK."""
 from __future__ import annotations
 
 import builtins
@@ -11,9 +12,7 @@ import click
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
-
 from portia.clarification_handler import ClarificationHandler  
-from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
 from portia.errors import InvalidConfigError
 from portia.logger import logger
@@ -27,11 +26,9 @@ from portia.config_loader import (
     get_config_file_path,
     get_config
 )
-from portia.config import LLMProvider,Config
-
 if TYPE_CHECKING:
     from collections.abc import Callable
-
+    from portia.cli_clarification_handler import CLIClarificationHandler
     from pydantic.fields import FieldInfo
 
 
@@ -81,7 +78,6 @@ def generate_cli_option_from_pydantic_field(
     
     if option_name.endswith("api-key"):
         return f
-
     field_type = _annotation_to_click_type(info.annotation)
     if field_type is None:
         return f
@@ -293,7 +289,7 @@ def create(profile_name: str, template: str | None = None) -> None:
     with open(config_file, "w") as f:
         toml.dump(data, f)
     
-    click.echo(f"✅ Created profile '{profile_name}'")
+    click.echo(f"✅ Created profile \"{profile_name}\"")
     if template:
         click.echo(f"   Using template: {template}")
 

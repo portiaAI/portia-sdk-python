@@ -1207,21 +1207,21 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     
     
     if os.getenv("PORTIA_API_KEY") and "portia_api_key" not in kwargs:
-        env_overrides["portia_api_key"] = SecretStr(os.getenv("PORTIA_API_KEY"))
+        env_overrides["portia_api_key"] = SecretStr(os.getenv("PORTIA_API_KEY") or "")
     if os.getenv("OPENAI_API_KEY") and "openai_api_key" not in kwargs:
-        env_overrides["openai_api_key"] = SecretStr(os.getenv("OPENAI_API_KEY"))
+        env_overrides["openai_api_key"] = SecretStr(os.getenv("OPENAI_API_KEY") or "")
     if os.getenv("ANTHROPIC_API_KEY") and "anthropic_api_key" not in kwargs:
-        env_overrides["anthropic_api_key"] = SecretStr(os.getenv("ANTHROPIC_API_KEY"))
+        env_overrides["anthropic_api_key"] = SecretStr(os.getenv("ANTHROPIC_API_KEY") or "")
     if os.getenv("MISTRAL_API_KEY") and "mistralai_api_key" not in kwargs:
-        env_overrides["mistralai_api_key"] = SecretStr(os.getenv("MISTRAL_API_KEY"))
+        env_overrides["mistralai_api_key"] = SecretStr(os.getenv("MISTRAL_API_KEY") or "")
     if os.getenv("GOOGLE_API_KEY") and "google_api_key" not in kwargs:
-        env_overrides["google_api_key"] = SecretStr(os.getenv("GOOGLE_API_KEY"))
+        env_overrides["google_api_key"] = SecretStr(os.getenv("GOOGLE_API_KEY") or "")
     if os.getenv("AZURE_OPENAI_API_KEY") and "azure_openai_api_key" not in kwargs:
-        env_overrides["azure_openai_api_key"] = SecretStr(os.getenv("AZURE_OPENAI_API_KEY"))
+        env_overrides["azure_openai_api_key"] = SecretStr(os.getenv("AZURE_OPENAI_API_KEY") or "")
     if os.getenv("AZURE_OPENAI_ENDPOINT") and "azure_openai_endpoint" not in kwargs:
         env_overrides["azure_openai_endpoint"] = os.getenv("AZURE_OPENAI_ENDPOINT")
     if os.getenv("OPENROUTER_API_KEY") and "openrouter_api_key" not in kwargs:
-        env_overrides["openrouter_api_key"] = SecretStr(os.getenv("OPENROUTER_API_KEY"))
+        env_overrides["openrouter_api_key"] = SecretStr(os.getenv("OPENROUTER_API_KEY") or "")
     
     
     if os.getenv("PORTIA_API_ENDPOINT") and "portia_api_endpoint" not in kwargs:

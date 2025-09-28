@@ -25,6 +25,7 @@ from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.errors import InvalidConfigError,ConfigNotFoundError
 from portia.config import default_config
+from typing import Generator
 
 
 
@@ -52,14 +53,14 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def mock_portia_cls() -> MagicMock:
+def mock_portia_cls() -> Generator[MagicMock, None, None]:
     """Mock the Portia class used by the CLI."""
     with patch("portia.cli.Portia", autospec=True) as mock_portia:
         yield mock_portia
 
 
 @pytest.fixture(autouse=True)
-def mock_config_get_generative_model() -> None:
+def mock_config_get_generative_model() -> Generator[None, None, None]:
     """Avoid real model initialization inside CLI."""
     
     with patch.object(Config, "get_generative_model") as mock_get_generative_model:
