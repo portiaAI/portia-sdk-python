@@ -841,11 +841,9 @@ async def test_example_builder_plan_scenarios(
         execution_hooks=ExecutionHooks(clarification_handler=ExampleBuilderClarificationHandler()),
     )
 
-    def calculate_total_price(
-        price_with_currency: CommodityPriceWithCurrency, purchase_quantity: str | int
-    ) -> float:
+    def calculate_total_price(price: float, purchase_quantity: str | int) -> float:
         """Calculate total price with string to int conversion."""
-        return price_with_currency.price * int(purchase_quantity)
+        return price * int(purchase_quantity)
 
     plan = (
         PlanBuilderV2("Buy some gold")
@@ -875,7 +873,7 @@ async def test_example_builder_plan_scenarios(
             step_name="Calculate total price",
             function=calculate_total_price,
             args={
-                "price_with_currency": StepOutput("Search gold price"),
+                "price": StepOutput("Search gold price", path="price"),
                 "purchase_quantity": StepOutput("Purchase quantity"),
             },
         )
@@ -962,8 +960,8 @@ def collect_fn(
     }
 
 
-def test_plan_v2_input_linking_with_add_steps() -> None:
-    """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
+def test_plan_v2_input_linking_with_add_sub_plan() -> None:
+    """Test input linking between top-level plan and sub-plan with input_values."""
     config = Config.from_default()
     portia = Portia(config=config)
 
@@ -1007,7 +1005,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
             step_name="second_number",
         )
         # Add sub-plan steps with input values for 2 of the 4 sub-plan inputs
-        .add_steps(
+        .add_sub_plan(
             sub_plan,
             input_values={
                 "sub_input_no_default_1": (
@@ -1411,6 +1409,122 @@ def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
     assert counter == 3
 
 
+def test_plan_v2_loop_with_all_step_outputs(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop with arguments."""
+    messages: list[str] = []
+    counter = 0
+    final_items: list = []
+
+    def record_func(message: str, items: list | None = None) -> None:
+        messages.append(message)
+        if items is not None:
+            final_items.extend(items)
+
+    def loop_function(message: str) -> int:
+        nonlocal counter
+        record_func(message)
+        return counter
+
+    def condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_eval_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test conditional loop with args")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=condition_with_args, args={"x": 42, "y": "test"})
+        .function_step(
+            function=lambda: loop_function("inside_loop"),
+            step_name="inside_loop",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda items: record_func("end", items),
+            args={"items": StepOutput("inside_loop", full=True)},
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "condition_eval_1_x_42_y_test",
+        "inside_loop",
+        "condition_eval_2_x_42_y_test",
+        "inside_loop",
+        "condition_eval_3_x_42_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+    assert final_items == [1, 2]
+
+
+def test_plan_v2_loop_with_all_step_outputs_path(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop with arguments."""
+    messages: list[str] = []
+    counter = 0
+    final_items: list = []
+    items: list = [{"item": 1}, {"item": 2}, None]
+
+    def record_func(message: str, items: list | None = None) -> None:
+        messages.append(message)
+        if items is not None:
+            final_items.extend(items)
+
+    def loop_function(message: str) -> dict:
+        nonlocal counter
+        nonlocal items
+        record_func(message)
+        return items[counter - 1]
+
+    def condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_eval_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test conditional loop with args")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=condition_with_args, args={"x": 42, "y": "test"})
+        .function_step(
+            function=lambda: loop_function("inside_loop"),
+            step_name="inside_loop",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda items: record_func("end", items),
+            args={"items": StepOutput("inside_loop", full=True, path="item")},
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE, plan_run.outputs.step_outputs
+
+    expected_messages = [
+        "start",
+        "condition_eval_1_x_42_y_test",
+        "inside_loop",
+        "condition_eval_2_x_42_y_test",
+        "inside_loop",
+        "condition_eval_3_x_42_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+    assert final_items == [1, 2]
+
+
 def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
     """Test PlanV2 conditional loop with string condition."""
     messages: list[str] = []
@@ -1740,7 +1854,7 @@ def test_plan_v2_do_while_loop_string_condition(local_portia: Portia) -> None:
     assert counter > 0
 
 
-@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
+@pytest.mark.flaky(reruns=3)
 @pytest.mark.parametrize("llm_provider", MODEL_PROVIDERS)
 @pytest.mark.asyncio
 async def test_react_agent_weather_research_and_poem(
@@ -1833,7 +1947,6 @@ class CountryClarificationHandler(ClarificationHandler):
         on_resolution(clarification, True)  # noqa: FBT003
 
 
-@pytest.mark.skip(reason="Test disabled until Openweathermap API added to CI")
 @pytest.mark.asyncio
 async def test_react_agent_weather_with_clarifications() -> None:
     """Test react agent weather lookup with clarification for country input."""
@@ -1849,7 +1962,7 @@ async def test_react_agent_weather_with_clarifications() -> None:
     ) -> UserVerificationClarification | None:
         nonlocal before_step_already_called
         before_step_already_called = True
-        if before_step_already_called:
+        if not before_step_already_called:
             return UserVerificationClarification(
                 plan_run_id=plan_run.id,
                 user_guidance="Are you happy to proceed with the search call?",

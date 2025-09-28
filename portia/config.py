@@ -976,7 +976,7 @@ class Config(BaseModel):
         - openai
         - anthropic
         - mistralai (requires portia-sdk-python[mistral] to be installed)
-        - google (requires portia-sdk-python[google] to be installed)
+        - google
         - azure-openai
         - grok
 
@@ -1047,7 +1047,6 @@ class Config(BaseModel):
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
             case LLMProvider.GOOGLE | LLMProvider.GOOGLE_GENERATIVE_AI:
-                validate_extras_dependencies("google", raise_error=True)
                 from portia.model import GoogleGenAiGenerativeModel
 
                 return GoogleGenAiGenerativeModel(

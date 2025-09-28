@@ -5,23 +5,26 @@ You can view an example of this class in use in example_builder.py.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.conditionals import ConditionalBlock, ConditionalBlockClauseType
+from portia.builder.conditional_step import ConditionalStep
+from portia.builder.conditionals import (
+    ConditionalBlock,
+    ConditionalBlockClauseType,
+)
+from portia.builder.invoke_tool_step import InvokeToolStep
+from portia.builder.llm_step import LLMStep
+from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopBlock, LoopStepType, LoopType
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Reference, default_step_name
-from portia.builder.step_v2 import (
-    ConditionalStep,
-    InvokeToolStep,
-    LLMStep,
-    LoopStep,
-    ReActAgentStep,
-    SingleToolAgentStep,
-    StepV2,
-    UserInputStep,
-    UserVerifyStep,
-)
+from portia.builder.single_tool_agent_step import SingleToolAgentStep
+from portia.builder.step_v2 import StepV2
+from portia.builder.sub_plan_step import SubPlanStep
+from portia.builder.user_input import UserInputStep
+from portia.builder.user_verify import UserVerifyStep
 from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
 from portia.telemetry.views import PlanV2BuildTelemetryEvent
@@ -32,7 +35,9 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
+    from portia.builder.step_v2 import StepV2
     from portia.common import Serializable
+    from portia.model import GenerativeModel
     from portia.tool import Tool
 
 
@@ -179,8 +184,6 @@ class PlanBuilderV2:
                 loop_block=loop_block,
                 loop_step_type=LoopStepType.START,
                 loop_type=loop_type,
-                start_index=len(self.plan.steps),
-                end_index=None,
             )
         )
         return self
@@ -216,18 +219,16 @@ class PlanBuilderV2:
         start_loop_step = self.plan.steps[loop_block.start_step_index]
         if not isinstance(start_loop_step, LoopStep):
             raise PlanBuilderError("The step at the start of the loop is not a LoopStep")
-        start_loop_step.end_index = len(self.plan.steps)
         self.plan.steps.append(
             LoopStep(
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 condition=start_loop_step.condition,
                 over=start_loop_step.over,
                 index=start_loop_step.index,
+                loop_block=loop_block,
                 loop_step_type=LoopStepType.END,
                 loop_type=start_loop_step.loop_type,
                 args=start_loop_step.args,
-                start_index=start_loop_step.start_index,
-                end_index=len(self.plan.steps),
             )
         )
         self._block_stack.pop()
@@ -419,6 +420,7 @@ class PlanBuilderV2:
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
         system_prompt: str | None = None,
+        model: str | GenerativeModel | None = None,
     ) -> PlanBuilderV2:
         """Add a step that sends a task to an LLM.
 
@@ -437,6 +439,8 @@ class PlanBuilderV2:
               via StepOutput("name_of_step") rather than by index.
             system_prompt: Optional system prompt for the LLM - allows overriding the default system
               prompt.
+            model: Optional model to use for this step. If not provided, the default model from the
+              config will be used.
 
         """
         self.plan.steps.append(
@@ -447,6 +451,7 @@ class PlanBuilderV2:
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
                 system_prompt=system_prompt,
+                model=model,
             )
         )
         return self
@@ -524,11 +529,12 @@ class PlanBuilderV2:
     def single_tool_agent_step(
         self,
         *,
-        tool: str,
+        tool: str | Tool,
         task: str,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
+        model: str | GenerativeModel | None = None,
     ) -> PlanBuilderV2:
         """Add a step where an agent uses a single tool to complete a task.
 
@@ -543,7 +549,7 @@ class PlanBuilderV2:
         schema.
 
         Args:
-            tool: The id of the tool the agent can use to complete the task.
+            tool: The id of the tool or the Tool instance the agent can use to complete the task.
             task: Natural language description of what the agent should accomplish.
             inputs: Optional context data for the agent. This can include references such as
                 Input and StepOutput whose values are resolved at runtime and provided as
@@ -552,6 +558,8 @@ class PlanBuilderV2:
                 output to match this schema.
             step_name: Optional explicit name for the step. This allows its output to be
                 referenced via StepOutput("name_of_step") rather than by index.
+            model: Optional model to use for this step. If not provided, the execution model from
+                the config will be used.
 
         """
         self.plan.steps.append(
@@ -562,6 +570,7 @@ class PlanBuilderV2:
                 output_schema=output_schema,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
+                model=model,
             )
         )
         return self
@@ -570,12 +579,13 @@ class PlanBuilderV2:
         self,
         *,
         task: str,
-        tools: list[str] | None = None,
+        tools: Sequence[str | Tool] | None = None,
         inputs: list[Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
         allow_agent_clarifications: bool = False,
         tool_call_limit: int = 25,
+        model: str | GenerativeModel | None = None,
     ) -> PlanBuilderV2:
         """Add a step that uses a ReAct agent with multiple tools.
 
@@ -584,13 +594,15 @@ class PlanBuilderV2:
 
         Args:
             task: The task to perform.
-            tools: The list of tool IDs to make available to the agent.
+            tools: The list of tool IDs or Tool instances to make available to the agent.
             inputs: The inputs to the task. If any of these values are instances of StepOutput or
               Input, the corresponding values will be substituted in when the plan is run.
             output_schema: The schema of the output.
             step_name: Optional name for the step. If not provided, will be auto-generated.
             allow_agent_clarifications: Whether to allow the agent to ask clarifying questions.
             tool_call_limit: Maximum number of tool calls the agent can make.
+            model: Optional model to use for this step. If not provided, the planning model from the
+                config will be used.
 
         """
         self.plan.steps.append(
@@ -603,6 +615,7 @@ class PlanBuilderV2:
                 tool_call_limit=tool_call_limit,
                 step_name=step_name or default_step_name(len(self.plan.steps)),
                 conditional_block=self._current_conditional_block,
+                model=model,
             )
         )
         return self
@@ -694,65 +707,74 @@ class PlanBuilderV2:
         self.plan.steps.append(step)
         return self
 
-    def add_steps(
+    def add_sub_plan(
         self,
         plan: PlanV2 | Iterable[StepV2],
         input_values: dict[str, Any] | None = None,
+        step_name: str | None = None,
     ) -> PlanBuilderV2:
-        """Add multiple steps or merge another plan into this builder.
+        """Add a step that runs a sub-plan and returns its final output.
 
-        This allows you to compose plans by merging smaller plans together, or to add
-        a sequence of pre-built steps all at once. When merging a PlanV2, both the
-        steps and the plan inputs are merged into the current builder.
-
-        This is useful for creating reusable sub-plans that can be incorporated into
-        larger workflows.
+        The sub-plan executes completely as an independent workflow with its own step sequence.
+        From the parent plan's perspective, the entire sub-plan execution appears as a single step
+        that produces one output value. Inputs for the sub-plan can be provided by the plan run
+        inputs when the parent plan is run or via the input_values parameter.
 
         Args:
-            plan: Either a complete PlanV2 to merge (including its steps and inputs),
-                or any iterable of StepV2 instances to add to the current plan.
+            plan: The sub-plan to run.
             input_values: Optional mapping of inputs in the sub-plan to values. This is
-                only used when plan is a PlanV2, and is useful if a sub-plan has an input
-                and you want to provide a value for it from a step in the top-level plan.
-                For example:
-                sub_plan = builder.input(name="input_name").build()
-                top_plan = builder.llm_step(step_name="llm_step", task="Task")
-                           .add_steps(sub_plan, input_values={"input_name": StepOutput("llm_step")})
-                           .build()
+               only used when plan is a PlanV2, and is useful if a sub-plan has an input
+               and you want to provide a value for it from a step in the top-level plan.
+               For example:
 
-            input_values: Optional mapping of input names to default values. Only used
-                when plan is a PlanV2. These values will be set as default values for
-                the corresponding plan inputs.
+           ```python
+               sub_plan = builder.input(name="input_name").build()
+               top_plan = builder.llm_step(step_name="llm_step", task="Task")
+                          .add_sub_plan(sub_plan, input_values={"input": StepOutput("llm_step")})
+                          .build()
+           ```
 
-        Raises:
-            PlanBuilderError: If duplicate input names are detected when merging plans,
-                or if you try to provide values for inputs that don't exist in the
-                sub-plan.
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        if isinstance(plan, PlanV2):
-            # Ensure there are no duplicate plan inputs
-            existing_input_names = {p.name for p in self.plan.plan_inputs}
-            for _input in plan.plan_inputs:
-                if _input.name in existing_input_names:
-                    raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
-            self.plan.plan_inputs.extend(plan.plan_inputs)
-            self.plan.steps.extend(plan.steps)
-        else:
-            self.plan.steps.extend(plan)
+        if not isinstance(plan, PlanV2):
+            builder = PlanBuilderV2()
+            for step in plan:
+                builder.add_step(step)
+            plan = builder.build()
 
-        if input_values and isinstance(plan, PlanV2):
+        # Create a copy to avoid modifying the original sub plan
+        plan = copy.deepcopy(plan)
+
+        # Ensure there are no duplicate plan inputs
+        existing_input_names = {p.name for p in self.plan.plan_inputs}
+        for _input in plan.plan_inputs:
+            if _input.name in existing_input_names:
+                raise PlanBuilderError(f"Duplicate input {_input.name} found in plan.")
+
+        if input_values:
             allowed_input_names = {p.name for p in plan.plan_inputs}
-            for input_name, input_value in input_values.items():
+            for input_name in input_values:
                 if input_name not in allowed_input_names:
                     raise PlanBuilderError(
-                        f"Tried to provide value for input {input_name} not found in "
-                        "sub-plan passed into add_steps()."
+                        f"Tried to provide value for input '{input_name}' not found in "
+                        f"sub-plan. Available inputs: {sorted(allowed_input_names)}"
                     )
-                for plan_input in self.plan.plan_inputs:
-                    if plan_input.name == input_name:
-                        plan_input.value = input_value
-                        break
+            for plan_input in plan.plan_inputs:
+                # Input values passed in here overwrite any default values for the input
+                plan_input.value = input_values.get(plan_input.name, plan_input.value)
+
+        self.plan.steps.append(
+            SubPlanStep(
+                plan=plan,
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+            )
+        )
+
+        # Add the plan inputs from the sub-plan to the parent plan
+        self.plan.plan_inputs.extend(plan.plan_inputs)
 
         return self
 
