@@ -17,6 +17,8 @@ Key Components
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.clarification import (
@@ -27,6 +29,11 @@ from portia.clarification import (
 from portia.common import PortiaEnum
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
+
+if TYPE_CHECKING:
+    from portia.builder.plan_v2 import PlanV2
+    from portia.config import Config
+    from portia.end_user import EndUser
 
 
 class PlanRunState(PortiaEnum):
@@ -195,6 +202,75 @@ class PlanRun(BaseModel):
             f"Run(id={self.id}, plan_id={self.plan_id}, "
             f"state={self.state}, current_step_index={self.current_step_index}, "
             f"final_output={'set' if self.outputs.final_output else 'unset'})"
+        )
+
+
+class PlanRunV2(BaseModel):
+    """A plan run V2 represents a running instance of a PlanV2.
+
+    This is the successor to PlanRun and contains all execution state for a PlanV2.
+    It consolidates the plan, end user, config, and execution state into a single object.
+
+    Attributes:
+        id (PlanRunUUID): A unique ID for this plan_run.
+        state (PlanRunState): The current state of the PlanRun.
+        current_step_index (int): The current step that is being executed.
+        plan (PlanV2): The PlanV2 being executed.
+        end_user (EndUser): The end user executing the plan.
+        step_output_values (list[dict[str, Output]]): List of step outputs by step index.
+        final_output (Output | None): The final consolidated output of the PlanRun if available.
+        plan_run_inputs (dict[str, LocalDataValue]): Dict mapping plan input names to their values.
+        config (Config): The Portia config for this run.
+
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    id: PlanRunUUID = Field(
+        default_factory=PlanRunUUID,
+        description="A unique ID for this plan_run.",
+    )
+    state: PlanRunState = Field(
+        default=PlanRunState.NOT_STARTED,
+        description="The current state of the PlanRun.",
+    )
+    current_step_index: int = Field(
+        default=0,
+        description="The current step that is being executed",
+    )
+    plan: PlanV2 = Field(
+        description="The PlanV2 being executed.",
+    )
+    end_user: EndUser = Field(
+        description="The end user executing the plan.",
+    )
+    step_output_values: list[dict[str, Output]] = Field(
+        default_factory=list,
+        description="List of step outputs indexed by step number.",
+    )
+    final_output: Output | None = Field(
+        default=None,
+        description="The final consolidated output of the PlanRun if available.",
+    )
+    plan_run_inputs: dict[str, LocalDataValue] = Field(
+        default_factory=dict,
+        description="Dict mapping plan input names to their values.",
+    )
+    config: Config = Field(
+        description="The Portia config for this run.",
+    )
+
+    def __str__(self) -> str:
+        """Return the string representation of the PlanRunV2.
+
+        Returns:
+            str: A string representation containing key run attributes.
+
+        """
+        return (
+            f"PlanRunV2(id={self.id}, plan_id={self.plan.id}, "
+            f"state={self.state}, current_step_index={self.current_step_index}, "
+            f"final_output={'set' if self.final_output else 'unset'})"
         )
 
 
