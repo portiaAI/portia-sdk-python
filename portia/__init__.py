@@ -91,7 +91,7 @@ from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
 from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
-from portia.plan_run import PlanRun, PlanRunState
+from portia.plan_run import PlanRun, PlanRunState, PlanRunV2
 
 # Core classes
 from portia.portia import ExecutionHooks, Portia
@@ -163,6 +163,7 @@ __all__ = [
     "PlanRun",
     "PlanRunNotFoundError",
     "PlanRunState",
+    "PlanRunV2",
     "PlanUUID",
     "PlanV2",
     "PlanningAgentType",
