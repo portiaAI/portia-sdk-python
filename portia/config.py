@@ -233,17 +233,6 @@ class ExecutionAgentType(Enum):
     DEFAULT = "DEFAULT"
 
 
-class PlanningAgentType(Enum):
-    """Enum for planning agents used for planning queries.
-
-    Attributes:
-        DEFAULT: The default planning agent.
-
-    """
-
-    DEFAULT = "DEFAULT"
-
-
 class LogLevel(Enum):
     """Enum for available log levels.
 
@@ -328,9 +317,9 @@ class GenerativeModelsConfig(BaseModel):
             model if no other model is specified. It is also used by default in the Portia SDK
             tool that require an LLM.
 
-        planning_model: The model to use for the PlanningAgent. Reasoning models are a good choice
-            here, as they are able to reason about the problem and the possible solutions. If not
-            specified, the default_model will be used.
+        planning_model: (DEPRECATED - no longer used) The model to use for legacy planning agent.
+            This field is kept for backward compatibility but has no effect. Use execution_model
+            or default_model instead.
 
         execution_model: The model to use for the ExecutionAgent. This model is used for the
             distilling context from the plan run into tool calls. If not specified, the
@@ -603,18 +592,6 @@ class Config(BaseModel):
     def parse_execution_agent_type(cls, value: str | ExecutionAgentType) -> ExecutionAgentType:
         """Parse execution_agent_type to enum if string provided."""
         return parse_str_to_enum(value, ExecutionAgentType)
-
-    # PlanningAgent Options
-    planning_agent_type: PlanningAgentType = Field(
-        default=PlanningAgentType.DEFAULT,
-        description="The default planning_agent_type to use.",
-    )
-
-    @field_validator("planning_agent_type", mode="before")
-    @classmethod
-    def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
-        """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
 
     large_output_threshold_tokens: int = Field(
         default=1_000,
@@ -1139,7 +1116,6 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         models=models,
         feature_flags=kwargs.pop("feature_flags", {}),
         storage_class=kwargs.pop("storage_class", default_storage_class),
-        planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
         execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
         **kwargs,
     )
