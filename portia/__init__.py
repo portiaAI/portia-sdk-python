@@ -38,7 +38,6 @@ from portia.config import (
     GenerativeModelsConfig,
     LLMModel,
     LogLevel,
-    PlanningAgentType,
     StorageClass,
     default_config,
 )
@@ -165,7 +164,6 @@ __all__ = [
     "PlanRunState",
     "PlanUUID",
     "PlanV2",
-    "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
     "PortiaToolRegistry",

@@ -88,8 +88,6 @@ Homepage = "https://www.portialabs.ai/"
 Repository = "https://github.com/portiaAI/portia-sdk-python"
 Documentation = "https://docs.portialabs.ai"
 
-[project.scripts]
-portia-cli = "portia.cli:cli"
 
 [dependency-groups]
 dev = [
@@ -181,7 +179,6 @@ omit = [
     "*/tests/*", # Don't cover test files themselves
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
-    "portia/cli.py",  # Best effort test coverage
 ]
 
 [tool.coverage.report]
