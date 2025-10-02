@@ -615,10 +615,18 @@ if BROWSERBASE_AVAILABLE:
         def step_complete(self, ctx: ToolRunContext) -> None:
             """Call when the step is complete closes the session to persist context."""
             # Only clean up the session on the final browser tool call
-            if any(
-                step.tool_id == "browser_tool"
-                for step in ctx.plan.steps[ctx.plan_run.current_step_index + 1 :]
-            ):
+            # Check if there are more browser tool steps coming up
+            from portia.builder.invoke_tool_step import InvokeToolStep
+
+            has_more_browser_steps = False
+            for step in ctx.plan.steps[ctx.plan_run.current_step_index + 1 :]:
+                if isinstance(step, InvokeToolStep):
+                    tool_id = step.tool if isinstance(step.tool, str) else step.tool.id
+                    if tool_id == "browser_tool":
+                        has_more_browser_steps = True
+                        break
+
+            if has_more_browser_steps:
                 return
 
             session_id = ctx.end_user.get_additional_data("bb_session_id")

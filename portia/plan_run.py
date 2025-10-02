@@ -17,6 +17,8 @@ Key Components
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from portia.clarification import (
@@ -25,8 +27,13 @@ from portia.clarification import (
     ClarificationListType,
 )
 from portia.common import PortiaEnum
+from portia.config import Config
+from portia.end_user import EndUser
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.prefixed_uuid import PlanRunUUID, PlanUUID
+
+if TYPE_CHECKING:
+    from portia.builder.plan_v2 import PlanV2
 
 
 class PlanRunState(PortiaEnum):
@@ -227,4 +234,149 @@ class ReadOnlyPlanRun(PlanRun):
             end_user_id=plan_run.end_user_id,
             plan_run_inputs=plan_run.plan_run_inputs,
             structured_output_schema=plan_run.structured_output_schema,
+        )
+
+
+class StepOutputValue(BaseModel):
+    """Value that can be referenced by name in a PlanV2 run.
+
+    Attributes:
+        value: The referenced value.
+        description: Description of the referenced value.
+        step_name: The name of the step that produced this value.
+        step_num: The step number that produced this value.
+
+    """
+
+    value: Any = Field(description="The referenced value.")
+    description: str = Field(description="Description of the referenced value.", default="")
+    step_name: str = Field(description="The name of the step that produced this value.")
+    step_num: int = Field(description="The step number that produced this value.")
+
+
+class PlanRunV2(BaseModel):
+    """A V2 plan run represents a running instance of a PlanV2.
+
+    This is the native representation for PlanV2 execution, replacing the legacy
+    PlanRun structure with a cleaner, more consistent data model.
+
+    Attributes:
+        id: A unique ID for this plan run.
+        state: The current state of the plan run.
+        current_step_index: The current step that is being executed.
+        plan: The PlanV2 being executed.
+        end_user: The end user executing the plan.
+        step_output_values: List of outputs from completed steps.
+        final_output: The final consolidated output of the plan run.
+        plan_run_inputs: Dict mapping plan input names to their values.
+        config: The Portia configuration.
+
+    """
+
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    id: PlanRunUUID = Field(
+        default_factory=PlanRunUUID,
+        description="A unique ID for this plan run.",
+    )
+    state: PlanRunState = Field(
+        default=PlanRunState.NOT_STARTED,
+        description="The current state of the plan run.",
+    )
+    current_step_index: int = Field(
+        default=0,
+        description="The current step that is being executed.",
+    )
+    plan: PlanV2 = Field(
+        description="The PlanV2 being executed.",
+    )
+    end_user: EndUser = Field(
+        description="The end user executing the plan.",
+    )
+    step_output_values: list[StepOutputValue] = Field(
+        default_factory=list,
+        description="List of outputs from completed steps.",
+    )
+    final_output: Output | None = Field(
+        default=None,
+        description="The final consolidated output of the plan run.",
+    )
+    plan_run_inputs: dict[str, LocalDataValue] = Field(
+        default_factory=dict,
+        description="Dict mapping plan input names to their values.",
+    )
+    config: Config = Field(
+        description="The Portia configuration.",
+    )
+    clarifications: ClarificationListType = Field(
+        default_factory=list,
+        description="Clarifications raised during this plan run.",
+    )
+
+    def get_outstanding_clarifications(self) -> ClarificationListType:
+        """Return all outstanding clarifications.
+
+        Returns:
+            ClarificationListType: A list of outstanding clarifications that have not been resolved.
+
+        """
+        return [
+            clarification
+            for clarification in self.clarifications
+            if not clarification.resolved
+        ]
+
+    def get_clarifications_for_step(self, step: int | None = None) -> ClarificationListType:
+        """Return clarifications for the given step.
+
+        Args:
+            step: The step to get clarifications for. Defaults to current step.
+
+        Returns:
+            ClarificationListType: A list of clarifications for the given step.
+
+        """
+        if step is None:
+            step = self.current_step_index
+        return [
+            clarification
+            for clarification in self.clarifications
+            if clarification.step == step
+        ]
+
+    def get_clarification_for_step(
+        self, category: ClarificationCategory, step: int | None = None
+    ) -> Clarification | None:
+        """Return a clarification of the given category for the given step if it exists.
+
+        Args:
+            step: The step to get a clarification for. Defaults to current step.
+            category: The category of the clarification to get.
+
+        Returns:
+            Clarification | None: The clarification if found, None otherwise.
+
+        """
+        if step is None:
+            step = self.current_step_index
+        return next(
+            (
+                clarification
+                for clarification in self.clarifications
+                if clarification.step == step and clarification.category == category
+            ),
+            None,
+        )
+
+    def __str__(self) -> str:
+        """Return the string representation of the PlanRunV2.
+
+        Returns:
+            str: A string representation containing key run attributes.
+
+        """
+        return (
+            f"PlanRunV2(id={self.id}, plan_id={self.plan.id}, "
+            f"state={self.state}, current_step_index={self.current_step_index}, "
+            f"final_output={'set' if self.final_output else 'unset'})"
         )

@@ -39,6 +39,7 @@ from pydantic import (
     model_validator,
 )
 
+from portia.builder.plan_v2 import PlanV2
 from portia.clarification import (
     ActionClarification,
     Clarification,
@@ -58,8 +59,7 @@ from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
-from portia.plan import Plan
-from portia.plan_run import PlanRun
+from portia.plan_run import PlanRunV2
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
@@ -69,21 +69,35 @@ MAX_TOOL_DESCRIPTION_LENGTH = 16384
 class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
+    This context provides tools with access to the current plan run state,
+    including the plan being executed, user information, configuration, and
+    any clarifications that need to be handled.
+
     Attributes:
-        plan_run(PlanRun): The run the tool run is part of.
-        plan(Plan): The plan the tool run is part of.
-        config(Config): The config for the SDK as a whole.
-        clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
+        plan_run: The V2 plan run the tool run is part of.
+        clarifications: Relevant clarifications for this tool execution.
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    end_user: EndUser
-    plan_run: PlanRun
-    plan: Plan
-    config: Config
+    plan_run: PlanRunV2
     clarifications: ClarificationListType
+
+    @property
+    def end_user(self) -> EndUser:
+        """Get the end user from the plan run."""
+        return self.plan_run.end_user
+
+    @property
+    def config(self) -> Config:
+        """Get the config from the plan run."""
+        return self.plan_run.config
+
+    @property
+    def plan(self) -> PlanV2:
+        """Get the plan from the plan run."""
+        return self.plan_run.plan
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
