@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from portia.builder.plan_v2 import PlanV2
+from portia.builder.step_v2 import StepV2
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -18,8 +20,7 @@ from portia.common import PortiaEnum
 from portia.errors import ToolHardError
 from portia.execution_agents.output import Output
 from portia.logger import logger
-from portia.plan import Plan, Step
-from portia.plan_run import PlanRun
+from portia.plan_run import PlanRunV2
 from portia.tool import Tool
 
 
@@ -53,53 +54,53 @@ class ExecutionHooks(BaseModel):
     clarification_handler: ClarificationHandler | None = None
     """Handler for clarifications raised during execution."""
 
-    before_step_execution: Callable[[Plan, PlanRun, Step], BeforeStepExecutionOutcome] | None = None
+    before_step_execution: Callable[[PlanV2, PlanRunV2, StepV2], BeforeStepExecutionOutcome] | None = None
     """Called before executing each step.
 
     Args:
-        plan: The plan being executed
-        plan_run: The current plan run
-        step: The step about to be executed
+        plan: The PlanV2 being executed
+        plan_run: The current PlanRunV2
+        step: The StepV2 about to be executed
 
     Returns:
         BeforeStepExecutionOutcome | None: Whether to continue with the step execution or skip it.
             If None is returned, the default behaviour is to continue with the step execution.
     """
 
-    after_step_execution: Callable[[Plan, PlanRun, Step, Output], None] | None = None
+    after_step_execution: Callable[[PlanV2, PlanRunV2, StepV2, Output], None] | None = None
     """Called after executing each step.
 
     When there's an error, this is called with the error as the output value.
 
     Args:
-        plan: The plan being executed
-        plan_run: The current plan run
-        step: The step that was executed
+        plan: The PlanV2 being executed
+        plan_run: The current PlanRunV2
+        step: The StepV2 that was executed
         output: The output from the step execution
     """
 
-    before_plan_run: Callable[[Plan, PlanRun], None] | None = None
+    before_plan_run: Callable[[PlanV2, PlanRunV2], None] | None = None
     """Called before executing the first step of the plan run.
 
     Args:
-        plan: The plan being executed
-        plan_run: The current plan run
+        plan: The PlanV2 being executed
+        plan_run: The current PlanRunV2
     """
 
-    after_plan_run: Callable[[Plan, PlanRun, Output], None] | None = None
+    after_plan_run: Callable[[PlanV2, PlanRunV2, Output], None] | None = None
     """Called after executing the plan run.
 
     This is not called if a clarification is raised, as it is expected that the plan
     will be resumed after the clarification is handled.
 
     Args:
-        plan: The plan that was executed
-        plan_run: The completed plan run
+        plan: The PlanV2 that was executed
+        plan_run: The completed PlanRunV2
         output: The final output from the plan execution
     """
 
     before_tool_call: (
-        Callable[[Tool, dict[str, Any], PlanRun, Step], Clarification | None] | None
+        Callable[[Tool, dict[str, Any], PlanRunV2, StepV2], Clarification | None] | None
     ) = None
     """Called before the tool is called.
 
@@ -107,21 +108,21 @@ class ExecutionHooks(BaseModel):
         tool: The tool about to be called
         args: The args for the tool call. These are mutable and so can be modified in place as
           required.
-        plan_run: The current plan run
-        step: The step being executed
+        plan_run: The current PlanRunV2
+        step: The StepV2 being executed
 
     Returns:
         Clarification | None: A clarification to raise, or None to proceed with the tool call
     """
 
-    after_tool_call: Callable[[Tool, Any, PlanRun, Step], Clarification | None] | None = None
+    after_tool_call: Callable[[Tool, Any, PlanRunV2, StepV2], Clarification | None] | None = None
     """Called after the tool is called.
 
     Args:
         tool: The tool that was called
         output: The output returned from the tool call
-        plan_run: The current plan run
-        step: The step being executed
+        plan_run: The current PlanRunV2
+        step: The StepV2 being executed
 
     Returns:
         Clarification | None: A clarification to raise, or None to proceed. If a clarification
@@ -135,8 +136,8 @@ class ExecutionHooks(BaseModel):
 def clarify_on_all_tool_calls(
     tool: Tool,
     args: dict[str, Any],
-    plan_run: PlanRun,
-    step: Step,
+    plan_run: PlanRunV2,
+    step: StepV2,
 ) -> Clarification | None:
     """Raise a clarification to check the user is happy with all tool calls before proceeding.
 
@@ -152,7 +153,7 @@ def clarify_on_all_tool_calls(
 
 def clarify_on_tool_calls(
     tool: str | Tool | list[str] | list[Tool],
-) -> Callable[[Tool, dict[str, Any], PlanRun, Step], Clarification | None]:
+) -> Callable[[Tool, dict[str, Any], PlanRunV2, StepV2], Clarification | None]:
     """Return a hook that raises a clarification before calls to the specified tool.
 
     Args:
@@ -185,8 +186,8 @@ def clarify_on_tool_calls(
 def _clarify_on_tool_call_hook(
     tool: Tool,
     args: dict[str, Any],
-    plan_run: PlanRun,
-    step: Step,  # noqa: ARG001
+    plan_run: PlanRunV2,
+    step: StepV2,  # noqa: ARG001
     tool_ids: list[str] | None,
 ) -> Clarification | None:
     """Raise a clarification to check the user is happy with all tool calls before proceeding."""
@@ -217,8 +218,8 @@ def _clarify_on_tool_call_hook(
     return None
 
 
-def log_step_outputs(plan: Plan, plan_run: PlanRun, step: Step, output: Output) -> None:  # noqa: ARG001
+def log_step_outputs(plan: PlanV2, plan_run: PlanRunV2, step: StepV2, output: Output) -> None:  # noqa: ARG001
     """Log the output of a step in the plan."""
     logger().info(
-        f"Step with task {step.task} using tool {step.tool_id} completed with result: {output}"
+        f"Step {step.step_name} completed with result: {output}"
     )
