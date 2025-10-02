@@ -59,7 +59,7 @@ from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
 from portia.plan import Plan
-from portia.plan_run import PlanRun
+from portia.plan_run import PlanRun, PlanRunV2
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
@@ -69,21 +69,68 @@ MAX_TOOL_DESCRIPTION_LENGTH = 16384
 class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
+    This context provides access to the V2-native PlanRunV2 execution state,
+    eliminating direct references to legacy Plan or PlanRun objects.
+
     Attributes:
-        plan_run(PlanRun): The run the tool run is part of.
-        plan(Plan): The plan the tool run is part of.
-        config(Config): The config for the SDK as a whole.
-        clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
+        plan_run_v2: The V2-native plan run the tool run is part of.
+        clarifications: Relevant clarifications for this tool run.
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    end_user: EndUser
-    plan_run: PlanRun
-    plan: Plan
-    config: Config
+    plan_run_v2: PlanRunV2
     clarifications: ClarificationListType
+
+    # Backward compatibility properties
+    @property
+    def end_user(self) -> EndUser:
+        """Get the end user from the plan run."""
+        return self.plan_run_v2.end_user
+
+    @property
+    def config(self) -> Config:
+        """Get the config from the plan run."""
+        return self.plan_run_v2.config
+
+    @property
+    def plan_run(self) -> PlanRun:
+        """Get a legacy PlanRun view for backward compatibility.
+
+        This creates a minimal PlanRun object from the PlanRunV2 state.
+        """
+        # Create a legacy PlanRun from V2 data for backward compatibility
+        from portia.plan_run import PlanRunOutputs
+
+        return PlanRun(
+            id=self.plan_run_v2.id,
+            plan_id=self.plan_run_v2.plan.id,
+            current_step_index=self.plan_run_v2.current_step_index,
+            state=self.plan_run_v2.state,
+            end_user_id=self.plan_run_v2.end_user.external_id,
+            outputs=PlanRunOutputs(
+                clarifications=self.clarifications,
+                step_outputs={},
+                final_output=self.plan_run_v2.final_output,
+            ),
+            plan_run_inputs=self.plan_run_v2.plan_run_inputs,
+        )
+
+    @property
+    def plan(self) -> Plan:
+        """Get a legacy Plan view for backward compatibility.
+
+        This converts the PlanV2 to a legacy Plan object.
+        """
+        from portia.plan import PlanContext
+
+        # Create a minimal PlanContext for the legacy plan
+        plan_context = PlanContext(
+            query="",  # Not available in V2
+            tool_registry_ids=[],  # Not available in V2
+        )
+        return self.plan_run_v2.plan.to_legacy_plan(plan_context)
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
