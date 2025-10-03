@@ -2900,3 +2900,91 @@ class Portia:
         for model in GenerativeModelsConfig.model_fields:
             getter = getattr(config, f"get_{model}")
             logger().debug(f"{model}: {getter()}")
+
+    def upvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Upvote a plan.
+
+        This method upvotes a plan by setting its liked field to True, which triggers
+        embedding creation for similarity search. Only available with PortiaCloudStorage.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to upvote.
+
+        Raises:
+            ValueError: If the storage is not PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+
+        """
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise ValueError("upvote_plan is only available with PortiaCloudStorage")
+
+        if isinstance(plan_id, str):
+            plan_id = PlanUUID.from_string(plan_id)
+
+        self.storage.upvote_plan(plan_id)
+
+    async def aupvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Upvote a plan asynchronously.
+
+        This method upvotes a plan by setting its liked field to True, which triggers
+        embedding creation for similarity search. Only available with PortiaCloudStorage.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to upvote.
+
+        Raises:
+            ValueError: If the storage is not PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+
+        """
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise ValueError("aupvote_plan is only available with PortiaCloudStorage")
+
+        if isinstance(plan_id, str):
+            plan_id = PlanUUID.from_string(plan_id)
+
+        await self.storage.aupvote_plan(plan_id)
+
+    def downvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Downvote a plan.
+
+        This method downvotes a plan by setting its liked field to False, which triggers
+        embedding deletion. Only available with PortiaCloudStorage.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to downvote.
+
+        Raises:
+            ValueError: If the storage is not PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+
+        """
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise ValueError("downvote_plan is only available with PortiaCloudStorage")
+
+        if isinstance(plan_id, str):
+            plan_id = PlanUUID.from_string(plan_id)
+
+        self.storage.downvote_plan(plan_id)
+
+    async def adownvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Downvote a plan asynchronously.
+
+        This method downvotes a plan by setting its liked field to False, which triggers
+        embedding deletion. Only available with PortiaCloudStorage.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to downvote.
+
+        Raises:
+            ValueError: If the storage is not PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+
+        """
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise ValueError("adownvote_plan is only available with PortiaCloudStorage")
+
+        if isinstance(plan_id, str):
+            plan_id = PlanUUID.from_string(plan_id)
+
+        await self.storage.adownvote_plan(plan_id)

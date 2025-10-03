@@ -3137,3 +3137,109 @@ def test_portia_run_plan_planv2_inside_async_context_raises_runtime_error(portia
             "run_plan should be called outside of an async context: Use arun_plan instead"
             in str(exc_info.value)
         )
+
+
+def test_upvote_plan_with_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test upvote_plan method with PortiaCloudStorage."""
+    config = Config(
+        portia_api_key="test_api_key",
+        storage_class=StorageClass.CLOUD,
+    )
+    portia = Portia(config=config)
+
+    plan_id = PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678"))
+
+    endpoint = config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/{plan_id}/upvote/"
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+
+    # Test with PlanUUID object
+    portia.upvote_plan(plan_id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    assert str(requests[0].url) == url
+
+    # Test with string plan ID
+    plan_id_str = str(plan_id)
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+    portia.upvote_plan(plan_id_str)
+
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 2
+
+
+def test_downvote_plan_with_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test downvote_plan method with PortiaCloudStorage."""
+    config = Config(
+        portia_api_key="test_api_key",
+        storage_class=StorageClass.CLOUD,
+    )
+    portia = Portia(config=config)
+
+    plan_id = PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678"))
+
+    endpoint = config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/{plan_id}/downvote/"
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+
+    # Test with PlanUUID object
+    portia.downvote_plan(plan_id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    assert str(requests[0].url) == url
+
+    # Test with string plan ID
+    plan_id_str = str(plan_id)
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+    portia.downvote_plan(plan_id_str)
+
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 2
+
+
+def test_upvote_plan_with_non_cloud_storage() -> None:
+    """Test upvote_plan method raises ValueError with non-cloud storage."""
+    config = Config(storage_class=StorageClass.IN_MEMORY)
+    portia = Portia(config=config)
+
+    plan_id = PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678"))
+
+    with pytest.raises(ValueError, match="upvote_plan is only available with PortiaCloudStorage"):
+        portia.upvote_plan(plan_id)
+
+
+def test_downvote_plan_with_non_cloud_storage() -> None:
+    """Test downvote_plan method raises ValueError with non-cloud storage."""
+    config = Config(storage_class=StorageClass.IN_MEMORY)
+    portia = Portia(config=config)
+
+    plan_id = PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678"))
+
+    with pytest.raises(ValueError, match="downvote_plan is only available with PortiaCloudStorage"):
+        portia.downvote_plan(plan_id)
