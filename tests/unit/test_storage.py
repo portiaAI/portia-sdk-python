@@ -1150,3 +1150,223 @@ def test_get_plan_by_query_edge_cases() -> None:
 
     found_plan = storage.get_plan_by_query(special_query)
     assert found_plan.plan_context.query == special_query
+
+
+def test_upvote_plan_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test upvoting a plan in Portia Cloud."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/upvote/"
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": True},
+    )
+
+    storage.upvote_plan(plan.id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert str(requests[0].url) == url
+    assert requests[0].method == "POST"
+
+
+async def test_aupvote_plan_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test upvoting a plan in Portia Cloud asynchronously."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/upvote/"
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": True},
+    )
+
+    await storage.aupvote_plan(plan.id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert str(requests[0].url) == url
+    assert requests[0].method == "POST"
+
+
+def test_downvote_plan_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test downvoting a plan in Portia Cloud."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/downvote/"
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": False},
+    )
+
+    storage.downvote_plan(plan.id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert str(requests[0].url) == url
+    assert requests[0].method == "POST"
+
+
+async def test_adownvote_plan_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test downvoting a plan in Portia Cloud asynchronously."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/downvote/"
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": False},
+    )
+
+    await storage.adownvote_plan(plan.id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert str(requests[0].url) == url
+    assert requests[0].method == "POST"
+
+
+def test_upvote_plan_error_handling(httpx_mock: HTTPXMock) -> None:
+    """Test error handling when upvoting a plan fails."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/upvote/"
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=404,
+        json={"detail": "Plan not found"},
+    )
+
+    with pytest.raises(StorageError):
+        storage.upvote_plan(plan.id)
+
+
+def test_downvote_plan_error_handling(httpx_mock: HTTPXMock) -> None:
+    """Test error handling when downvoting a plan fails."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/downvote/"
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=403,
+        json={"detail": "Permission denied"},
+    )
+
+    with pytest.raises(StorageError):
+        storage.downvote_plan(plan.id)
+
+
+def test_upvote_plan_idempotency(httpx_mock: HTTPXMock) -> None:
+    """Test that upvoting an already upvoted plan is idempotent."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/upvote/"
+    # Mock multiple successful upvotes
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": True},
+    )
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": True},
+    )
+
+    # Upvote twice
+    storage.upvote_plan(plan.id)
+    storage.upvote_plan(plan.id)
+
+    # Verify both requests were made successfully
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 2
+
+
+def test_downvote_plan_idempotency(httpx_mock: HTTPXMock) -> None:
+    """Test that downvoting an already downvoted plan is idempotent."""
+    config = get_test_config()
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[],
+    )
+
+    url = f"{config.portia_cloud_url}/api/v0/plans/{plan.id}/downvote/"
+    # Mock multiple successful downvotes
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": False},
+    )
+    httpx_mock.add_response(
+        url=url,
+        method="POST",
+        status_code=200,
+        json={"liked": False},
+    )
+
+    # Downvote twice
+    storage.downvote_plan(plan.id)
+    storage.downvote_plan(plan.id)
+
+    # Verify both requests were made successfully
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 2

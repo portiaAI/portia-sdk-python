@@ -1828,6 +1828,96 @@ class PortiaCloudStorage(Storage):
         except Exception as e:
             raise StorageError(e) from e
 
+    def upvote_plan(self, plan_id: PlanUUID) -> None:
+        """Upvote a plan in Portia Cloud.
+
+        Sets the plan's liked status to True, which triggers embedding creation
+        for use in User-Led Learning (ULL) features.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to upvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.post(
+                url=f"/api/v0/plans/{plan_id}/upvote/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    async def aupvote_plan(self, plan_id: PlanUUID) -> None:
+        """Upvote a plan in Portia Cloud asynchronously.
+
+        Sets the plan's liked status to True, which triggers embedding creation
+        for use in User-Led Learning (ULL) features.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to upvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url=f"/api/v0/plans/{plan_id}/upvote/",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    def downvote_plan(self, plan_id: PlanUUID) -> None:
+        """Downvote a plan in Portia Cloud.
+
+        Sets the plan's liked status to False, which triggers embedding deletion
+        to remove the plan from User-Led Learning (ULL) features.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to downvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.post(
+                url=f"/api/v0/plans/{plan_id}/downvote/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    async def adownvote_plan(self, plan_id: PlanUUID) -> None:
+        """Downvote a plan in Portia Cloud asynchronously.
+
+        Sets the plan's liked status to False, which triggers embedding deletion
+        to remove the plan from User-Led Learning (ULL) features.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to downvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url=f"/api/v0/plans/{plan_id}/downvote/",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
     def save_end_user(self, end_user: EndUser) -> EndUser:
         """Save an end_user to Portia Cloud.
 
