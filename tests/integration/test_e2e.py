@@ -1011,9 +1011,9 @@ def test_portia_plan_steps_inputs_dependencies(
     assert plan.steps[0].condition is None, "First step should not have a condition"
 
     assert len(plan.steps[1].inputs) == 1, "Second step should have 1 input from calculation step"
-    assert (
-        plan.steps[1].inputs[0].name == plan.steps[0].output
-    ), "Second step should equal the output of the first step"
+    assert plan.steps[1].inputs[0].name == plan.steps[0].output, (
+        "Second step should equal the output of the first step"
+    )
     assert plan.steps[1].tool_id == "llm_tool", "Second step should have the LLM tool"
     assert plan.steps[1].condition is None, "Second step should not have a condition"
 
@@ -1026,9 +1026,9 @@ def test_portia_plan_steps_inputs_dependencies(
     assert plan.steps[2].tool_id == "llm_tool", "Third step should be llm_tool"
 
     assert len(plan.steps[3].inputs) >= 1, "Fourth step should have summary input"
-    assert any(
-        inp.name == plan.steps[2].output for inp in plan.steps[3].inputs
-    ), "Fourth step inputs should have summary input"
+    assert any(inp.name == plan.steps[2].output for inp in plan.steps[3].inputs), (
+        "Fourth step inputs should have summary input"
+    )
     assert plan.steps[3].tool_id == "file_writer_tool", "Fourth step should be file_writer_tool"
     assert "100" in str(plan.steps[3].condition), "Fourth step condition does not contain 100"
 

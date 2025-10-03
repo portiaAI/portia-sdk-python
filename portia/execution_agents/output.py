@@ -170,8 +170,7 @@ Output = LocalDataValue | AgentMemoryValue
 
 
 @deprecated(
-    "LocalOutput is deprecated and will be removed in the 0.4 release - "
-    "use LocalDataValue instead"
+    "LocalOutput is deprecated and will be removed in the 0.4 release - use LocalDataValue instead"
 )
 class LocalOutput(LocalDataValue):
     """Alias of LocalDataValue kept for backwards compatibility."""

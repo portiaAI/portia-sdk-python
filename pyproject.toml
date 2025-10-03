@@ -24,7 +24,6 @@ dependencies = [
     "langchain-openai>=0.3,<0.4 ; python_version >= '3.11' and python_version < '4.0'",
     "langchain>=0.3.17,<0.4 ; python_version >= '3.11' and python_version < '4.0'",
     "langgraph>=0.2.59,<0.3 ; python_version >= '3.11' and python_version < '4.0'",
-    "click>=8.1.7,<9",
     "loguru>=0.7.3,<0.8 ; python_version >= '3.11' and python_version < '4.0'",
     "python-dotenv>=1.0.1,<2",
     "pandas>=2.2.3,<3",
@@ -88,8 +87,6 @@ Homepage = "https://www.portialabs.ai/"
 Repository = "https://github.com/portiaAI/portia-sdk-python"
 Documentation = "https://docs.portialabs.ai"
 
-[project.scripts]
-portia-cli = "portia.cli:cli"
 
 [dependency-groups]
 dev = [
@@ -181,7 +178,6 @@ omit = [
     "*/tests/*", # Don't cover test files themselves
     "example.py", # Don't cover example
     "*/_unstable/**",  # Don't check _unstable files
-    "portia/cli.py",  # Best effort test coverage
 ]
 
 [tool.coverage.report]
@@ -195,7 +191,7 @@ type = "python"
 
 [[tool.pydoc-markdown.processors]]
 type = "filter"
-expression = "not 'test' in name and not 'cli' in name and not 'prefixed_uuid' in name and not 'common' in name and not 'templates' in name and not '_unstable' in name and default()"
+expression = "not 'test' in name and not 'prefixed_uuid' in name and not 'common' in name and not 'templates' in name and not '_unstable' in name and default()"
 skip_empty_modules = true
 
 [[tool.pydoc-markdown.processors]]

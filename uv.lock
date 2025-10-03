@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13' and python_full_version < '4'",
@@ -2099,7 +2099,6 @@ version = "0.8.1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
-    { name = "click" },
     { name = "google-genai" },
     { name = "instructor", marker = "python_full_version < '4'" },
     { name = "jinja2" },
@@ -2201,7 +2200,6 @@ requires-dist = [
     { name = "browser-use", marker = "python_full_version >= '3.11' and python_full_version < '4' and extra == 'tools-browser-local'", specifier = "==0.1.40" },
     { name = "browserbase", marker = "extra == 'all'", specifier = ">=1.2.0,<2" },
     { name = "browserbase", marker = "extra == 'tools-browser-browserbase'", specifier = ">=1.2.0,<2" },
-    { name = "click", specifier = ">=8.1.7,<9" },
     { name = "google-genai", specifier = ">=1.18.0" },
     { name = "groq", marker = "extra == 'all'", specifier = ">=0.12.0,<1.0" },
     { name = "groq", marker = "extra == 'groq'", specifier = ">=0.12.0,<1.0" },

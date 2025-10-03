@@ -33,7 +33,7 @@ import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from inspect import signature
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -153,7 +153,7 @@ class Reference(BaseModel, ABC):
         raise NotImplementedError  # pragma: no cover
 
     @classmethod
-    def from_str(cls: type[T], input_str: str) -> T:
+    def from_str(cls, input_str: str) -> Self:
         """Create a reference from a string representation.
 
         Args:

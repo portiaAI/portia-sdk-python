@@ -212,7 +212,7 @@ end_user_phone:
 end_user_attributes:{{"email": "hello@world.com"}}
 ----------
 System Context:
-Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}"""
+Today's date is {datetime.now(UTC).strftime("%Y-%m-%d")}"""
     )
 
 
