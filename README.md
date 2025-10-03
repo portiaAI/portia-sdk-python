@@ -106,10 +106,6 @@ pip install portia-sdk-python
 ```bash
 export OPENAI_API_KEY='your-api-key-here'
 ```
-**Step 3:** Validate your installation by submitting a simple maths prompt from the command line
-```
-portia-cli run "add 1 + 2"
-```
 
 **All set? Now let's explore some basic usage of the product 🚀**
 
@@ -129,7 +125,6 @@ Finally we also introduce the concept of a `tool_registry`, which is a flexible 
 ```python
 from dotenv import load_dotenv
 from portia import Config, Portia, DefaultToolRegistry
-from portia.cli import CLIExecutionHooks
 
 load_dotenv(override=True)
 
@@ -144,7 +139,6 @@ config = Config.from_default()
 portia = Portia(
    config=config,
    tools=DefaultToolRegistry(config=config),
-   execution_hooks=CLIExecutionHooks(),
 )
 
 plan = portia.run(task)

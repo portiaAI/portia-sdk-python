@@ -138,7 +138,7 @@ Return the outcome and reason in the given format.
     def _get_plan_steps_pretty(self, plan: Plan) -> str:
         """Get the pretty print representation of the plan steps."""
         return "\n".join(
-            [f"Step {i+1}: {step.pretty_print()}" for i, step in enumerate(plan.steps)]
+            [f"Step {i + 1}: {step.pretty_print()}" for i, step in enumerate(plan.steps)]
         )
 
     async def apre_step_introspection(

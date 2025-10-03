@@ -496,17 +496,17 @@ def test_verifier_model_schema_validation() -> None:
 
     required_field1 = next(arg for arg in result_inputs.args if arg.name == "required_field1")
     required_field2 = next(arg for arg in result_inputs.args if arg.name == "required_field2")
-    assert (
-        required_field1.schema_invalid
-    ), "required_field1 should be marked as missing when validation fails"
-    assert (
-        required_field2.schema_invalid
-    ), "required_field2 should be marked as missing when validation fails"
+    assert required_field1.schema_invalid, (
+        "required_field1 should be marked as missing when validation fails"
+    )
+    assert required_field2.schema_invalid, (
+        "required_field2 should be marked as missing when validation fails"
+    )
 
     optional_field = next(arg for arg in result_inputs.args if arg.name == "optional_field")
-    assert (
-        not optional_field.schema_invalid
-    ), "optional_field should not be marked as missing when validation fails"
+    assert not optional_field.schema_invalid, (
+        "optional_field should not be marked as missing when validation fails"
+    )
 
 
 def test_verifier_model_validates_schema_with_templating() -> None:

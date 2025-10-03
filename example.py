@@ -11,7 +11,6 @@ from portia import (
     Portia,
     example_tool_registry,
 )
-from portia.cli import CLIExecutionHooks
 from portia.end_user import EndUser
 
 load_dotenv()
@@ -57,15 +56,8 @@ if plan_run.state == PlanRunState.NEED_CLARIFICATION:
         )
     portia.resume(plan_run)
 
-# You can also pass in a clarification handler to manage clarifications
-portia = Portia(
-    Config.from_default(default_log_level=LogLevel.DEBUG),
-    tools=example_tool_registry + InMemoryToolRegistry.from_local_tools([FileReaderTool()]),
-    execution_hooks=CLIExecutionHooks(),
-)
-plan_run = portia.run(
-    "Read the poem.txt file and write a review of it",
-)
+# Note: You can also pass in a clarification handler to manage clarifications
+# via execution_hooks if needed
 
 # You can pass inputs into a plan
 plan_run = portia.run(
