@@ -225,23 +225,10 @@ class ExecutionAgentType(Enum):
 
     Attributes:
         ONE_SHOT: The one-shot agent.
-        DEFAULT: The default agent.
 
     """
 
     ONE_SHOT = "ONE_SHOT"
-    DEFAULT = "DEFAULT"
-
-
-class PlanningAgentType(Enum):
-    """Enum for planning agents used for planning queries.
-
-    Attributes:
-        DEFAULT: The default planning agent.
-
-    """
-
-    DEFAULT = "DEFAULT"
 
 
 class LogLevel(Enum):
@@ -302,9 +289,7 @@ def parse_str_to_enum(value: str | E, enum_type: type[E]) -> E:
     )
 
 
-PLANNING_MODEL_KEY = "planning_model_name"
 EXECUTION_MODEL_KEY = "execution_model_name"
-INTROSPECTION_MODEL_KEY = "introspection_model_name"
 SUMMARISER_MODEL_KEY = "summariser_model_name"
 DEFAULT_MODEL_KEY = "default_model_name"
 
@@ -328,16 +313,9 @@ class GenerativeModelsConfig(BaseModel):
             model if no other model is specified. It is also used by default in the Portia SDK
             tool that require an LLM.
 
-        planning_model: The model to use for the PlanningAgent. Reasoning models are a good choice
-            here, as they are able to reason about the problem and the possible solutions. If not
-            specified, the default_model will be used.
-
         execution_model: The model to use for the ExecutionAgent. This model is used for the
             distilling context from the plan run into tool calls. If not specified, the
             default_model will be used.
-
-        introspection_model: The model to use for the IntrospectionAgent. This model is used to
-            introspect the problem and the plan. If not specified, the default_model will be used.
 
         summarizer_model: The model to use for the SummarizerAgent. This model is used to
             summarize output from the plan run. If not specified, the default_model will be used.
@@ -347,9 +325,7 @@ class GenerativeModelsConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     default_model: GenerativeModel | str | None = None
-    planning_model: GenerativeModel | str | None = None
     execution_model: GenerativeModel | str | None = None
-    introspection_model: GenerativeModel | str | None = None
     summarizer_model: GenerativeModel | str | None = None
 
     @model_validator(mode="before")
@@ -404,7 +380,6 @@ class Config(BaseModel):
         default_log_level: The default log level (e.g., DEBUG, INFO).
         default_log_sink: The default destination for logs (e.g., sys.stdout).
         json_log_serialize: Whether to serialize logs in JSON format.
-        planning_agent_type: The planning agent type.
         execution_agent_type: The execution agent type.
         feature_flags: A dictionary of feature flags for the SDK.
         clarifications_enabled: Whether to enable clarifications for the execution agent.
@@ -604,18 +579,6 @@ class Config(BaseModel):
         """Parse execution_agent_type to enum if string provided."""
         return parse_str_to_enum(value, ExecutionAgentType)
 
-    # PlanningAgent Options
-    planning_agent_type: PlanningAgentType = Field(
-        default=PlanningAgentType.DEFAULT,
-        description="The default planning_agent_type to use.",
-    )
-
-    @field_validator("planning_agent_type", mode="before")
-    @classmethod
-    def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
-        """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
-
     large_output_threshold_tokens: int = Field(
         default=1_000,
         description="The threshold number of tokens before we start treating an output as a"
@@ -635,46 +598,6 @@ class Config(BaseModel):
     ) -> GenerativeModel | str | None:
         """Get the default model for the given agent key."""
         match agent_key:
-            case "planning_model":
-                match llm_provider:
-                    case LLMProvider.OPENAI:
-                        return "openai/o3-mini"
-                    case LLMProvider.ANTHROPIC:
-                        return "anthropic/claude-3-7-sonnet-latest"
-                    case LLMProvider.MISTRALAI:
-                        return "mistralai/mistral-large-latest"
-                    case LLMProvider.GOOGLE:
-                        return "google/gemini-2.5-pro"
-                    case LLMProvider.AMAZON:
-                        return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
-                    case LLMProvider.AZURE_OPENAI:
-                        return "azure-openai/o3-mini"
-                    case LLMProvider.OPENROUTER:
-                        return "openrouter/moonshotai/kimi-k2"
-                    case LLMProvider.GROK:
-                        return "grok/grok-4-0709"
-                    case LLMProvider.GROQ:
-                        return "groq/llama3-70b-8192"
-                return None
-            case "introspection_model":
-                match llm_provider:
-                    case LLMProvider.OPENAI:
-                        return "openai/o4-mini"
-                    case LLMProvider.ANTHROPIC:
-                        return "anthropic/claude-3-7-sonnet-latest"
-                    case LLMProvider.MISTRALAI:
-                        return "mistralai/mistral-large-latest"
-                    case LLMProvider.GOOGLE:
-                        return "google/gemini-2.5-flash"
-                    case LLMProvider.AMAZON:
-                        return "amazon/eu.anthropic.claude-3-7-sonnet-20250219-v1:0"
-                    case LLMProvider.AZURE_OPENAI:
-                        return "azure-openai/o4-mini"
-                    case LLMProvider.GROK:
-                        return "grok/grok-4-0709"
-                    case LLMProvider.GROQ:
-                        return "groq/llama3-8b-8192"
-                return None
             case "default_model":
                 match llm_provider:
                     case LLMProvider.OPENAI:
@@ -715,20 +638,6 @@ class Config(BaseModel):
                 "external LLM provider (e.g. OpenAI / Anthropic etc), make sure you have provided "
                 "an API key for that provider.",
             )
-        if self.models.planning_model is None and (
-            model := self.get_agent_default_model(
-                agent_key="planning_model",
-                llm_provider=self.llm_provider,
-            )
-        ):
-            self.models.planning_model = model
-        if self.models.introspection_model is None and (
-            model := self.get_agent_default_model(
-                agent_key="introspection_model",
-                llm_provider=self.llm_provider,
-            )
-        ):
-            self.models.introspection_model = model
         return self
 
     @model_validator(mode="after")
@@ -747,9 +656,7 @@ class Config(BaseModel):
         # right API keys and other required configuration.
         for model_getter, label, value in [
             (self.get_default_model, "default_model", self.models.default_model),
-            (self.get_planning_model, "planning_model", self.models.planning_model),
             (self.get_execution_model, "execution_model", self.models.execution_model),
-            (self.get_introspection_model, "introspection_model", self.models.introspection_model),
             (
                 self.get_summarizer_model,
                 "summarizer_model",
@@ -845,28 +752,12 @@ class Config(BaseModel):
             )
         return model
 
-    def get_planning_model(self) -> GenerativeModel:
-        """Get or build the planning model from the config.
-
-        See the GenerativeModelsConfig class for more information
-        """
-        return self.get_generative_model(self.models.planning_model) or self.get_default_model()
-
     def get_execution_model(self) -> GenerativeModel:
         """Get or build the execution model from the config.
 
         See the GenerativeModelsConfig class for more information
         """
         return self.get_generative_model(self.models.execution_model) or self.get_default_model()
-
-    def get_introspection_model(self) -> GenerativeModel:
-        """Get or build the introspection model from the config.
-
-        See the GenerativeModelsConfig class for more information
-        """
-        return (
-            self.get_generative_model(self.models.introspection_model) or self.get_default_model()
-        )
 
     def get_summarizer_model(self) -> GenerativeModel:
         """Get or build the summarizer model from the config.
@@ -1085,9 +976,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
 
     legacy_model_kwargs = {}
     for legacy_model_key, new_model_key in {
-        PLANNING_MODEL_KEY: "planning_model",
         EXECUTION_MODEL_KEY: "execution_model",
-        INTROSPECTION_MODEL_KEY: "introspection_model",
         SUMMARISER_MODEL_KEY: "summarizer_model",
         DEFAULT_MODEL_KEY: "default_model",
     }.items():
@@ -1125,9 +1014,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
 
     models = GenerativeModelsConfig(
         default_model=kwargs_models.get("default_model"),
-        planning_model=kwargs_models.get("planning_model"),
         execution_model=kwargs_models.get("execution_model"),
-        introspection_model=kwargs_models.get("introspection_model"),
         summarizer_model=kwargs_models.get("summarizer_model"),
     )
 
@@ -1139,7 +1026,6 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         models=models,
         feature_flags=kwargs.pop("feature_flags", {}),
         storage_class=kwargs.pop("storage_class", default_storage_class),
-        planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
         execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
         **kwargs,
     )

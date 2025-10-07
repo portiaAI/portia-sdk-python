@@ -38,7 +38,6 @@ from portia.config import (
     GenerativeModelsConfig,
     LLMModel,
     LogLevel,
-    PlanningAgentType,
     StorageClass,
     default_config,
 )
@@ -90,7 +89,7 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
+from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
@@ -154,7 +153,6 @@ __all__ = [
     "MultipleChoiceClarification",
     "Output",
     "Plan",
-    "PlanBuilder",
     "PlanBuilderV2",
     "PlanContext",
     "PlanError",
@@ -165,7 +163,6 @@ __all__ = [
     "PlanRunState",
     "PlanUUID",
     "PlanV2",
-    "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
     "PortiaToolRegistry",
