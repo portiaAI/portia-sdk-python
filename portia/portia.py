@@ -42,7 +42,6 @@ from portia.config import (
     Config,
     ExecutionAgentType,
     GenerativeModelsConfig,
-    PlanningAgentType,
     StorageClass,
 )
 from portia.end_user import EndUser
@@ -53,7 +52,6 @@ from portia.errors import (
     SkipExecutionError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
@@ -62,19 +60,10 @@ from portia.execution_agents.output import (
 )
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
-from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
-from portia.introspection_agents.introspection_agent import (
-    COMPLETED_OUTPUT,
-    SKIPPED_OUTPUT,
-    BaseIntrospectionAgent,
-    PreStepIntrospection,
-    PreStepIntrospectionOutcome,
-)
 from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
-from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
     DiskFileStorage,
@@ -102,7 +91,6 @@ if TYPE_CHECKING:
 
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-    from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
 
 class Portia:
