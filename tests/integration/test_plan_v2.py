@@ -960,8 +960,8 @@ def collect_fn(
     }
 
 
-def test_plan_v2_input_linking_with_add_steps() -> None:
-    """Test input linking between top-level plan and sub-plan using add_steps with input_values."""
+def test_plan_v2_input_linking_with_add_sub_plan() -> None:
+    """Test input linking between top-level plan and sub-plan with input_values."""
     config = Config.from_default()
     portia = Portia(config=config)
 
@@ -1005,7 +1005,7 @@ def test_plan_v2_input_linking_with_add_steps() -> None:
             step_name="second_number",
         )
         # Add sub-plan steps with input values for 2 of the 4 sub-plan inputs
-        .add_steps(
+        .add_sub_plan(
             sub_plan,
             input_values={
                 "sub_input_no_default_1": (
@@ -1407,6 +1407,122 @@ def test_plan_v2_loop_with_args(local_portia: Portia) -> None:
     ]
     assert messages == expected_messages
     assert counter == 3
+
+
+def test_plan_v2_loop_with_all_step_outputs(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop with arguments."""
+    messages: list[str] = []
+    counter = 0
+    final_items: list = []
+
+    def record_func(message: str, items: list | None = None) -> None:
+        messages.append(message)
+        if items is not None:
+            final_items.extend(items)
+
+    def loop_function(message: str) -> int:
+        nonlocal counter
+        record_func(message)
+        return counter
+
+    def condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_eval_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test conditional loop with args")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=condition_with_args, args={"x": 42, "y": "test"})
+        .function_step(
+            function=lambda: loop_function("inside_loop"),
+            step_name="inside_loop",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda items: record_func("end", items),
+            args={"items": StepOutput("inside_loop", full=True)},
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE
+
+    expected_messages = [
+        "start",
+        "condition_eval_1_x_42_y_test",
+        "inside_loop",
+        "condition_eval_2_x_42_y_test",
+        "inside_loop",
+        "condition_eval_3_x_42_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+    assert final_items == [1, 2]
+
+
+def test_plan_v2_loop_with_all_step_outputs_path(local_portia: Portia) -> None:
+    """Test PlanV2 conditional loop with arguments."""
+    messages: list[str] = []
+    counter = 0
+    final_items: list = []
+    items: list = [{"item": 1}, {"item": 2}, None]
+
+    def record_func(message: str, items: list | None = None) -> None:
+        messages.append(message)
+        if items is not None:
+            final_items.extend(items)
+
+    def loop_function(message: str) -> dict:
+        nonlocal counter
+        nonlocal items
+        record_func(message)
+        return items[counter - 1]
+
+    def condition_with_args(x: int, y: str) -> bool:
+        nonlocal counter
+        counter += 1
+        record_func(f"condition_eval_{counter}_x_{x}_y_{y}")
+        return counter < 3  # Run twice
+
+    plan = (
+        PlanBuilderV2(label="Test conditional loop with args")
+        .function_step(
+            function=lambda: record_func("start"),
+        )
+        .loop(while_=condition_with_args, args={"x": 42, "y": "test"})
+        .function_step(
+            function=lambda: loop_function("inside_loop"),
+            step_name="inside_loop",
+        )
+        .end_loop()
+        .function_step(
+            function=lambda items: record_func("end", items),
+            args={"items": StepOutput("inside_loop", full=True, path="item")},
+        )
+        .build()
+    )
+
+    plan_run = local_portia.run_plan(plan)
+    assert plan_run.state == PlanRunState.COMPLETE, plan_run.outputs.step_outputs
+
+    expected_messages = [
+        "start",
+        "condition_eval_1_x_42_y_test",
+        "inside_loop",
+        "condition_eval_2_x_42_y_test",
+        "inside_loop",
+        "condition_eval_3_x_42_y_test",
+        "end",
+    ]
+    assert messages == expected_messages
+    assert counter == 3
+    assert final_items == [1, 2]
 
 
 def test_plan_v2_loop_string_condition(local_portia: Portia) -> None:
