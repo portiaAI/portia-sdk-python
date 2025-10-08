@@ -44,41 +44,24 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
     args_schema: type[BaseModel] = OpenAISearchToolSchema
     output_schema: tuple[str, str] = ("list", "list: search results with urls, titles, and content")
     should_summarize: bool = True
+    model: str = "gpt-5-mini"
+    web_search_context_size: str = "medium"
+    api_key: str | None = None
 
-    def __init__(
-        self,
-        model: str = "gpt-5-mini",
-        web_search_context_size: str = "medium",
-        api_key: str | None = None,
-    ) -> None:
-        """Initialize the OpenAI Search Tool.
-
-        Args:
-            model: The model to use for search (default: gpt-5-mini)
-            web_search_context_size: Context size for web search ("small", "medium", "large")
-            api_key: OpenAI API key, if None will use OPENAI_API_KEY env var
-
-        """
-        super().__init__()
-        self._model = model
-        self._web_search_context_size = web_search_context_size
-
-        api_key_value = api_key or os.getenv("OPENAI_API_KEY")
+    def _get_api_key(self) -> str:
+        """Get the OpenAI API key from instance or environment."""
+        api_key_value = self.api_key or os.getenv("OPENAI_API_KEY")
         if not api_key_value:
             raise ToolHardError("OPENAI_API_KEY is required to use OpenAI search")
+        return api_key_value
 
-        self._client = OpenAI(api_key=api_key_value)
-        self._async_client = AsyncOpenAI(api_key=api_key_value)
+    def _get_client(self) -> OpenAI:
+        """Get or create the OpenAI client."""
+        return OpenAI(api_key=self._get_api_key())
 
-    @property
-    def model(self) -> str:
-        """Get the model being used."""
-        return self._model
-
-    @property
-    def web_search_context_size(self) -> str:
-        """Get the web search context size."""
-        return self._web_search_context_size
+    def _get_async_client(self) -> AsyncOpenAI:
+        """Get or create the async OpenAI client."""
+        return AsyncOpenAI(api_key=self._get_api_key())
 
     def run(self, _: ToolRunContext, search_query: str) -> list[dict[str, Any]]:
         """Run the OpenAI Search Tool."""
@@ -118,46 +101,54 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
     def _execute_search_sync(self, search_query: str) -> list[dict[str, Any]]:
         """Execute synchronous search with proper error handling."""
         try:
-            response = self._client.responses.create(
-                model=self._model,
+            client = self._get_client()
+            response = client.responses.create(
+                model=self.model,
                 input=(
                     f"Search the web for '{search_query}' and provide results as a JSON array "
                     f"where each result has url, title, and content fields. Format: "
                     f'[{{"url": "...", "title": "...", "content": "..."}}, ...]'
                 ),
                 tools=[
-                    {
+                    {  # type: ignore[typeddict-item]
                         "type": "web_search_preview",
-                        "web_search_preview": {"context_size": self._web_search_context_size},
+                        "web_search_preview": {"context_size": self.web_search_context_size},
                     }
                 ],
                 store=False,  # Don't store responses for privacy
                 timeout=60.0,
             )
             return self._parse_formatted_response(response)
+        except (ToolHardError, ToolSoftError):
+            # Re-raise our own error types without modification
+            raise
         except Exception as e:  # noqa: BLE001 - Need to catch all OpenAI API exceptions
             return self._handle_api_error(e)
 
     async def _execute_search_async(self, search_query: str) -> list[dict[str, Any]]:
         """Execute asynchronous search with proper error handling."""
         try:
-            response = await self._async_client.responses.create(
-                model=self._model,
+            client = self._get_async_client()
+            response = await client.responses.create(
+                model=self.model,
                 input=(
                     f"Search the web for '{search_query}' and provide results as a JSON array "
                     f"where each result has url, title, and content fields. Format: "
                     f'[{{"url": "...", "title": "...", "content": "..."}}, ...]'
                 ),
                 tools=[
-                    {
+                    {  # type: ignore[typeddict-item]
                         "type": "web_search_preview",
-                        "web_search_preview": {"context_size": self._web_search_context_size},
+                        "web_search_preview": {"context_size": self.web_search_context_size},
                     }
                 ],
                 store=False,  # Don't store responses for privacy
                 timeout=60.0,
             )
             return self._parse_formatted_response(response)
+        except (ToolHardError, ToolSoftError):
+            # Re-raise our own error types without modification
+            raise
         except Exception as e:  # noqa: BLE001 - Need to catch all OpenAI API exceptions
             return self._handle_api_error(e)
 
@@ -171,33 +162,33 @@ class OpenAISearchTool(Tool[list[dict[str, Any]]]):
             raise ToolSoftError(f"OpenAI API server error: {e}") from e
         raise ToolSoftError(f"OpenAI API error: {e}") from e
 
-    def _parse_formatted_response(self, response: object) -> list[dict[str, Any]]:
+    def _parse_formatted_response(self, response: Any) -> list[dict[str, Any]]:  # noqa: ANN401
         """Parse the JSON response from OpenAI Response API."""
-        if not hasattr(response, "output") or not response.output:
+        if not response.output:
             return []
 
         try:
             # OpenAI Response API returns text in response.output.text
             response_text = response.output.text
-            
+
             # Try to parse as JSON array directly
-            if response_text.strip().startswith('['):
+            if response_text.strip().startswith("["):
                 return json.loads(response_text.strip())
-            
+
             # If not direct JSON array, try to extract JSON from response text
             # Look for JSON array pattern in the response
-            json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+            json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group())
-            
+
             # Fallback: try to parse entire response as JSON
             parsed_response = json.loads(response_text)
             if isinstance(parsed_response, list):
                 return parsed_response
-            elif isinstance(parsed_response, dict) and "results" in parsed_response:
+            if isinstance(parsed_response, dict) and "results" in parsed_response:
                 return parsed_response["results"]
-            
-            return []
         except (json.JSONDecodeError, AttributeError, KeyError):
             # Return empty results if parsing fails - don't raise errors for empty results
-            return []
+            pass
+
+        return []

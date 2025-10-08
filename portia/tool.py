@@ -21,7 +21,7 @@ import json
 from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
-from typing import Any, Generic, Self, TypeVar, Union
+from typing import Any, Generic, Self, TypeVar
 
 import httpx
 import mcp

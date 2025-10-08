@@ -139,12 +139,11 @@ def test_portia_local_default_config_without_api_keys() -> None:
         assert str(portia.config) == str(Config.from_default())
 
         # Tools in open_source_tool_registry but not in default tool registry:
-        # Based on test results: open_source has 14 tools, default has 6 tools  
+        # Based on test results: open_source has 14 tools, default has 6 tools
         # Difference is 8 tools when OPENAI_API_KEY is set but no TAVILY_API_KEY
         expected_diff = 8  # Actual difference from test results
         if os.getenv("MISTRAL_API_KEY"):
             expected_diff = 9  # + pdf_reader_tool
-
 
         assert (
             len(portia.tool_registry.get_tools())

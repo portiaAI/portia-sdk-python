@@ -34,6 +34,7 @@ def test_openai_search_tool_integration() -> None:
     assert plan_run.outputs.final_output
 
     final_output = plan_run.outputs.final_output.get_value()
+    assert final_output is not None
     assert "Paris" in final_output
 
     # Verify step outputs exist
