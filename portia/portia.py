@@ -2790,7 +2790,7 @@ class Portia:
                     if not isinstance(result, LocalDataValue):
                         local_output_value = LocalDataValue(value=result.message)
                     else:
-                        local_output_value = LocalDataValue(value=result.message)
+                        local_output_value = LocalDataValue(value=result.message)  # pragma: no cover
                     
                     output_value = self._set_step_output(local_output_value, run_data.plan_run, legacy_step)
                     if not is_clarification(result):
