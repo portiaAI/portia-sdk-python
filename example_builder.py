@@ -85,7 +85,7 @@ plan = (
         condition=lambda total_price: total_price > 100,  # noqa: PLR2004
         args={"total_price": StepOutput("Calculate total price")},
     )
-    .function_step(function=lambda: print("Hey big spender!"))  # noqa: T201
+    .exit(message="Exit as it's too expensive")
     .else_()
     .function_step(function=lambda: print("We need more gold!"))  # noqa: T201
     .endif()
