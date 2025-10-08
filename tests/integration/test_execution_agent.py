@@ -9,7 +9,7 @@ from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import LocalDataValue
-from portia.plan import PlanBuilder
+from portia.plan import Plan, PlanContext, Step
 from portia.plan_run import PlanRun
 from portia.storage import InMemoryStorage
 from portia.tool import Tool, ToolRunContext
@@ -94,18 +94,19 @@ def test_execution_agent_with_long_tool_description(model: str) -> None:
     end_user = EndUser(external_id="test_user")
 
     # Create Plan
-    plan = (
-        PlanBuilder("Simulate quantum entanglement")
-        .step(
-            task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
-            "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "
-            "representing the GHZ state [0.707, 0, 0, 0, 0, 0, 0, 0.707] (initial_state_vector"
-            "=[0.707, 0, 0, 0, 0, 0, 0, 0.707]). Use the 'computational' measurement basis "
-            "and 'gaussian' noise model with an amplitude of 0.05 (noise_amplitude=0.05).",
-            tool_id=tool.id,
-            output="$result",
-        )
-        .build()
+    plan = Plan(
+        plan_context=PlanContext(query="Simulate quantum entanglement", tool_ids=[tool.id]),
+        steps=[
+            Step(
+                task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
+                "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "
+                "representing the GHZ state [0.707, 0, 0, 0, 0, 0, 0, 0.707] (initial_state_vector"
+                "=[0.707, 0, 0, 0, 0, 0, 0, 0.707]). Use the 'computational' measurement basis "
+                "and 'gaussian' noise model with an amplitude of 0.05 (noise_amplitude=0.05).",
+                tool_id=tool.id,
+                output="$result",
+            )
+        ],
     )
 
     # Create PlanRun
@@ -150,18 +151,19 @@ async def test_execution_agent_with_long_tool_description_async(model: str) -> N
     end_user = EndUser(external_id="test_user")
 
     # Create Plan
-    plan = (
-        PlanBuilder("Simulate quantum entanglement")
-        .step(
-            task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
-            "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "
-            "representing the GHZ state [0.707, 0, 0, 0, 0, 0, 0, 0.707] (initial_state_vector"
-            "=[0.707, 0, 0, 0, 0, 0, 0, 0.707]). Use the 'computational' measurement basis "
-            "and 'gaussian' noise model with an amplitude of 0.05 (noise_amplitude=0.05).",
-            tool_id=tool.id,
-            output="$result",
-        )
-        .build()
+    plan = Plan(
+        plan_context=PlanContext(query="Simulate quantum entanglement", tool_ids=[tool.id]),
+        steps=[
+            Step(
+                task="Run the quantum simulator for a 3-qubit system (particle_count=3) for 500 "
+                "femtoseconds (simulation_time_femtoseconds=500.0). Use an initial state vector "
+                "representing the GHZ state [0.707, 0, 0, 0, 0, 0, 0, 0.707] (initial_state_vector"
+                "=[0.707, 0, 0, 0, 0, 0, 0, 0.707]). Use the 'computational' measurement basis "
+                "and 'gaussian' noise model with an amplitude of 0.05 (noise_amplitude=0.05).",
+                tool_id=tool.id,
+                output="$result",
+            )
+        ],
     )
 
     # Create PlanRun

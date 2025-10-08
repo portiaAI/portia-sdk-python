@@ -21,7 +21,7 @@ from portia.open_source_tools.browser_tool import (
     BrowserToolForUrl,
     BrowserToolForUrlSchema,
 )
-from portia.plan import PlanBuilder
+from portia.plan import Plan, PlanContext, Step
 from portia.plan_run import PlanRun
 from portia.prefixed_uuid import PlanRunUUID
 from tests.utils import assert_clarification_equality_without_uuid, get_test_tool_context
@@ -752,12 +752,13 @@ def test_browser_tool_multiple_calls(
     mock_browserbase_provider: BrowserInfrastructureProviderBrowserBase,
 ) -> None:
     """Test step_complete only cleans up on final browser tool call."""
-    plan = (
-        PlanBuilder()
-        .step(task="1st browser tool task", tool_id="browser_tool")
-        .step(task="2nd browser tool task", tool_id="browser_tool")
-        .step(task="3rd browser tool task", tool_id="browser_tool")
-        .build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=["browser_tool"]),
+        steps=[
+            Step(task="1st browser tool task", tool_id="browser_tool", output="$output_0"),
+            Step(task="2nd browser tool task", tool_id="browser_tool", output="$output_1"),
+            Step(task="3rd browser tool task", tool_id="browser_tool", output="$output_2"),
+        ],
     )
     end_user = EndUser(
         external_id="123",
