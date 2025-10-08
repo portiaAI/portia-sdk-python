@@ -2785,24 +2785,30 @@ class Portia:
                         result = result.value
                 case ExitStepResult():
                     logger().info(f"Exit step executed: {result.message}")
-                    
+
                     # Store the just the message before handling the exit logic
                     if not isinstance(result, LocalDataValue):
                         local_output_value = LocalDataValue(value=result.message)
                     else:
-                        local_output_value = LocalDataValue(value=result.message)  # pragma: no cover
-                    
-                    output_value = self._set_step_output(local_output_value, run_data.plan_run, legacy_step)
+                        local_output_value = LocalDataValue(
+                            value=result.message
+                        )  # pragma: no cover
+
+                    output_value = self._set_step_output(
+                        local_output_value, run_data.plan_run, legacy_step
+                    )
                     if not is_clarification(result):
                         run_data.step_output_values.append(
                             StepOutputValue(
                                 step_name=step.step_name,
                                 step_num=index,
                                 value=result.message,
-                                description=(f"Output from step '{step.step_name}' (Description: {step})"),
+                                description=(
+                                    f"Output from step '{step.step_name}' (Description: {step})"
+                                ),
                             )
                         )
-                    
+
                     if result.error:
                         return self._handle_execution_error(
                             run_data.plan_run,
