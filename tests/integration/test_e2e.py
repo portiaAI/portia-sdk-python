@@ -22,7 +22,7 @@ from portia.config import (
 from portia.errors import PlanError, ToolHardError, ToolSoftError
 from portia.model import LLMProvider, OpenAIGenerativeModel
 from portia.open_source_tools.registry import example_tool_registry, open_source_tool_registry
-from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, Step, Variable
+from portia.plan import Plan, PlanContext, PlanInput, Step, Variable
 from portia.plan_run import PlanRunState
 from portia.portia import ExecutionHooks, Portia
 from portia.tool import Tool
@@ -1155,26 +1155,28 @@ def test_run_plan_with_large_step_input() -> None:
             assert "I'll start my apprenticeship as old maid" in body
             return f"Email sent to {recipient} with subject '{subject}'"
 
-    plan = (
-        PlanBuilder(
-            "Send an email to robbie@portialabs.ai titles 'Story' containing the first "
-            "chapter of War and Peace"
-        )
-        .step(
-            task="Get the first chapter of War and Peace",
-            tool_id=StoryTool().id,
-            output="$story",
-        )
-        .step(
-            task="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
+    plan = Plan(
+        plan_context=PlanContext(
+            query="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
             "chapter of War and Peace",
-            tool_id=EmailTool().id,
-            output="$result",
-            inputs=[
-                Variable(name="$story", description="The first chapter of War and Peace"),
-            ],
-        )
-        .build()
+            tool_ids=[StoryTool().id, EmailTool().id],
+        ),
+        steps=[
+            Step(
+                task="Get the first chapter of War and Peace",
+                tool_id=StoryTool().id,
+                output="$story",
+            ),
+            Step(
+                task="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
+                "chapter of War and Peace",
+                tool_id=EmailTool().id,
+                output="$result",
+                inputs=[
+                    Variable(name="$story", description="The first chapter of War and Peace"),
+                ],
+            ),
+        ],
     )
 
     portia = Portia(config=config, tools=ToolRegistry([StoryTool(), EmailTool()]))
@@ -1238,26 +1240,28 @@ async def test_arun_plan_with_large_step_input() -> None:
             assert "I'll start my apprenticeship as old maid" in body
             return f"Email sent to {recipient} with subject '{subject}'"
 
-    plan = (
-        PlanBuilder(
-            "Send an email to robbie@portialabs.ai titles 'Story' containing the first "
-            "chapter of War and Peace"
-        )
-        .step(
-            task="Get the first chapter of War and Peace",
-            tool_id=StoryTool().id,
-            output="$story",
-        )
-        .step(
-            task="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
+    plan = Plan(
+        plan_context=PlanContext(
+            query="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
             "chapter of War and Peace",
-            tool_id=EmailTool().id,
-            output="$result",
-            inputs=[
-                Variable(name="$story", description="The first chapter of War and Peace"),
-            ],
-        )
-        .build()
+            tool_ids=[StoryTool().id, EmailTool().id],
+        ),
+        steps=[
+            Step(
+                task="Get the first chapter of War and Peace",
+                tool_id=StoryTool().id,
+                output="$story",
+            ),
+            Step(
+                task="Send an email to robbie@portialabs.ai titles 'Story' containing the first "
+                "chapter of War and Peace",
+                tool_id=EmailTool().id,
+                output="$result",
+                inputs=[
+                    Variable(name="$story", description="The first chapter of War and Peace"),
+                ],
+            ),
+        ],
     )
 
     portia = Portia(config=config, tools=ToolRegistry([StoryTool(), EmailTool()]))
