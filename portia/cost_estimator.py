@@ -438,7 +438,7 @@ Please provide your estimate with a brief explanation of your reasoning.
     def _get_model_pricing(self, model_name: str) -> dict[str, float]:
         """Get pricing information for a model from LiteLLM or fallback to defaults."""
         try:
-            cost_map = litellm.get_model_cost_map(LITELLM_PRICING_URL)
+            cost_map = litellm.get_model_cost_map(LITELLM_PRICING_URL)  # pyright: ignore[reportPrivateImportUsage]
 
             if model_name in cost_map:
                 model_data = cost_map[model_name]
@@ -448,7 +448,9 @@ Please provide your estimate with a brief explanation of your reasoning.
                 }
 
         except (ValueError, TypeError, KeyError, AttributeError) as e:  # pragma: no cover
-            logger().warning(f"Failed to fetch LiteLLM pricing data: {e}, using default pricing")  # pragma: no cover
+            logger().warning(
+                f"Failed to fetch LiteLLM pricing data: {e}, using default pricing"
+            )  # pragma: no cover
 
         return DEFAULT_MODEL_PRICING  # pragma: no cover
 

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from portia.builder.conditionals import ConditionalBlock
 from portia.builder.llm_step import LLMStep
 from portia.builder.plan_builder_v2 import PlanBuilderV2
 from portia.builder.react_agent_step import ReActAgentStep
@@ -17,7 +18,6 @@ from portia.cost_estimator import (
     StepCostEstimate,
 )
 from portia.plan import Plan, PlanContext, PlanInput, Step
-from portia.builder.conditionals import ConditionalBlock
 
 
 @pytest.fixture
@@ -612,7 +612,6 @@ def test_edge_case_coverage_final() -> None:
         import pytest
 
         pytest.skip("OPENAI_API_KEY not set")
-
 
     config = Config.from_default(default_model="openai/gpt-4o")
     estimator = CostEstimator(config)
