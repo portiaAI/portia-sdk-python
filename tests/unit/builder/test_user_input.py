@@ -40,8 +40,8 @@ def test_user_input_step_str_multiple_choice() -> None:
     assert str(step) == "UserInputStep(type='multiple choice', message='Choose an option')"
 
 
-def test_user_input_step_to_legacy_step_text_input() -> None:
-    """Test UserInputStep to_legacy_step method for text input."""
+def test_user_input_step_to_step_data_text_input() -> None:
+    """Test UserInputStep to_step_data method for text input."""
     step = UserInputStep(
         message="Enter your name",
         step_name="name_input",
@@ -50,7 +50,7 @@ def test_user_input_step_to_legacy_step_text_input() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$name_input_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "User input (Text input): Enter your name"
@@ -60,8 +60,8 @@ def test_user_input_step_to_legacy_step_text_input() -> None:
     assert legacy_step.structured_output_schema is None
 
 
-def test_user_input_step_to_legacy_step_multiple_choice() -> None:
-    """Test UserInputStep to_legacy_step method for multiple choice."""
+def test_user_input_step_to_step_data_multiple_choice() -> None:
+    """Test UserInputStep to_step_data method for multiple choice."""
     step = UserInputStep(
         message="Choose an option",
         step_name="choice",
@@ -71,7 +71,7 @@ def test_user_input_step_to_legacy_step_multiple_choice() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$choice_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "User input (Multiple choice): Choose an option"

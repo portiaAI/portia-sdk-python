@@ -44,7 +44,7 @@ class ExitStep(StepV2):
         return ExitStepResult(message=message, error=self.error)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this ExitStep to a legacy Step."""
         if self.error:
             task = f"Exit plan with error: {self.message}"

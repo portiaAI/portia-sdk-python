@@ -51,7 +51,7 @@ class StepV2(BaseModel, ABC):
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this step to the legacy Step format.
 
         This is primarily used to determine how the steps should be presented in the Portia

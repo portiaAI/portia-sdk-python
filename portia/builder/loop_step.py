@@ -102,7 +102,7 @@ class LoopStep(StepV2):
         return LoopStepResult(loop_result=conditional_result, value=conditional_result)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this LoopStep to a PlanStep."""
         if isinstance(self.condition, str):
             cond_str = self.condition

@@ -284,8 +284,8 @@ async def test_sub_plan_step_run_with_string_template_input_values() -> None:
         assert message_input.value == "User Alice says: Hello world"
 
 
-def test_sub_plan_step_to_legacy_step() -> None:
-    """Test SubPlanStep to_legacy_step method."""
+def test_sub_plan_step_to_step_data() -> None:
+    """Test SubPlanStep to_step_data method."""
     mock_sub_plan = Mock()
     mock_sub_plan.id = "sub_plan_id"
     mock_sub_plan.label = "Sub Plan"
@@ -295,17 +295,17 @@ def test_sub_plan_step_to_legacy_step() -> None:
     mock_step1 = Mock()
     mock_legacy_step1 = Mock()
     mock_legacy_step1.tool_id = "tool1"
-    mock_step1.to_legacy_step.return_value = mock_legacy_step1
+    mock_step1.to_step_data.return_value = mock_legacy_step1
 
     mock_step2 = Mock()
     mock_legacy_step2 = Mock()
     mock_legacy_step2.tool_id = None
-    mock_step2.to_legacy_step.return_value = mock_legacy_step2
+    mock_step2.to_step_data.return_value = mock_legacy_step2
 
     mock_step3 = Mock()
     mock_legacy_step3 = Mock()
     mock_legacy_step3.tool_id = "tool3"
-    mock_step3.to_legacy_step.return_value = mock_legacy_step3
+    mock_step3.to_step_data.return_value = mock_legacy_step3
 
     mock_sub_plan.steps = [mock_step1, mock_step2, mock_step3]
 
@@ -317,7 +317,7 @@ def test_sub_plan_step_to_legacy_step() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$sub_plan_step_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "Run sub-plan: Sub Plan"
@@ -330,8 +330,8 @@ def test_sub_plan_step_to_legacy_step() -> None:
     assert legacy_step.inputs[0].name == "user_input"
 
 
-def test_sub_plan_step_to_legacy_step_no_tools() -> None:
-    """Test SubPlanStep to_legacy_step method when sub-plan has no tools."""
+def test_sub_plan_step_to_step_data_no_tools() -> None:
+    """Test SubPlanStep to_step_data method when sub-plan has no tools."""
     mock_sub_plan = Mock()
     mock_sub_plan.id = "sub_plan_id"
     mock_sub_plan.label = "Sub Plan No Tools"
@@ -342,12 +342,12 @@ def test_sub_plan_step_to_legacy_step_no_tools() -> None:
     mock_step1 = Mock()
     mock_legacy_step1 = Mock()
     mock_legacy_step1.tool_id = None
-    mock_step1.to_legacy_step.return_value = mock_legacy_step1
+    mock_step1.to_step_data.return_value = mock_legacy_step1
 
     mock_step2 = Mock()
     mock_legacy_step2 = Mock()
     mock_legacy_step2.tool_id = None
-    mock_step2.to_legacy_step.return_value = mock_legacy_step2
+    mock_step2.to_step_data.return_value = mock_legacy_step2
 
     mock_sub_plan.steps = [mock_step1, mock_step2]
 
@@ -359,7 +359,7 @@ def test_sub_plan_step_to_legacy_step_no_tools() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$sub_plan_step_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "Run sub-plan: Sub Plan No Tools"

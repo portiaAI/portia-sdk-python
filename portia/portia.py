@@ -2740,7 +2740,7 @@ class Portia:
             index = run_data.plan_run.current_step_index
             step = plan.steps[index]
 
-            legacy_step = step.to_legacy_step(plan)
+            legacy_step = step.to_step_data(plan)
 
             try:
                 self._handle_before_step_execution_hook(
@@ -2760,7 +2760,7 @@ class Portia:
                     PlanV2StepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=False,
-                        tool_id=step.to_legacy_step(plan).tool_id,
+                        tool_id=step.to_step_data(plan).tool_id,
                     )
                 )
                 return self._handle_execution_error(
@@ -2771,7 +2771,7 @@ class Portia:
                     PlanV2StepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=True,
-                        tool_id=step.to_legacy_step(plan).tool_id,
+                        tool_id=step.to_step_data(plan).tool_id,
                     )
                 )
 
@@ -2856,7 +2856,7 @@ class Portia:
                     plan_run=str(run_data.plan_run.id),
                 )
                 error_value = LocalDataValue(value=str(e))
-                self._set_step_output(error_value, run_data.plan_run, step.to_legacy_step(plan))
+                self._set_step_output(error_value, run_data.plan_run, step.to_step_data(plan))
                 run_data.step_output_values.append(
                     StepOutputValue(
                         step_name=step.step_name,

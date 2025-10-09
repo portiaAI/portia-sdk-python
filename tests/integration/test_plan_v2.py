@@ -618,7 +618,7 @@ def test_plan_v2_legacy_condition_string() -> None:
         )
         .build()
     )
-    condition_strings = [s.to_legacy_step(plan).condition for s in plan.steps]
+    condition_strings = [s.to_step_data(plan).condition for s in plan.steps]
     assert condition_strings == [
         None,  # 0: initial if_ conditional
         "If $step_0_output is true",

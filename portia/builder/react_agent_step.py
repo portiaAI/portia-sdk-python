@@ -127,7 +127,7 @@ class ReActAgentStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this SingleToolAgentStep to a Step."""
         return Step(
             task=self.task,

@@ -72,7 +72,7 @@ class WrappedToolNode(ToolNode):
         if self.run_data.execution_hooks.before_tool_call:
             logger().debug("Calling before_tool_call execution hook")
             clarification = self.run_data.execution_hooks.before_tool_call(
-                tool, kwargs, self.run_data.plan_run, step.to_legacy_step(self.run_data.plan)
+                tool, kwargs, self.run_data.plan_run, step.to_step_data(self.run_data.plan)
             )
             if clarification:
                 return {
@@ -92,7 +92,7 @@ class WrappedToolNode(ToolNode):
         if self.run_data.execution_hooks.after_tool_call:
             logger().debug("Calling after_tool_call execution hook")
             self.run_data.execution_hooks.after_tool_call(
-                tool, result, self.run_data.plan_run, step.to_legacy_step(self.run_data.plan)
+                tool, result, self.run_data.plan_run, step.to_step_data(self.run_data.plan)
             )
 
         return result

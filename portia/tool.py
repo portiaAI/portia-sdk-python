@@ -39,6 +39,7 @@ from pydantic import (
     model_validator,
 )
 
+from portia.builder.plan_v2 import PlanV2
 from portia.clarification import (
     ActionClarification,
     Clarification,
@@ -60,6 +61,8 @@ from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
 from portia.plan import Plan
 from portia.plan_run import PlanRun
+from portia.plan_run_v2 import PlanRunV2
+from portia.prefixed_uuid import PlanRunUUID  # noqa: TC001
 from portia.templates.render import render_template
 
 """MAX_TOOL_DESCRIPTION_LENGTH is limited to stop overflows in the planner context window."""
@@ -69,21 +72,39 @@ MAX_TOOL_DESCRIPTION_LENGTH = 16384
 class ToolRunContext(BaseModel):
     """Context passed to tools when running.
 
+    This context provides both V2 (plan_v2, plan_run_v2) and legacy (plan, plan_run)
+    plan objects for compatibility during the migration period. Tools should prefer
+    using the V2 objects when available.
+
     Attributes:
-        plan_run(PlanRun): The run the tool run is part of.
-        plan(Plan): The plan the tool run is part of.
+        end_user(EndUser): The end user who is running the plan.
+        plan_run_v2(PlanRunV2 | None): The current PlanRunV2 instance (new structure).
+        plan_v2(PlanV2 | None): The current PlanV2 (new structure).
+        plan_run(PlanRun | None): The run the tool run is part of (legacy structure).
+        plan(Plan | None): The plan the tool run is part of (legacy structure).
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
 
     """
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     end_user: EndUser
-    plan_run: PlanRun
-    plan: Plan
+    plan_run_v2: PlanRunV2 | None = None
+    plan_v2: PlanV2 | None = None
+    plan_run: PlanRun | None = None
+    plan: Plan | None = None
     config: Config
     clarifications: ClarificationListType
+
+    @property
+    def plan_run_id(self) -> PlanRunUUID:
+        """Get the plan run ID from either V2 or legacy structure."""
+        if self.plan_run_v2:
+            return self.plan_run_v2.id
+        if self.plan_run:
+            return self.plan_run.id
+        raise ValueError("Neither plan_run_v2 nor plan_run is set")
 
 
 class _ArgsSchemaPlaceholder(BaseModel):
@@ -636,7 +657,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.ACTION:
                     return LocalDataValue(
                         value=ActionClarification(
-                            plan_run_id=ctx.plan_run.id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             action_url=HttpUrl(clarification["action_url"]),
                             user_guidance=clarification["user_guidance"],
@@ -646,7 +667,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.INPUT:
                     return LocalDataValue(
                         value=InputClarification(
-                            plan_run_id=ctx.plan_run.id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -656,7 +677,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.MULTIPLE_CHOICE:
                     return LocalDataValue(
                         value=MultipleChoiceClarification(
-                            plan_run_id=ctx.plan_run.id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -667,7 +688,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 case ClarificationCategory.VALUE_CONFIRMATION:
                     return LocalDataValue(
                         value=ValueConfirmationClarification(
-                            plan_run_id=ctx.plan_run.id,
+                            plan_run_id=ctx.plan_run_id,
                             id=ClarificationUUID.from_string(clarification["id"]),
                             argument_name=clarification["argument_name"],
                             user_guidance=clarification["user_guidance"],
@@ -695,7 +716,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                     {
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run.id),
+                            "plan_run_id": str(ctx.plan_run_id),
                         },
                     },
                 ),
@@ -760,7 +781,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                         "arguments": combine_args_kwargs(*args, **kwargs),
                         "execution_context": {
                             "end_user_id": ctx.end_user.external_id,
-                            "plan_run_id": str(ctx.plan_run.id),
+                            "plan_run_id": str(ctx.plan_run_id),
                             "additional_data": ctx.end_user.additional_data,
                         },
                     },
@@ -809,7 +830,7 @@ class PortiaRemoteTool(Tool, Generic[SERIALIZABLE_TYPE_VAR]):
                 "tool_ids": sorted(tool_ids),
                 "execution_context": {
                     "end_user_id": tool_run_context.end_user.external_id,
-                    "plan_run_id": str(tool_run_context.plan_run.id),
+                    "plan_run_id": str(tool_run_context.plan_run_id),
                 },
             },
         )

@@ -96,7 +96,7 @@ class UserInputStep(StepV2):
         return previous_clarification.response
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this UserInputStep to a legacy Step."""
         input_type = "Multiple choice" if self.options else "Text input"
         return Step(

@@ -258,7 +258,7 @@ Please provide your estimate with a brief explanation of your reasoning.
 
         try:
             dummy_plan = PlanV2(steps=[step])
-            tools = step.to_legacy_step(dummy_plan).tool_id or ""
+            tools = step.to_step_data(dummy_plan).tool_id or ""
         except (ValueError, AttributeError) as e:
             logger().debug(f"Failed to convert step to legacy format: {e}")
             tools = ""

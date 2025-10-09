@@ -57,6 +57,7 @@ from portia.prefixed_uuid import PLAN_RUN_UUID_PREFIX, PLAN_UUID_PREFIX
 from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
+    from portia.builder.plan_v2 import PlanV2
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
@@ -89,6 +90,19 @@ class PlanStorage(ABC):
 
         """
         raise NotImplementedError("save_plan is not implemented")
+
+    @abstractmethod
+    def save_plan_v2(self, plan: PlanV2) -> None:
+        """Save a PlanV2.
+
+        Args:
+            plan (PlanV2): The PlanV2 object to save.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("save_plan_v2 is not implemented")
 
     @abstractmethod
     def get_plan(self, plan_id: PlanUUID) -> Plan:
@@ -523,6 +537,7 @@ class InMemoryStorage(Storage):
     """
 
     plans: dict[PlanUUID, Plan]
+    plans_v2: dict[PlanUUID, PlanV2]
     runs: dict[PlanRunUUID, PlanRun]
     outputs: defaultdict[PlanRunUUID, dict[str, LocalDataValue]]
     end_users: dict[str, EndUser]
@@ -530,6 +545,7 @@ class InMemoryStorage(Storage):
     def __init__(self) -> None:
         """Initialize Storage."""
         self.plans = {}
+        self.plans_v2 = {}
         self.runs = {}
         self.outputs = defaultdict(dict)
         self.end_users = {}
@@ -542,6 +558,15 @@ class InMemoryStorage(Storage):
 
         """
         self.plans[plan.id] = plan
+
+    def save_plan_v2(self, plan: PlanV2) -> None:
+        """Add PlanV2 to dict.
+
+        Args:
+            plan (PlanV2): The PlanV2 object to save.
+
+        """
+        self.plans_v2[plan.id] = plan
 
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Get plan from dict.
@@ -786,6 +811,15 @@ class DiskFileStorage(Storage):
 
         """
         self._write(f"{plan.id}.json", plan)
+
+    def save_plan_v2(self, plan: PlanV2) -> None:
+        """Save a PlanV2 object to the storage.
+
+        Args:
+            plan (PlanV2): The PlanV2 object to save.
+
+        """
+        self._write(f"{plan.id}_v2.json", plan)
 
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a Plan object by its ID.
@@ -1104,9 +1138,50 @@ class PortiaCloudStorage(Storage):
                 },
             )
         except Exception as e:
-            raise StorageError(e) from e
-        else:
-            self.check_response(response)
+            raise StorageError(f"Error saving plan to Portia Cloud: {e}") from e
+        self.check_response(response)
+
+    def save_plan_v2(self, plan: PlanV2) -> None:
+        """Save a PlanV2 to Portia Cloud.
+
+        Args:
+            plan (PlanV2): The PlanV2 object to save to the cloud.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            # Convert PlanV2 to legacy Plan for cloud storage
+            # This is a temporary solution during migration
+            from portia.plan import PlanContext  # noqa: PLC0415
+
+            tool_ids = []
+            for step in plan.steps:
+                legacy_step = step.to_step_data(plan)
+                if legacy_step.tool_id:
+                    tool_ids.append(legacy_step.tool_id)
+
+            plan_context = PlanContext(query=plan.label, tool_ids=sorted(set(tool_ids)))
+            legacy_plan = plan.to_legacy_plan(plan_context)
+
+            # Save the legacy representation to cloud
+            response = self.client.post(
+                url="/api/v0/plans/",
+                json={
+                    "id": str(legacy_plan.id),
+                    "query": legacy_plan.plan_context.query,
+                    "tool_ids": legacy_plan.plan_context.tool_ids,
+                    "steps": [step.model_dump(mode="json") for step in legacy_plan.steps],
+                    "plan_inputs": [
+                        {**input_.model_dump(mode="json"), "description": input_.description}
+                        for input_ in legacy_plan.plan_inputs
+                    ],
+                },
+            )
+        except Exception as e:
+            raise StorageError(f"Error saving PlanV2 to Portia Cloud: {e}") from e
+        self.check_response(response)
 
     async def asave_plan(self, plan: Plan) -> None:
         """Save a plan to Portia Cloud.

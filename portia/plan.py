@@ -280,10 +280,10 @@ class PlanInput(BaseModel):
 
 
 class Step(BaseModel):
-    """A step in a PlanRun.
+    """Simple data class for UI serialization of steps.
 
-    A step represents a task in the run to be executed. It contains inputs (variables) and
-    outputs, and may reference a tool to complete the task.
+    This class is used only for serializing step data for the UI/dashboard.
+    It is no longer used for execution - PlanV2 and StepV2 are used for that.
 
     Args:
         task (str): The task that needs to be completed by this step.
@@ -294,7 +294,7 @@ class Step(BaseModel):
 
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", frozen=True)
 
     task: str = Field(
         description="The task that needs to be completed by this step",

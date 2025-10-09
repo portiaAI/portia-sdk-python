@@ -68,7 +68,7 @@ class CustomStep(StepV2):
         """Execute the step."""
         return "mock result"
 
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this step to a Step from plan.py.
 
         A Step is the legacy representation of a step in the plan, and is still used in the

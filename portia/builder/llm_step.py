@@ -92,7 +92,7 @@ class LLMStep(StepV2):
         return await wrapped_tool.arun(tool_ctx, task=task, task_data=task_data)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this LLMStep to a legacy Step."""
         return Step(
             task=self.task,

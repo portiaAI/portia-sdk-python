@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from portia.builder.step_v2 import StepV2
     from portia.common import Serializable
     from portia.model import GenerativeModel
+    from portia.storage import Storage
     from portia.tool import Tool
 
 
@@ -832,8 +833,12 @@ class PlanBuilderV2:
         self.plan.summarize = summarize
         return self
 
-    def build(self) -> PlanV2:
+    def build(self, storage: Storage | None = None) -> PlanV2:
         """Finalize and return the built plan.
+
+        Args:
+            storage: Optional storage instance to save the plan. If provided, the plan will be
+                saved to storage after building.
 
         Raises:
             PlanBuilderError: If there are any issues when building the plan (e.g. an if block is
@@ -856,5 +861,9 @@ class PlanBuilderV2:
                 plan_length=len(self.plan.steps), step_type_counts=step_type_counts
             )
         )
+
+        # Save the plan to storage if provided
+        if storage is not None:
+            storage.save_plan_v2(self.plan)
 
         return self.plan

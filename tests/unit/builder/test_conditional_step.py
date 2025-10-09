@@ -250,8 +250,8 @@ async def test_conditional_step_run_with_string_condition() -> None:
         mock_agent.execute.assert_called_once_with(conditional="x > 5", arguments={"x": 10})
 
 
-def test_conditional_step_to_legacy_step_with_function_condition() -> None:
-    """Test ConditionalStep to_legacy_step with function condition."""
+def test_conditional_step_to_step_data_with_function_condition() -> None:
+    """Test ConditionalStep to_step_data with function condition."""
     conditional_block = ConditionalBlock(clause_step_indexes=[0, 3])
 
     def my_test_function(x: int) -> bool:
@@ -276,7 +276,7 @@ def test_conditional_step_to_legacy_step_with_function_condition() -> None:
         mock_input_name.return_value = "user_input"
         mock_legacy_condition.return_value = "test condition"
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Conditional clause: If result of my_test_function is true"
@@ -291,8 +291,8 @@ def test_conditional_step_to_legacy_step_with_function_condition() -> None:
         mock_legacy_condition.assert_called_once_with(mock_plan)
 
 
-def test_conditional_step_to_legacy_step_with_string_condition() -> None:
-    """Test ConditionalStep to_legacy_step with string condition."""
+def test_conditional_step_to_step_data_with_string_condition() -> None:
+    """Test ConditionalStep to_step_data with string condition."""
     conditional_block = ConditionalBlock(clause_step_indexes=[0, 2])
 
     step = ConditionalStep(
@@ -314,7 +314,7 @@ def test_conditional_step_to_legacy_step_with_string_condition() -> None:
         mock_input_name.return_value = "age"
         mock_legacy_condition.return_value = "legacy condition string"
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Conditional clause: user_age >= 18"
@@ -326,8 +326,8 @@ def test_conditional_step_to_legacy_step_with_string_condition() -> None:
         assert legacy_step.inputs[0].name == "age"
 
 
-def test_conditional_step_to_legacy_step_with_lambda_function() -> None:
-    """Test ConditionalStep to_legacy_step with lambda function condition."""
+def test_conditional_step_to_step_data_with_lambda_function() -> None:
+    """Test ConditionalStep to_step_data with lambda function condition."""
     conditional_block = ConditionalBlock(clause_step_indexes=[0, 1])
 
     lambda_condition = lambda x: x > 5  # noqa: E731
@@ -347,7 +347,7 @@ def test_conditional_step_to_legacy_step_with_lambda_function() -> None:
     with patch.object(step, "_get_legacy_condition") as mock_legacy_condition:
         mock_legacy_condition.return_value = None
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         assert "If result of" in legacy_step.task
         assert "is true" in legacy_step.task

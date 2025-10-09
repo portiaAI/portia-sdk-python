@@ -85,7 +85,7 @@ class UserVerifyStep(StepV2):
         return True
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this UserVerifyStep to a legacy Step."""
         return Step(
             task=f"User verification: {self.message}",

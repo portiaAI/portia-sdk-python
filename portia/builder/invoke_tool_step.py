@@ -115,7 +115,7 @@ class InvokeToolStep(StepV2):
         return output_value
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this InvokeToolStep to a legacy Step."""
         args_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]

@@ -493,8 +493,8 @@ async def test_invoke_tool_step_with_string_arg_templates() -> None:
         mock_tool._arun.assert_called_once_with(mock_tool_ctx, query="Search result for Alice")
 
 
-def test_invoke_tool_step_to_legacy_step() -> None:
-    """Test InvokeToolStep to_legacy_step method."""
+def test_invoke_tool_step_to_step_data() -> None:
+    """Test InvokeToolStep to_step_data method."""
     args = {"query": Input("user_query"), "limit": 10}
     step = InvokeToolStep(
         tool="search_tool",
@@ -509,7 +509,7 @@ def test_invoke_tool_step_to_legacy_step() -> None:
     with patch.object(args["query"], "get_legacy_name") as mock_input_name:
         mock_input_name.return_value = "user_query"
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Use tool search_tool with args: query=$user_query, limit=10"
