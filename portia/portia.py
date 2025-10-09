@@ -34,6 +34,7 @@ from portia.builder.exit import ExitStepResult
 from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopStepResult, LoopStepType
 from portia.builder.plan_v2 import PlanV2
+from portia.builder.react_agent_step import ReActAgentStep
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -41,9 +42,7 @@ from portia.clarification import (
 from portia.cloud import PortiaCloudClient
 from portia.config import (
     Config,
-    ExecutionAgentType,
     GenerativeModelsConfig,
-    PlanningAgentType,
     StorageClass,
 )
 from portia.end_user import EndUser
@@ -54,7 +53,6 @@ from portia.errors import (
     SkipExecutionError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
@@ -63,7 +61,6 @@ from portia.execution_agents.output import (
 )
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
-from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
     SKIPPED_OUTPUT,
@@ -75,7 +72,6 @@ from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
-from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
     DiskFileStorage,
@@ -207,18 +203,17 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
     ) -> PlanRun:
-        """End-to-end function to generate a plan and then execute it.
+        """End-to-end function to generate a simple ReAct agent plan and then execute it.
 
-        This is the simplest way to plan and execute a query using the SDK.
+        This is the simplest way to execute a query using the SDK. It creates a single-step
+        ReAct agent plan that uses the provided tools to complete the task.
 
         Args:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects,
-            or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
-            storage. If not provided, a default set of example plans will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Deprecated. This parameter
+            is no longer used and will be ignored.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
                 Provides input values for the run. This can be a list of PlanInput objects, a list
@@ -228,7 +223,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will not be
                 stored with the plan itself if using cloud storage and must be re-attached to the
                 plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
+            use_cached_plan (bool): Deprecated. This parameter is no longer used and will be ignored.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -250,18 +245,16 @@ class Portia:
             )
         )
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan = self._plan(
+
+        # Generate a simple single-step ReAct agent plan
+        plan = self._generate_simple_react_plan(
             query,
             tools,
-            example_plans,
-            end_user,
-            coerced_plan_run_inputs,
             structured_output_schema,
-            use_cached_plan,
         )
+
         end_user = self.initialize_end_user(end_user)
-        plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
-        return self._resume(plan_run)
+        return self.run_plan(plan, end_user, coerced_plan_run_inputs, structured_output_schema)
 
     async def arun(
         self,
@@ -273,18 +266,17 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
     ) -> PlanRun:
-        """End-to-end function to generate a plan and then execute it.
+        """End-to-end function to generate a simple ReAct agent plan and then execute it.
 
-        This is the simplest way to plan and execute a query using the SDK.
+        This is the simplest way to execute a query using the SDK. It creates a single-step
+        ReAct agent plan that uses the provided tools to complete the task.
 
         Args:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects,
-            or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
-            storage. If not provided, a default set of example plans will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Deprecated. This parameter
+            is no longer used and will be ignored.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
                 Provides input values for the run. This can be a list of PlanInput objects, a list
@@ -294,7 +286,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will not be
                 stored with the plan itself if using cloud storage and must be re-attached to the
                 plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
+            use_cached_plan (bool): Deprecated. This parameter is no longer used and will be ignored.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -316,18 +308,16 @@ class Portia:
             )
         )
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan = await self._aplan(
+
+        # Generate a simple single-step ReAct agent plan
+        plan = self._generate_simple_react_plan(
             query,
             tools,
-            example_plans,
-            end_user,
-            coerced_plan_run_inputs,
             structured_output_schema,
-            use_cached_plan,
         )
+
         end_user = await self.ainitialize_end_user(end_user)
-        plan_run = await self._acreate_plan_run(plan, end_user, coerced_plan_run_inputs)
-        return await self._aresume(plan_run)
+        return await self.arun_plan(plan, end_user, coerced_plan_run_inputs, structured_output_schema)
 
     def _coerce_plan_run_inputs(
         self,
@@ -372,60 +362,34 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
     ) -> Plan:
-        """Plans how to do the query given the set of tools and any examples.
+        """DEPRECATED: This method has been removed as the V1 planning agent is no longer supported.
+
+        Please use the PlanBuilder API instead to create plans:
+
+        from portia.builder import PlanBuilderV2, ReActAgentStep
+
+        plan = PlanBuilderV2()
+        plan.add_step(ReActAgentStep(task=query, tools=tools))
+
+        Or use portia.run() for simple execution without explicit planning.
 
         Args:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
-            If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs.
-            This can include Plan objects, PlanUUID objects, or plan ID strings
-            (starting with "plan-"). Plan IDs will be loaded from storage.
-            If not provided, a default set of example plans will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Deprecated.
             end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
-                of inputs required for the plan.
-                This can be a list of Planinput objects, a list of dicts with keys "name" and
-                "description" (optional), or a list of plan run input names. If a value is provided
-                with a PlanInput object or in a dictionary, it will be ignored as values are only
-                used when running the plan.
-            structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
-
-        Returns:
-            Plan: The plan for executing the query.
+            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Deprecated.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema.
+            use_cached_plan (bool): Deprecated.
 
         Raises:
-            PlanError: If there is an error while generating the plan.
+            NotImplementedError: This method is no longer supported.
 
         """
-        self.telemetry.capture(
-            PortiaFunctionCallTelemetryEvent(
-                function_name="portia_plan",
-                function_call_details={
-                    "tools": (
-                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
-                        if tools
-                        else None
-                    ),
-                    "example_plans_provided": example_plans is not None,
-                    "end_user_provided": end_user is not None,
-                    "plan_inputs_provided": plan_inputs is not None,
-                },
-            )
-        )
-        return self._plan(
-            query,
-            tools,
-            example_plans,
-            end_user,
-            plan_inputs,
-            structured_output_schema,
-            use_cached_plan,
+        raise NotImplementedError(
+            "The plan() method has been removed as the V1 planning agent is no longer supported. "
+            "Please use the PlanBuilder API (PlanBuilderV2) to create plans, or use portia.run() "
+            "for simple execution without explicit planning."
         )
 
     def _resolve_example_plans(
@@ -567,57 +531,34 @@ class Portia:
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
     ) -> Plan:
-        """Plans how to do the query given the set of tools and any examples asynchronously.
+        """DEPRECATED: This method has been removed as the V1 planning agent is no longer supported.
+
+        Please use the PlanBuilder API instead to create plans:
+
+        from portia.builder import PlanBuilderV2, ReActAgentStep
+
+        plan = PlanBuilderV2()
+        plan.add_step(ReActAgentStep(task=query, tools=tools))
+
+        Or use portia.arun() for simple execution without explicit planning.
 
         Args:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
-            If not provided all tools in the registry will be used.
-            example_plans (list[Plan] | None): Optional list of example plans. If not
-            provide a default set of example plans will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Deprecated.
             end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
-                of inputs required for the plan.
-                This can be a list of Planinput objects, a list of dicts with keys "name" and
-                "description" (optional), or a list of plan run input names. If a value is provided
-                with a PlanInput object or in a dictionary, it will be ignored as values are only
-                used when running the plan.
-            structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
-
-        Returns:
-            Plan: The plan for executing the query.
+            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Deprecated.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema.
+            use_cached_plan (bool): Deprecated.
 
         Raises:
-            PlanError: If there is an error while generating the plan.
+            NotImplementedError: This method is no longer supported.
 
         """
-        self.telemetry.capture(
-            PortiaFunctionCallTelemetryEvent(
-                function_name="portia_aplan",
-                function_call_details={
-                    "tools": (
-                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
-                        if tools
-                        else None
-                    ),
-                    "example_plans_provided": example_plans is not None,
-                    "end_user_provided": end_user is not None,
-                    "plan_inputs_provided": plan_inputs is not None,
-                },
-            )
-        )
-        return await self._aplan(
-            query,
-            tools,
-            example_plans,
-            end_user,
-            plan_inputs,
-            structured_output_schema,
-            use_cached_plan,
+        raise NotImplementedError(
+            "The aplan() method has been removed as the V1 planning agent is no longer supported. "
+            "Please use the PlanBuilder API (PlanBuilderV2) to create plans, or use portia.arun() "
+            "for simple execution without explicit planning."
         )
 
     def _plan(
@@ -821,6 +762,50 @@ class Portia:
         )
         logger().debug(plan.pretty_print())
 
+        return plan
+
+    def _generate_simple_react_plan(
+        self,
+        query: str,
+        tools: list[Tool] | list[str] | None = None,
+        structured_output_schema: type[BaseModel] | None = None,
+    ) -> PlanV2:
+        """Generate a simple single-step ReAct agent plan.
+
+        Args:
+            query (str): The query/task to be executed.
+            tools (list[Tool] | list[str] | None): List of tools to use for the query.
+                If not provided all tools in the registry will be used.
+            structured_output_schema (type[BaseModel] | None): The optional structured output schema.
+
+        Returns:
+            PlanV2: A simple plan with a single ReAct agent step.
+
+        """
+        # Resolve tools
+        if isinstance(tools, list):
+            resolved_tools = [
+                self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
+                for tool in tools
+            ]
+        else:
+            resolved_tools = self.tool_registry.match_tools(query)
+
+        # Create a single ReAct agent step
+        react_step = ReActAgentStep(
+            task=query,
+            tools=resolved_tools,
+            output_schema=structured_output_schema,
+        )
+
+        # Create and return the plan
+        plan = PlanV2(
+            steps=[react_step],
+            final_output_schema=structured_output_schema,
+            label=f"Execute: {query[:50]}{'...' if len(query) > 50 else ''}",
+        )
+
+        logger().info(f"Generated simple ReAct plan for query: {query}")
         return plan
 
     def _coerce_plan_inputs(
@@ -2348,20 +2333,6 @@ class Portia:
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
 
-    def _get_planning_agent(self) -> BasePlanningAgent:
-        """Get the planning_agent based on the configuration.
-
-        Returns:
-            BasePlanningAgent: The planning agent to be used for generating plans.
-
-        """
-        cls: type[BasePlanningAgent]
-        match self.config.planning_agent_type:
-            case PlanningAgentType.DEFAULT:
-                cls = DefaultPlanningAgent
-
-        return cls(self.config)
-
     def _get_final_output(
         self,
         plan: Plan,
@@ -2547,9 +2518,6 @@ class Portia:
             raise PlanError(
                 "PORTIA_API_KEY is required to use Portia cloud tools.",
             ) from PlanError(original_error)
-
-    def _get_introspection_agent(self) -> BaseIntrospectionAgent:
-        return DefaultIntrospectionAgent(self.config, self.storage)
 
     def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> Output:
         """Set the output for a step."""
