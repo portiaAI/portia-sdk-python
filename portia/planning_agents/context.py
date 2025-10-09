@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
+
+# Default example plans have been removed as V1 planning agents are deprecated
+DEFAULT_EXAMPLE_PLANS: list = []
 
 if TYPE_CHECKING:
     from portia.end_user import EndUser
