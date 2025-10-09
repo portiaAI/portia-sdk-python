@@ -104,7 +104,7 @@ class ConditionalStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this ConditionalStep to a legacy Step."""
         if isinstance(self.condition, str):
             cond_str = self.condition

@@ -158,13 +158,13 @@ async def test_exit_step_run_with_none_resolved_message() -> None:
     assert result.error is False
 
 
-def test_exit_step_to_legacy_step_normal_exit() -> None:
-    """Test ExitStep to_legacy_step method for normal exit."""
+def test_exit_step_to_step_data_normal_exit() -> None:
+    """Test ExitStep to_step_data method for normal exit."""
     step = ExitStep(step_name="exit_step", message="Normal completion")
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$exit_step_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "Exit plan: Normal completion"
@@ -174,13 +174,13 @@ def test_exit_step_to_legacy_step_normal_exit() -> None:
     assert len(legacy_step.inputs) == 0
 
 
-def test_exit_step_to_legacy_step_error_exit() -> None:
-    """Test ExitStep to_legacy_step method for error exit."""
+def test_exit_step_to_step_data_error_exit() -> None:
+    """Test ExitStep to_step_data method for error exit."""
     step = ExitStep(step_name="exit_step", message="Error occurred", error=True)
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$exit_step_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "Exit plan with error: Error occurred"
@@ -190,13 +190,13 @@ def test_exit_step_to_legacy_step_error_exit() -> None:
     assert len(legacy_step.inputs) == 0
 
 
-def test_exit_step_to_legacy_step_no_message() -> None:
-    """Test ExitStep to_legacy_step method without message."""
+def test_exit_step_to_step_data_no_message() -> None:
+    """Test ExitStep to_step_data method without message."""
     step = ExitStep(step_name="exit_step")
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$exit_step_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "Exit plan: "

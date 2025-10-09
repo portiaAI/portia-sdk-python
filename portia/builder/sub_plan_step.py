@@ -64,9 +64,9 @@ class SubPlanStep(StepV2):
         return plan_run.outputs.final_output.full_value(run_data.storage)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: PlanV2) -> Step:
         """Convert this SubPlanStep to a legacy Step."""
-        tools = [s.to_legacy_step(plan).tool_id for s in self.plan.steps]
+        tools = [s.to_step_data(plan).tool_id for s in self.plan.steps]
         inputs = [Input(plan_input.name) for plan_input in self.plan.plan_inputs]
         return Step(
             task=f"Run sub-plan: {self.plan.label}",

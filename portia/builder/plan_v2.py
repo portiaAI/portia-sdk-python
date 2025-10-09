@@ -110,7 +110,7 @@ class PlanV2(BaseModel):
         return Plan(
             id=self.id,
             plan_context=plan_context,
-            steps=[step.to_legacy_step(self) for step in self.steps],
+            steps=[step.to_step_data(self) for step in self.steps],
             plan_inputs=self.plan_inputs,
             structured_output_schema=self.final_output_schema,
         )
@@ -164,7 +164,7 @@ class PlanV2(BaseModel):
         tools = []
         legacy_steps = []
         for step in self.steps:
-            legacy_step = step.to_legacy_step(self)
+            legacy_step = step.to_step_data(self)
             if legacy_step.tool_id:
                 tools.append(legacy_step.tool_id)
             legacy_steps.append(legacy_step)

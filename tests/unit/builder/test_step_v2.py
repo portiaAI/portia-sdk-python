@@ -28,8 +28,8 @@ class ConcreteStepV2(StepV2):
         """Mock run method."""
         return "test result"
 
-    def to_legacy_step(self, plan: PlanV2) -> PlanStep:  # noqa: ARG002
-        """Mock to_legacy_step method."""
+    def to_step_data(self, plan: PlanV2) -> PlanStep:  # noqa: ARG002
+        """Mock to_step_data method."""
         return PlanStep(
             task="Test task",
             inputs=[],

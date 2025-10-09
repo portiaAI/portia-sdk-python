@@ -379,8 +379,8 @@ async def test_llm_step_run_with_string_template_input() -> None:
         assert call_args[1]["task_data"] == ["Use step0 and Alice"]
 
 
-def test_llm_step_to_legacy_step() -> None:
-    """Test LLMStep to_legacy_step method."""
+def test_llm_step_to_step_data() -> None:
+    """Test LLMStep to_step_data method."""
     inputs = [Input("user_query"), StepOutput(0)]
     step = LLMStep(
         task="Analyze data",
@@ -400,7 +400,7 @@ def test_llm_step_to_legacy_step() -> None:
         mock_input_name.return_value = "user_query"
         mock_stepoutput_name.return_value = "step_0_output"
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         # Verify the PlanStep has the correct attributes
         assert isinstance(legacy_step, PlanStep)

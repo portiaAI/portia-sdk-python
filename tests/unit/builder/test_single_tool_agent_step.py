@@ -101,7 +101,7 @@ def test_single_tool_agent_with_tool_object() -> None:
 
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$use_output"
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
     assert legacy_step.tool_id == "mock_tool"
 
 
@@ -228,8 +228,8 @@ def test_single_tool_agent_step_passes_model_to_agent() -> None:
         assert agent == mock_agent
 
 
-def test_single_tool_agent_to_legacy_step() -> None:
-    """Test SingleToolAgent to_legacy_step method."""
+def test_single_tool_agent_to_step_data() -> None:
+    """Test SingleToolAgent to_step_data method."""
     inputs = [Input("query"), StepOutput(0)]
     step = SingleToolAgentStep(
         task="Search for information",
@@ -249,7 +249,7 @@ def test_single_tool_agent_to_legacy_step() -> None:
         mock_input_name.return_value = "query"
         mock_step_output_name.return_value = "step_0_output"
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Search for information"
@@ -302,7 +302,7 @@ async def test_single_tool_agent_with_string_template_task_and_inputs() -> None:
     mock_output_obj = LocalDataValue(value="Search completed successfully")
     mock_tool = Mock()
 
-    # Mock the plan for to_legacy_step conversion
+    # Mock the plan for to_step_data conversion
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$templated_search_output"
     mock_run_data.plan = mock_plan

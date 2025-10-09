@@ -347,8 +347,8 @@ async def test_loop_step_run_default_case() -> None:
     assert result.loop_result is True
 
 
-def test_loop_step_to_legacy_step_with_callable_condition() -> None:
-    """Test LoopStep to_legacy_step method with callable condition."""
+def test_loop_step_to_step_data_with_callable_condition() -> None:
+    """Test LoopStep to_step_data method with callable condition."""
     step = LoopStep(
         step_name="test_loop",
         condition=lambda x: x > 0,
@@ -360,15 +360,15 @@ def test_loop_step_to_legacy_step_with_callable_condition() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "loop_output"
 
-    result = step.to_legacy_step(mock_plan)
+    result = step.to_step_data(mock_plan)
 
     assert result.task == "Loop clause: If result of <lambda> is true"
     assert result.output == "loop_output"
     assert result.tool_id is None
 
 
-def test_loop_step_to_legacy_step_with_string_condition() -> None:
-    """Test LoopStep to_legacy_step method with string condition."""
+def test_loop_step_to_step_data_with_string_condition() -> None:
+    """Test LoopStep to_step_data method with string condition."""
     step = LoopStep(
         step_name="test_loop",
         condition="x > 0",
@@ -380,15 +380,15 @@ def test_loop_step_to_legacy_step_with_string_condition() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "loop_output"
 
-    result = step.to_legacy_step(mock_plan)
+    result = step.to_step_data(mock_plan)
 
     assert result.task == "Loop clause: x > 0"
     assert result.output == "loop_output"
     assert result.tool_id is None
 
 
-def test_loop_step_to_legacy_step_with_reference_args() -> None:
-    """Test LoopStep to_legacy_step method with reference arguments."""
+def test_loop_step_to_step_data_with_reference_args() -> None:
+    """Test LoopStep to_step_data method with reference arguments."""
     step = LoopStep(
         step_name="test_loop",
         condition=lambda x: x > 0,
@@ -400,7 +400,7 @@ def test_loop_step_to_legacy_step_with_reference_args() -> None:
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "loop_output"
 
-    result = step.to_legacy_step(mock_plan)
+    result = step.to_step_data(mock_plan)
 
     assert result.task == "Loop clause: If result of <lambda> is true"
     assert result.output == "loop_output"
