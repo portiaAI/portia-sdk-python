@@ -41,9 +41,7 @@ from portia.clarification import (
 from portia.cloud import PortiaCloudClient
 from portia.config import (
     Config,
-    ExecutionAgentType,
     GenerativeModelsConfig,
-    PlanningAgentType,
     StorageClass,
 )
 from portia.end_user import EndUser
@@ -54,7 +52,6 @@ from portia.errors import (
     SkipExecutionError,
 )
 from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-from portia.execution_agents.default_execution_agent import DefaultExecutionAgent
 from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.execution_agents.output import (
@@ -63,7 +60,6 @@ from portia.execution_agents.output import (
 )
 from portia.execution_agents.utils.final_output_summarizer import FinalOutputSummarizer
 from portia.execution_hooks import BeforeStepExecutionOutcome, ExecutionHooks
-from portia.introspection_agents.default_introspection_agent import DefaultIntrospectionAgent
 from portia.introspection_agents.introspection_agent import (
     COMPLETED_OUTPUT,
     SKIPPED_OUTPUT,
@@ -75,7 +71,6 @@ from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
-from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
     DiskFileStorage,
@@ -103,7 +98,6 @@ if TYPE_CHECKING:
 
     from portia.common import Serializable
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
-    from portia.planning_agents.base_planning_agent import BasePlanningAgent
 
 
 class Portia:
@@ -215,10 +209,7 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects,
-            or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
-            storage. If not provided, a default set of example plans will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Deprecated. Ignored in V2.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
                 Provides input values for the run. This can be a list of PlanInput objects, a list
@@ -228,7 +219,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will not be
                 stored with the plan itself if using cloud storage and must be re-attached to the
                 plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
+            use_cached_plan (bool): Deprecated. Ignored in V2.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -243,21 +234,17 @@ class Portia:
                         if tools
                         else None
                     ),
-                    "example_plans_provided": example_plans is not None,
                     "end_user_provided": end_user is not None,
                     "plan_run_inputs_provided": plan_run_inputs is not None,
                 },
             )
         )
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan = self._plan(
+        plan = self._create_simple_react_plan(
             query,
             tools,
-            example_plans,
-            end_user,
             coerced_plan_run_inputs,
             structured_output_schema,
-            use_cached_plan,
         )
         end_user = self.initialize_end_user(end_user)
         plan_run = self._create_plan_run(plan, end_user, coerced_plan_run_inputs)
@@ -281,10 +268,7 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects,
-            or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
-            storage. If not provided, a default set of example plans will be used.
+            example_plans (Sequence[Plan | PlanUUID | str] | None): Deprecated. Ignored in V2.
             end_user (str | EndUser | None = None): The end user for this plan run.
             plan_run_inputs (list[PlanInput] | list[dict[str, str]] | dict[str, str] | None):
                 Provides input values for the run. This can be a list of PlanInput objects, a list
@@ -294,7 +278,7 @@ class Portia:
                 for the query. This is passed on to plan runs created from this plan but will not be
                 stored with the plan itself if using cloud storage and must be re-attached to the
                 plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
+            use_cached_plan (bool): Deprecated. Ignored in V2.
 
         Returns:
             PlanRun: The run resulting from executing the query.
@@ -309,21 +293,17 @@ class Portia:
                         if tools
                         else None
                     ),
-                    "example_plans_provided": example_plans is not None,
                     "end_user_provided": end_user is not None,
                     "plan_run_inputs_provided": plan_run_inputs is not None,
                 },
             )
         )
         coerced_plan_run_inputs = self._coerce_plan_run_inputs(plan_run_inputs)
-        plan = await self._aplan(
+        plan = await self._acreate_simple_react_plan(
             query,
             tools,
-            example_plans,
-            end_user,
             coerced_plan_run_inputs,
             structured_output_schema,
-            use_cached_plan,
         )
         end_user = await self.ainitialize_end_user(end_user)
         plan_run = await self._acreate_plan_run(plan, end_user, coerced_plan_run_inputs)
@@ -362,313 +342,25 @@ class Portia:
             return to_return
         raise ValueError("Invalid plan run inputs received")
 
-    def plan(
+    def _create_simple_react_plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
-        end_user: str | EndUser | None = None,
-        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
-        use_cached_plan: bool = False,
     ) -> Plan:
-        """Plans how to do the query given the set of tools and any examples.
+        """Create a simple single-step ReAct plan for the query.
 
         Args:
-            query (str): The query to generate the plan for.
+            query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
-            If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs.
-            This can include Plan objects, PlanUUID objects, or plan ID strings
-            (starting with "plan-"). Plan IDs will be loaded from storage.
-            If not provided, a default set of example plans will be used.
-            end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
-                of inputs required for the plan.
-                This can be a list of Planinput objects, a list of dicts with keys "name" and
-                "description" (optional), or a list of plan run input names. If a value is provided
-                with a PlanInput object or in a dictionary, it will be ignored as values are only
-                used when running the plan.
-            structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
+            plan_inputs (list[PlanInput] | None): Optional list of inputs for the plan.
+            structured_output_schema (type[BaseModel] | None): Optional structured output schema.
 
         Returns:
-            Plan: The plan for executing the query.
-
-        Raises:
-            PlanError: If there is an error while generating the plan.
+            Plan: A simple single-step plan that uses a ReAct agent.
 
         """
-        self.telemetry.capture(
-            PortiaFunctionCallTelemetryEvent(
-                function_name="portia_plan",
-                function_call_details={
-                    "tools": (
-                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
-                        if tools
-                        else None
-                    ),
-                    "example_plans_provided": example_plans is not None,
-                    "end_user_provided": end_user is not None,
-                    "plan_inputs_provided": plan_inputs is not None,
-                },
-            )
-        )
-        return self._plan(
-            query,
-            tools,
-            example_plans,
-            end_user,
-            plan_inputs,
-            structured_output_schema,
-            use_cached_plan,
-        )
-
-    def _resolve_example_plans(
-        self, example_plans: Sequence[Plan | PlanUUID | str] | None
-    ) -> list[Plan] | None:
-        """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
-
-        Args:
-            example_plans (Sequence[Plan | PlanUUID | str] | None): List of example plans or
-            plan IDs.
-                - Plan objects are used directly
-                - PlanUUID objects are loaded from storage
-                - String objects must be plan ID strings (starting with "plan-")
-
-        Returns:
-            list[Plan] | None: List of resolved Plan objects, or None if input was None.
-
-        Raises:
-            PlanNotFoundError: If a plan ID cannot be found in storage.
-            ValueError: If a string is not a plan ID string.
-            TypeError: If an invalid type is provided.
-
-        """
-        if example_plans is None:
-            return None
-
-        resolved_plans = []
-        for example_plan in example_plans:
-            resolved_plan = self._resolve_single_example_plan(example_plan)
-            resolved_plans.append(resolved_plan)
-
-        return resolved_plans
-
-    async def _aresolve_example_plans(
-        self, example_plans: Sequence[Plan | PlanUUID | str] | None
-    ) -> list[Plan] | None:
-        """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
-
-        Args:
-            example_plans (Sequence[Plan | PlanUUID | str] | None): List of example plans or
-            plan IDs.
-                - Plan objects are used directly
-                - PlanUUID objects are loaded from storage
-                - String objects must be plan ID strings (starting with "plan-")
-
-        Returns:
-            list[Plan] | None: List of resolved Plan objects, or None if input was None.
-
-        Raises:
-            PlanNotFoundError: If a plan ID cannot be found in storage.
-            ValueError: If a string is not a plan ID string.
-            TypeError: If an invalid type is provided.
-
-        """
-        if example_plans is None:
-            return None
-
-        resolved_plans = []
-        for example_plan in example_plans:
-            resolved_plan = await self._aresolve_single_example_plan(example_plan)
-            resolved_plans.append(resolved_plan)
-
-        return resolved_plans
-
-    def _resolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
-        """Resolve a single example plan from various input types."""
-        if isinstance(example_plan, Plan):
-            return example_plan
-        if isinstance(example_plan, PlanUUID):
-            return self._load_plan_by_uuid(example_plan)
-        if isinstance(example_plan, str):
-            return self._resolve_string_example_plan(example_plan)
-        raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
-        )
-
-    async def _aresolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
-        if isinstance(example_plan, Plan):
-            return example_plan
-        if isinstance(example_plan, PlanUUID):
-            return await self._aload_plan_by_uuid(example_plan)
-        if isinstance(example_plan, str):
-            return await self._aresolve_string_example_plan(example_plan)
-        raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
-        )
-
-    def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
-        """Load a plan from storage by UUID."""
-        try:
-            return self.storage.get_plan(plan_uuid)
-        except Exception as e:
-            raise PlanNotFoundError(plan_uuid) from e
-
-    async def _aload_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
-        """Load a plan from storage by UUID asynchronously."""
-        try:
-            return await self.storage.aget_plan(plan_uuid)
-        except Exception as e:
-            raise PlanNotFoundError(plan_uuid) from e
-
-    def _resolve_string_example_plan(self, example_plan: str) -> Plan:
-        """Resolve a string example plan - must be a plan ID string."""
-        # Only support plan ID strings, not query strings
-        if not example_plan.startswith("plan-"):
-            raise ValueError(
-                f"String '{example_plan}' must be a plan ID (starting with 'plan-'). "
-                "Query strings are not supported."
-            )
-
-        plan_uuid = PlanUUID.from_string(example_plan)
-        try:
-            return self._load_plan_by_uuid(plan_uuid)
-        except Exception as e:
-            raise PlanNotFoundError(plan_uuid) from e
-
-    async def _aresolve_string_example_plan(self, example_plan: str) -> Plan:
-        """Resolve a string example plan - must be a plan ID string."""
-        # Only support plan ID strings, not query strings
-        if not example_plan.startswith("plan-"):
-            raise ValueError(
-                f"String '{example_plan}' must be a plan ID (starting with 'plan-'). "
-                "Query strings are not supported."
-            )
-
-        plan_uuid = PlanUUID.from_string(example_plan)
-        try:
-            return await self._aload_plan_by_uuid(plan_uuid)
-        except Exception as e:
-            raise PlanNotFoundError(plan_uuid) from e
-
-    async def aplan(
-        self,
-        query: str,
-        tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
-        end_user: str | EndUser | None = None,
-        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
-        structured_output_schema: type[BaseModel] | None = None,
-        use_cached_plan: bool = False,
-    ) -> Plan:
-        """Plans how to do the query given the set of tools and any examples asynchronously.
-
-        Args:
-            query (str): The query to generate the plan for.
-            tools (list[Tool] | list[str] | None): List of tools to use for the query.
-            If not provided all tools in the registry will be used.
-            example_plans (list[Plan] | None): Optional list of example plans. If not
-            provide a default set of example plans will be used.
-            end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
-                of inputs required for the plan.
-                This can be a list of Planinput objects, a list of dicts with keys "name" and
-                "description" (optional), or a list of plan run input names. If a value is provided
-                with a PlanInput object or in a dictionary, it will be ignored as values are only
-                used when running the plan.
-            structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
-
-        Returns:
-            Plan: The plan for executing the query.
-
-        Raises:
-            PlanError: If there is an error while generating the plan.
-
-        """
-        self.telemetry.capture(
-            PortiaFunctionCallTelemetryEvent(
-                function_name="portia_aplan",
-                function_call_details={
-                    "tools": (
-                        ",".join([tool.id if isinstance(tool, Tool) else tool for tool in tools])
-                        if tools
-                        else None
-                    ),
-                    "example_plans_provided": example_plans is not None,
-                    "end_user_provided": end_user is not None,
-                    "plan_inputs_provided": plan_inputs is not None,
-                },
-            )
-        )
-        return await self._aplan(
-            query,
-            tools,
-            example_plans,
-            end_user,
-            plan_inputs,
-            structured_output_schema,
-            use_cached_plan,
-        )
-
-    def _plan(
-        self,
-        query: str,
-        tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
-        end_user: str | EndUser | None = None,
-        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
-        structured_output_schema: type[BaseModel] | None = None,
-        use_cached_plan: bool = False,
-    ) -> Plan:
-        """Implement synchronous planning logic.
-
-        This is used when we're already in an event loop and can't use asyncio.run().
-
-        Args:
-            query (str): The query to generate the plan for.
-            tools (list[Tool] | list[str] | None): List of tools to use for the query.
-            If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs.
-            This can include Plan objects, PlanUUID objects or plan ID strings
-            (starting with "plan-"). Plan IDs will be loaded from storage.
-            If not provided, a default set of example plans will be used.
-            end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
-                of inputs required for the plan.
-                This can be a list of Planinput objects, a list of dicts with keys "name" and
-                "description" (optional), or a list of plan run input names. If a value is provided
-                with a PlanInput object or in a dictionary, it will be ignored as values are only
-                used when running the plan.
-            structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
-
-        Returns:
-            Plan: The plan for executing the query.
-
-        Raises:
-            PlanError: If there is an error while generating the plan.
-
-        """
-        if use_cached_plan:
-            try:
-                return self.storage.get_plan_by_query(query)
-            except StorageError as e:
-                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
-
         if isinstance(tools, list):
             tools = [
                 self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
@@ -678,99 +370,54 @@ class Portia:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        resolved_example_plans = self._resolve_example_plans(example_plans)
+        logger().info(f"Creating simple ReAct plan for query - {query}")
 
-        end_user = self.initialize_end_user(end_user)
-        logger().info(f"Running planning_agent for query - {query}")
-        planning_agent = self._get_planning_agent()
-        coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
-
-        outcome = planning_agent.generate_steps_or_error(
-            query=query,
-            tool_list=tools,
-            end_user=end_user,
-            examples=resolved_example_plans,
-            plan_inputs=coerced_plan_inputs,
+        # Create a simple single-step plan with ReAct agent behavior
+        # This mimics what the old OneShotAgent does but as a plan structure
+        step = Step(
+            task=query,
+            tool_id=tools[0].id if len(tools) == 1 else None,
+            inputs=[],
         )
-
-        if outcome.error:
-            self._log_replan_with_portia_cloud_tools(
-                outcome.error,
-                query,
-                end_user,
-                resolved_example_plans,
-            )
-            logger().error(f"Error in planning - {outcome.error}")
-            raise PlanError(outcome.error)
 
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
                 tool_ids=[tool.id for tool in tools],
             ),
-            steps=outcome.steps,
-            plan_inputs=coerced_plan_inputs or [],
+            steps=[step],
+            plan_inputs=plan_inputs or [],
             structured_output_schema=structured_output_schema,
         )
 
         self.storage.save_plan(plan)
         logger().info(
-            f"Plan created with {len(plan.steps)} steps",
+            f"Simple ReAct plan created with 1 step",
             plan=str(plan.id),
         )
         logger().debug(plan.pretty_print())
 
         return plan
 
-    async def _aplan(
+    async def _acreate_simple_react_plan(
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
-        end_user: str | EndUser | None = None,
-        plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
+        plan_inputs: list[PlanInput] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
-        use_cached_plan: bool = False,
     ) -> Plan:
-        """Async implementation of planning logic.
-
-        This is the core async implementation that both sync and async methods use.
+        """Create a simple single-step ReAct plan for the query (async version).
 
         Args:
-            query (str): The query to generate the plan for.
+            query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
-            If not provided all tools in the registry will be used.
-            example_plans (list[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs.
-            This can include Plan objects, PlanUUID objects or plan ID strings
-            (starting with "plan-"). Plan IDs will be loaded from storage.
-            If not provided, a default set of example plans will be used.
-            end_user (str | EndUser | None = None): The optional end user for this plan.
-            plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
-                of inputs required for the plan.
-                This can be a list of Planinput objects, a list of dicts with keys "name" and
-                "description" (optional), or a list of plan run input names. If a value is provided
-                with a PlanInput object or in a dictionary, it will be ignored as values are only
-                used when running the plan.
-            structured_output_schema (type[BaseModel] | None): The optional structured output schema
-                for the query. This is passed on to plan runs created from this plan but will be
-                not be stored with the plan itself if using cloud storage and must be re-attached
-                to the plan run if using cloud storage.
-            use_cached_plan (bool): Whether to use a cached plan if it exists.
+            plan_inputs (list[PlanInput] | None): Optional list of inputs for the plan.
+            structured_output_schema (type[BaseModel] | None): Optional structured output schema.
 
         Returns:
-            Plan: The plan for executing the query.
-
-        Raises:
-            PlanError: If there is an error while generating the plan.
+            Plan: A simple single-step plan that uses a ReAct agent.
 
         """
-        if use_cached_plan:
-            try:
-                return await self.storage.aget_plan_by_query(query)
-            except StorageError as e:
-                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
-
         if isinstance(tools, list):
             tools = [
                 self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
@@ -780,73 +427,34 @@ class Portia:
         if not tools:
             tools = self.tool_registry.match_tools(query)
 
-        resolved_example_plans = await self._aresolve_example_plans(example_plans)
+        logger().info(f"Creating simple ReAct plan for query - {query}")
 
-        end_user = await self.ainitialize_end_user(end_user)
-        logger().info(f"Running planning_agent for query - {query}")
-        planning_agent = self._get_planning_agent()
-        coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
-        outcome = await planning_agent.agenerate_steps_or_error(
-            query=query,
-            tool_list=tools,
-            end_user=end_user,
-            examples=resolved_example_plans,
-            plan_inputs=coerced_plan_inputs,
+        # Create a simple single-step plan with ReAct agent behavior
+        step = Step(
+            task=query,
+            tool_id=tools[0].id if len(tools) == 1 else None,
+            inputs=[],
         )
-
-        if outcome.error:
-            self._log_replan_with_portia_cloud_tools(
-                outcome.error,
-                query,
-                end_user,
-                resolved_example_plans,
-            )
-            logger().error(f"Error in planning - {outcome.error}")
-            raise PlanError(outcome.error)
 
         plan = Plan(
             plan_context=PlanContext(
                 query=query,
                 tool_ids=[tool.id for tool in tools],
             ),
-            steps=outcome.steps,
-            plan_inputs=coerced_plan_inputs or [],
+            steps=[step],
+            plan_inputs=plan_inputs or [],
             structured_output_schema=structured_output_schema,
         )
 
         await self.storage.asave_plan(plan)
         logger().info(
-            f"Plan created with {len(plan.steps)} steps",
+            f"Simple ReAct plan created with 1 step",
             plan=str(plan.id),
         )
         logger().debug(plan.pretty_print())
 
         return plan
 
-    def _coerce_plan_inputs(
-        self, plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None
-    ) -> list[PlanInput] | None:
-        """Coerce plan inputs from any input type into a list of PlanInputs we use internally."""
-        if plan_inputs is None:
-            return None
-        if isinstance(plan_inputs, list):
-            to_return = []
-            for plan_input in plan_inputs:
-                if isinstance(plan_input, dict):
-                    if "name" not in plan_input:
-                        raise ValueError("Plan input must have a name and description")
-                    to_return.append(
-                        PlanInput(
-                            name=plan_input["name"],
-                            description=plan_input.get("description", None),
-                        )
-                    )
-                elif isinstance(plan_input, str):
-                    to_return.append(PlanInput(name=plan_input))
-                else:
-                    to_return.append(plan_input)
-            return to_return
-        raise ValueError("Invalid plan inputs received")
 
     def run_plan(
         self,
@@ -2348,19 +1956,6 @@ class Portia:
                     )
                 self._set_plan_run_state(plan_run, PlanRunState.COMPLETE)
 
-    def _get_planning_agent(self) -> BasePlanningAgent:
-        """Get the planning_agent based on the configuration.
-
-        Returns:
-            BasePlanningAgent: The planning agent to be used for generating plans.
-
-        """
-        cls: type[BasePlanningAgent]
-        match self.config.planning_agent_type:
-            case PlanningAgentType.DEFAULT:
-                cls = DefaultPlanningAgent
-
-        return cls(self.config)
 
     def _get_final_output(
         self,
@@ -2488,15 +2083,10 @@ class Portia:
             self.storage,
             plan_run,
         )
-        cls: type[BaseExecutionAgent]
-        match self.config.execution_agent_type:
-            case ExecutionAgentType.ONE_SHOT:
-                cls = OneShotAgent
-            case ExecutionAgentType.DEFAULT:
-                cls = DefaultExecutionAgent
-        cls = OneShotAgent if isinstance(tool, LLMTool) else cls
+        # V2: Always use OneShotAgent (the only execution agent)
+        cls = OneShotAgent
         logger().debug(
-            f"Using agent: {type(cls).__name__}",
+            f"Using agent: OneShotAgent",
             plan=str(plan.id),
             plan_run=str(plan_run.id),
         )
@@ -2510,47 +2100,6 @@ class Portia:
             execution_hooks=self.execution_hooks,
         )
 
-    def _log_replan_with_portia_cloud_tools(
-        self,
-        original_error: str,
-        query: str,
-        end_user: EndUser,
-        example_plans: list[Plan] | None = None,
-    ) -> None:
-        """Generate a plan using Portia cloud tools for users who's plans fail without them."""
-        if not isinstance(self.tool_registry, DefaultToolRegistry) or self.config.portia_api_key:
-            return
-        unauthenticated_client = PortiaCloudClient.new_client(
-            self.config,
-            allow_unauthenticated=True,
-        )
-        portia_registry = PortiaToolRegistry(
-            client=unauthenticated_client,
-        ).with_default_tool_filter()
-        cloud_registry = self.tool_registry + portia_registry
-        tools = cloud_registry.match_tools(query)
-        planning_agent = self._get_planning_agent()
-        replan_outcome = planning_agent.generate_steps_or_error(
-            query=query,
-            tool_list=tools,
-            end_user=end_user,
-            examples=example_plans,
-        )
-        if not replan_outcome.error:
-            tools_used = ", ".join([str(step.tool_id) for step in replan_outcome.steps])
-            logger().error(
-                f"Error in planning - {original_error.rstrip('.')}.\n"
-                f"Replanning with Portia cloud tools would successfully generate a plan using "
-                f"tools: {tools_used}.\n"
-                f"Go to https://app.portialabs.ai to sign up.",
-            )
-            raise PlanError(
-                "PORTIA_API_KEY is required to use Portia cloud tools.",
-            ) from PlanError(original_error)
-
-    def _get_introspection_agent(self) -> BaseIntrospectionAgent:
-        return DefaultIntrospectionAgent(self.config, self.storage)
-
     def _set_step_output(self, output: Output, plan_run: PlanRun, step: Step) -> Output:
         """Set the output for a step."""
         plan_run.outputs.step_outputs[step.output] = output
@@ -2559,12 +2108,7 @@ class Portia:
     def _persist_step_state(self, plan_run: PlanRun, step: Step) -> Output:
         """Ensure the plan run state is persisted to storage."""
         step_output = plan_run.outputs.step_outputs[step.output]
-        if isinstance(step_output, LocalDataValue) and self.config.exceeds_output_threshold(
-            step_output.serialize_value(),
-        ):
-            step_output = self.storage.save_plan_run_output(step.output, step_output, plan_run.id)
-            plan_run.outputs.step_outputs[step.output] = step_output
-
+        # Agent memory feature removed - always store outputs locally
         self.storage.save_plan_run(plan_run)
         return step_output
 

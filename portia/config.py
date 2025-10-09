@@ -36,7 +36,6 @@ from portia.model import (
     OpenAIGenerativeModel,
     OpenRouterGenerativeModel,
 )
-from portia.token_check import estimate_tokens
 
 T = TypeVar("T")
 
@@ -220,30 +219,6 @@ SUPPORTED_GOOGLE_GENERATIVE_AI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
 SUPPORTED_AZURE_OPENAI_MODELS = ALL_MODELS_SUPPORTED_WITH_DEPRECATION
 
 
-class ExecutionAgentType(Enum):
-    """Enum for types of agents used for executing a step.
-
-    Attributes:
-        ONE_SHOT: The one-shot agent.
-        DEFAULT: The default agent.
-
-    """
-
-    ONE_SHOT = "ONE_SHOT"
-    DEFAULT = "DEFAULT"
-
-
-class PlanningAgentType(Enum):
-    """Enum for planning agents used for planning queries.
-
-    Attributes:
-        DEFAULT: The default planning agent.
-
-    """
-
-    DEFAULT = "DEFAULT"
-
-
 class LogLevel(Enum):
     """Enum for available log levels.
 
@@ -265,7 +240,6 @@ class LogLevel(Enum):
     CRITICAL = "CRITICAL"
 
 
-FEATURE_FLAG_AGENT_MEMORY_ENABLED = "feature_flag_agent_memory_enabled"
 
 
 E = TypeVar("E", bound=Enum)
@@ -524,7 +498,6 @@ class Config(BaseModel):
         self.feature_flags = {
             # Fill here with any default feature flags.
             # e.g. CONDITIONAL_FLAG: True,
-            FEATURE_FLAG_AGENT_MEMORY_ENABLED: True,
             **self.feature_flags,
         }
         return self
@@ -592,41 +565,6 @@ class Config(BaseModel):
         default=False,
         description="Whether to serialize logs to JSON",
     )
-    # Agent Options
-    execution_agent_type: ExecutionAgentType = Field(
-        default=ExecutionAgentType.ONE_SHOT,
-        description="The default agent type to use.",
-    )
-
-    @field_validator("execution_agent_type", mode="before")
-    @classmethod
-    def parse_execution_agent_type(cls, value: str | ExecutionAgentType) -> ExecutionAgentType:
-        """Parse execution_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, ExecutionAgentType)
-
-    # PlanningAgent Options
-    planning_agent_type: PlanningAgentType = Field(
-        default=PlanningAgentType.DEFAULT,
-        description="The default planning_agent_type to use.",
-    )
-
-    @field_validator("planning_agent_type", mode="before")
-    @classmethod
-    def parse_planning_agent_type(cls, value: str | PlanningAgentType) -> PlanningAgentType:
-        """Parse planning_agent_type to enum if string provided."""
-        return parse_str_to_enum(value, PlanningAgentType)
-
-    large_output_threshold_tokens: int = Field(
-        default=1_000,
-        description="The threshold number of tokens before we start treating an output as a"
-        "large output and write it to agent memory rather than storing it locally",
-    )
-
-    def exceeds_output_threshold(self, value: str | list[str | dict]) -> bool:
-        """Determine whether the provided output value exceeds the large output threshold."""
-        if not self.feature_flags.get(FEATURE_FLAG_AGENT_MEMORY_ENABLED):
-            return False
-        return estimate_tokens(str(value)) > self.large_output_threshold_tokens
 
     def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
         self,
@@ -1139,7 +1077,5 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         models=models,
         feature_flags=kwargs.pop("feature_flags", {}),
         storage_class=kwargs.pop("storage_class", default_storage_class),
-        planning_agent_type=kwargs.pop("planning_agent_type", PlanningAgentType.DEFAULT),
-        execution_agent_type=kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
         **kwargs,
     )
