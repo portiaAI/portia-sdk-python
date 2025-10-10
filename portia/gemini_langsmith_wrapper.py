@@ -33,7 +33,9 @@ def _process_outputs(
                 "messages": [
                     {
                         "role": "ai",
-                        "content": _extract_parts(outputs.candidates[0].content)[0],
+                        "content": _extract_parts(outputs.candidates[0].content)[0]  # type: ignore[reportArgumentType]
+                        if outputs.candidates[0].content is not None
+                        else "",
                     },
                 ]
             }

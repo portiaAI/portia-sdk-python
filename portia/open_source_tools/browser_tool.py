@@ -330,7 +330,7 @@ class BrowserTool(Tool[str | BaseModel]):
         llm = model.to_langchain()
         agent = Agent(
             task=task_description,
-            llm=llm,
+            llm=llm,  # type: ignore[reportArgumentType]
             browser=self.infrastructure_provider.setup_browser(ctx),
             controller=Controller(output_model=output_model),
         )
@@ -493,7 +493,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         return Browser(
-            config=BrowserConfig(
+            config=BrowserConfig(  # type: ignore [reportCallIssue]
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
             ),
@@ -774,7 +774,7 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
             return Browser(
-                config=BrowserConfig(
+                config=BrowserConfig(  # type: ignore [reportCallIssue]
                     cdp_url=session_connect_url,
                 ),
             )

@@ -12,8 +12,11 @@ import os
 import warnings
 from collections.abc import Container
 from enum import Enum
-from typing import Any, NamedTuple, Self, TypeVar, Optional
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+from typing import Any, NamedTuple, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -371,7 +374,6 @@ class GenerativeModelsConfig(BaseModel):
         return new_data
 
 
-
 CACHE_TTL_SECONDS = 60 * 60 * 24
 
 
@@ -417,7 +419,7 @@ class Config(BaseModel):
         description="The API endpoint for the Portia Cloud API",
     )
     portia_dashboard_url: str = Field(
-        default="https://app.portialabs.ai", 
+        default="https://app.portialabs.ai",
         description="The URL for the Portia Cloud Dashboard",
     )
     portia_api_key: SecretStr | None = Field(
@@ -436,7 +438,7 @@ class Config(BaseModel):
     )
     openai_api_key: SecretStr = Field(
         default=SecretStr(""),
-        description="The API Key for OpenAI. Must be set if llm-provider is OPENAI", 
+        description="The API Key for OpenAI. Must be set if llm-provider is OPENAI",
     )
     anthropic_api_key: SecretStr = Field(
         default=SecretStr(""),
@@ -541,11 +543,10 @@ class Config(BaseModel):
 
     # Storage Options
     storage_class: StorageClass = Field(
-    default=StorageClass.MEMORY,  # Will be overridden by config loader logic
-    description="Where to store Plans and PlanRuns. By default these will be kept in memory"
-    "if no API key is provided.",
-)
-
+        default=StorageClass.MEMORY,  # Will be overridden by config loader logic
+        description="Where to store Plans and PlanRuns. By default these will be kept in memory"
+        "if no API key is provided.",
+    )
 
     @field_validator("storage_class", mode="before")
     @classmethod
@@ -571,17 +572,16 @@ class Config(BaseModel):
         """Parse default_log_level to enum if string provided."""
         return parse_str_to_enum(value, LogLevel)
 
-
     default_log_sink: str = Field(
         default="sys.stdout",
         description="Where to send logs. By default logs will be sent to sys.stdout",
     )
-    
+
     json_log_serialize: bool = Field(
         default=False,
         description="Whether to serialize logs to JSON",
     )
-   
+
     execution_agent_type: ExecutionAgentType = Field(
         default=ExecutionAgentType.ONE_SHOT,
         description="The default agent type to use.",
@@ -593,7 +593,6 @@ class Config(BaseModel):
         """Parse execution_agent_type to enum if string provided."""
         return parse_str_to_enum(value, ExecutionAgentType)
 
-    
     planning_agent_type: PlanningAgentType = Field(
         default=PlanningAgentType.DEFAULT,
         description="The default planning_agent_type to use.",
@@ -617,7 +616,7 @@ class Config(BaseModel):
             return False
         return estimate_tokens(str(value)) > self.large_output_threshold_tokens
 
-    def get_agent_default_model(  # noqa: C901, PLR0911, PLR0912
+    def get_agent_default_model(  # noqa: PLR0911, PLR0912
         self,
         agent_key: str,
         llm_provider: LLMProvider | None = None,
@@ -767,90 +766,112 @@ class Config(BaseModel):
 
         """
         return default_config(**kwargs)
-    
+
     @classmethod
     def from_local_config(
-        cls, 
-        profile: str = "default", 
-        config_file: Optional[Path] = None,
-        **overrides: Any
+        cls, profile: str = "default", config_file: Path | None = None, **overrides: Any
     ) -> Config:
         """Create Config instance from TOML profile with proper precedence.
-        
+
         Precedence order (highest to lowest):
         1. Direct code overrides (**overrides)
-        2. Config file values  
+        2. Config file values
         3. Environment variables
-        
+
         Args:
-            profile: Profile name to load (default: "default")  
+            profile: Profile name to load (default: "default")
             config_file: Optional path to config file
             **overrides: Direct parameter overrides
-            
+
         Returns:
             Config instance with merged settings
-            
+
         Example:
             config = Config.from_local_config(profile="openai")
-            config = Config.from_local_config(profile="gemini", default_model="google/gemini-2.5-pro")
+            config = Config.from_local_config(
+                profile="gemini",
+                default_model="google/gemini-2.5-pro",
+            )
+
         """
         # Import here to avoid circular import
         from portia.config_loader import get_config
-        
+
         # Load configuration with proper precedence
         config_dict = get_config(profile, config_file, **overrides)
-        
+
         # Handle models configuration specially
         models_config = {}
-        model_fields = ["default_model", "planning_model", "execution_model", 
-                    "introspection_model", "summarizer_model"]
-        
+        model_fields = [
+            "default_model",
+            "planning_model",
+            "execution_model",
+            "introspection_model",
+            "summarizer_model",
+        ]
+
         for field in model_fields:
-            if field in config_dict and config_dict[field]:
+            if config_dict.get(field):
                 models_config[field] = config_dict.pop(field)
-        
+
         if models_config:
             config_dict["models"] = GenerativeModelsConfig(**models_config)
-        
+
         # Convert string values to SecretStr for API keys (only if non-empty)
         secret_fields = [
-            "portia_api_key", "openrouter_api_key", "openai_api_key", 
-            "anthropic_api_key", "mistralai_api_key", "google_api_key",
-            "azure_openai_api_key"
+            "portia_api_key",
+            "openrouter_api_key",
+            "openai_api_key",
+            "anthropic_api_key",
+            "mistralai_api_key",
+            "google_api_key",
+            "azure_openai_api_key",
         ]
-        
+
         for field in secret_fields:
             if field in config_dict and config_dict[field] and config_dict[field] != "":
                 config_dict[field] = SecretStr(config_dict[field])
-        
+
         # Handle storage_class logic (replicate the original default_factory logic)
         if "storage_class" not in config_dict or not config_dict["storage_class"]:
             # Check if portia_api_key is available to decide default storage
-            has_portia_key = (
-                config_dict.get("portia_api_key") or 
-                os.getenv("PORTIA_API_KEY")
+            has_portia_key = config_dict.get("portia_api_key") or os.getenv("PORTIA_API_KEY")
+            config_dict["storage_class"] = (
+                StorageClass.CLOUD if has_portia_key else StorageClass.MEMORY
             )
-            config_dict["storage_class"] = StorageClass.CLOUD if has_portia_key else StorageClass.MEMORY
-        
+
         # Parse string enums
         if "storage_class" in config_dict and isinstance(config_dict["storage_class"], str):
-            config_dict["storage_class"] = parse_str_to_enum(config_dict["storage_class"], StorageClass)
-        
-        if "execution_agent_type" in config_dict and isinstance(config_dict["execution_agent_type"], str):
-            config_dict["execution_agent_type"] = parse_str_to_enum(config_dict["execution_agent_type"], ExecutionAgentType)
-            
-        if "planning_agent_type" in config_dict and isinstance(config_dict["planning_agent_type"], str):
-            config_dict["planning_agent_type"] = parse_str_to_enum(config_dict["planning_agent_type"], PlanningAgentType)
-            
+            config_dict["storage_class"] = parse_str_to_enum(
+                config_dict["storage_class"], StorageClass
+            )
+
+        if "execution_agent_type" in config_dict and isinstance(
+            config_dict["execution_agent_type"], str
+        ):
+            config_dict["execution_agent_type"] = parse_str_to_enum(
+                config_dict["execution_agent_type"], ExecutionAgentType
+            )
+
+        if "planning_agent_type" in config_dict and isinstance(
+            config_dict["planning_agent_type"], str
+        ):
+            config_dict["planning_agent_type"] = parse_str_to_enum(
+                config_dict["planning_agent_type"], PlanningAgentType
+            )
+
         if "default_log_level" in config_dict and isinstance(config_dict["default_log_level"], str):
-            config_dict["default_log_level"] = parse_str_to_enum(config_dict["default_log_level"], LogLevel)
-        
+            config_dict["default_log_level"] = parse_str_to_enum(
+                config_dict["default_log_level"], LogLevel
+            )
+
         # Parse llm_provider if it's a string
         if "llm_provider" in config_dict and isinstance(config_dict["llm_provider"], str):
-            config_dict["llm_provider"] = parse_str_to_enum(config_dict["llm_provider"], LLMProvider)
-        
-        return cls(**config_dict)
+            config_dict["llm_provider"] = parse_str_to_enum(
+                config_dict["llm_provider"], LLMProvider
+            )
 
+        return cls(**config_dict)
 
     def has_api_key(self, name: str) -> bool:
         """Check if the given API Key is available."""
@@ -994,7 +1015,7 @@ class Config(BaseModel):
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model_from_name(  # noqa: PLR0911,C901
+    def _construct_model_from_name(  # noqa: PLR0911
         self,
         llm_provider: LLMProvider,
         model_name: str,
@@ -1128,7 +1149,7 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
     return None
 
 
-def default_config(**kwargs) -> Config:  # noqa: ANN003
+def default_config(**kwargs) -> Config:  # noqa: ANN003, PLR0915, PLR0912
     """Return default config with values that can be overridden.
 
     Returns:
@@ -1147,7 +1168,6 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         warnings.warn("No API keys found for any LLM provider", stacklevel=2, category=UserWarning)
         llm_provider = None
 
-    
     if llm_model_name := kwargs.pop("llm_model_name", None):
         warnings.warn(
             "llm_model_name is deprecated and will be removed in a future version. Use "
@@ -1204,8 +1224,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         summarizer_model=kwargs_models.get("summarizer_model"),
     )
     env_overrides = {}
-    
-    
+
     if os.getenv("PORTIA_API_KEY") and "portia_api_key" not in kwargs:
         env_overrides["portia_api_key"] = SecretStr(os.getenv("PORTIA_API_KEY") or "")
     if os.getenv("OPENAI_API_KEY") and "openai_api_key" not in kwargs:
@@ -1222,8 +1241,7 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         env_overrides["azure_openai_endpoint"] = os.getenv("AZURE_OPENAI_ENDPOINT")
     if os.getenv("OPENROUTER_API_KEY") and "openrouter_api_key" not in kwargs:
         env_overrides["openrouter_api_key"] = SecretStr(os.getenv("OPENROUTER_API_KEY") or "")
-    
-    
+
     if os.getenv("PORTIA_API_ENDPOINT") and "portia_api_endpoint" not in kwargs:
         env_overrides["portia_api_endpoint"] = os.getenv("PORTIA_API_ENDPOINT")
     if os.getenv("PORTIA_DASHBOARD_URL") and "portia_dashboard_url" not in kwargs:
@@ -1244,12 +1262,12 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
     # Merge env overrides with kwargs (kwargs take precedence over env vars)
     final_kwargs = {**env_overrides, **kwargs}
 
-   
     default_storage_class = (
-        StorageClass.CLOUD if (os.getenv("PORTIA_API_KEY") or final_kwargs.get("portia_api_key"))
+        StorageClass.CLOUD
+        if (os.getenv("PORTIA_API_KEY") or final_kwargs.get("portia_api_key"))
         else StorageClass.MEMORY
     )
-    
+
     return Config(
         llm_provider=llm_provider,
         models=models,
@@ -1259,5 +1277,3 @@ def default_config(**kwargs) -> Config:  # noqa: ANN003
         execution_agent_type=final_kwargs.pop("execution_agent_type", ExecutionAgentType.ONE_SHOT),
         **final_kwargs,
     )
-
-    
