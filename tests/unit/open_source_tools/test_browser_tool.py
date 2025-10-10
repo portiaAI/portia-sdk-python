@@ -76,7 +76,11 @@ def mock_browserbase_provider(
 class MockBrowserInfrastructureProvider(BrowserInfrastructureProvider):
     """Mock browser infrastructure provider."""
 
-    def setup_browser(self, _: ToolRunContext) -> Browser:  # type: ignore reportIncompatibleMethodOverride
+    def setup_browser(
+        self,
+        _: ToolRunContext,
+        allowed_domains: list[str] | None = None,  # noqa: ARG002
+    ) -> Browser:  # type: ignore reportIncompatibleMethodOverride
         """Create the browser with a mock for testing."""
         return MagicMock()
 
