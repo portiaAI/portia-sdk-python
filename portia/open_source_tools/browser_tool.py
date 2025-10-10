@@ -774,9 +774,7 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
             return Browser(
-                config=BrowserProfile( 
                     cdp_url=session_connect_url,
-                ),
             )
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
