@@ -25,7 +25,7 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from browser_use import Agent, Browser, BrowserConfig, Controller
+from browser_use import Agent, Browser, BrowserProfile, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
@@ -493,7 +493,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         return Browser(
-            config=BrowserConfig(  
+            config=BrowserProfile(  
                 chrome_instance_path=self.chrome_path,
                 extra_chromium_args=self.extra_chromium_args or [],
             ),
@@ -774,7 +774,7 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
             return Browser(
-                config=BrowserConfig( 
+                config=BrowserProfile( 
                     cdp_url=session_connect_url,
                 ),
             )
