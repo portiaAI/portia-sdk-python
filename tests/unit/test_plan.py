@@ -1,5 +1,7 @@
 """Plan tests."""
 
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -11,6 +13,7 @@ from portia.plan import (
     PlanUUID,
     ReadOnlyPlan,
     Step,
+    UserPlanVote,
     Variable,
 )
 from tests.utils import get_test_plan_run
@@ -195,3 +198,139 @@ def test_plan_input_equality() -> None:
     # Test inequality with different types
     assert original_input != "not a plan input"
     assert original_input != 42
+
+
+def test_plan_with_voting_metadata() -> None:
+    """Test that Plan can be created with voting metadata."""
+    now = datetime.now(UTC)
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="test task", output="$output")],
+        upvotes=10,
+        downvotes=2,
+        created_by="user123",
+        created_at=now,
+        num_runs=5,
+        is_upvoted=True,
+    )
+
+    assert plan.upvotes == 10
+    assert plan.downvotes == 2
+    assert plan.created_by == "user123"
+    assert plan.created_at == now
+    assert plan.num_runs == 5
+    assert plan.is_upvoted is True
+
+
+def test_plan_voting_metadata_defaults() -> None:
+    """Test that Plan voting metadata fields have proper defaults."""
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="test task", output="$output")],
+    )
+
+    assert plan.upvotes == 0
+    assert plan.downvotes == 0
+    assert plan.created_by is None
+    assert plan.created_at is None
+    assert plan.num_runs == 0
+    assert plan.is_upvoted is False
+
+
+def test_plan_from_response_with_voting_fields() -> None:
+    """Test Plan.from_response handles voting metadata fields."""
+    plan_uuid = str(PlanUUID())
+    response_json = {
+        "id": plan_uuid,
+        "query": "test query",
+        "tool_ids": ["tool1"],
+        "steps": [{"task": "test task", "output": "$output", "inputs": []}],
+        "plan_inputs": [],
+        "upvotes": 15,
+        "downvotes": 3,
+        "created_by": "user456",
+        "created_at": "2025-01-15T10:30:00Z",
+        "num_runs": 8,
+        "is_upvoted": True,
+    }
+
+    plan = Plan.from_response(response_json)
+
+    assert plan.upvotes == 15
+    assert plan.downvotes == 3
+    assert plan.created_by == "user456"
+    assert plan.created_at is not None
+    assert plan.num_runs == 8
+    assert plan.is_upvoted is True
+
+
+def test_plan_from_response_without_voting_fields() -> None:
+    """Test Plan.from_response handles missing voting metadata fields."""
+    plan_uuid = str(PlanUUID())
+    response_json = {
+        "id": plan_uuid,
+        "query": "test query",
+        "tool_ids": ["tool1"],
+        "steps": [{"task": "test task", "output": "$output", "inputs": []}],
+        "plan_inputs": [],
+    }
+
+    plan = Plan.from_response(response_json)
+
+    assert plan.upvotes == 0
+    assert plan.downvotes == 0
+    assert plan.created_by is None
+    assert plan.created_at is None
+    assert plan.num_runs == 0
+    assert plan.is_upvoted is False
+
+
+def test_user_plan_vote_creation() -> None:
+    """Test UserPlanVote can be created with valid data."""
+    plan_id = PlanUUID()
+    vote = UserPlanVote(
+        user_id="user123",
+        plan_id=plan_id,
+        vote_status="up",
+    )
+
+    assert vote.user_id == "user123"
+    assert vote.plan_id == plan_id
+    assert vote.vote_status == "up"
+
+
+def test_user_plan_vote_validation() -> None:
+    """Test UserPlanVote validates vote_status."""
+    plan_id = PlanUUID()
+
+    # Valid vote statuses
+    UserPlanVote(user_id="user123", plan_id=plan_id, vote_status="up")
+    UserPlanVote(user_id="user123", plan_id=plan_id, vote_status="down")
+
+    # Invalid vote status
+    with pytest.raises(ValidationError, match="vote_status must be either 'up' or 'down'"):
+        UserPlanVote(user_id="user123", plan_id=plan_id, vote_status="invalid")
+
+
+def test_readonly_plan_preserves_voting_metadata() -> None:
+    """Test that ReadOnlyPlan preserves voting metadata."""
+    now = datetime.now(UTC)
+    plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="test task", output="$output")],
+        upvotes=20,
+        downvotes=5,
+        created_by="user789",
+        created_at=now,
+        num_runs=12,
+        is_upvoted=True,
+    )
+
+    read_only = ReadOnlyPlan.from_plan(plan)
+
+    assert read_only.upvotes == plan.upvotes
+    assert read_only.downvotes == plan.downvotes
+    assert read_only.created_by == plan.created_by
+    assert read_only.created_at == plan.created_at
+    assert read_only.num_runs == plan.num_runs
+    assert read_only.is_upvoted == plan.is_upvoted
