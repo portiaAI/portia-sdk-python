@@ -506,7 +506,7 @@ def test_browserbase_provider_setup_browser(
     browser = mock_browserbase_provider.setup_browser(context)
 
     assert isinstance(browser, Browser)
-    assert browser.config.cdp_url == "test_connect_url"  # type: ignore[reportAttributeAccessIssue]
+    assert browser.cdp_url == "test_connect_url"  # type: ignore[reportAttributeAccessIssue]
 
 
 def test_browser_tool_for_url_init_default_parameters() -> None:
