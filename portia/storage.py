@@ -1945,3 +1945,150 @@ class PortiaCloudStorage(Storage):
                 phone_number=response_json["phone_number"],
                 additional_data=response_json["additional_data"],
             )
+
+    def upvote_plan(self, plan_id: PlanUUID) -> Plan:
+        """Upvote a plan in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to upvote.
+
+        Returns:
+            Plan: The updated Plan object with new vote counts.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.put(
+                url=f"/api/v0/plans/{plan_id}/upvote/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan.from_response(response_json)
+
+    async def aupvote_plan(self, plan_id: PlanUUID) -> Plan:
+        """Upvote a plan in Portia Cloud asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to upvote.
+
+        Returns:
+            Plan: The updated Plan object with new vote counts.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.put(
+                    url=f"/api/v0/plans/{plan_id}/upvote/",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan.from_response(response_json)
+
+    def downvote_plan(self, plan_id: PlanUUID) -> Plan:
+        """Downvote a plan in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to downvote.
+
+        Returns:
+            Plan: The updated Plan object with new vote counts.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.put(
+                url=f"/api/v0/plans/{plan_id}/downvote/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan.from_response(response_json)
+
+    async def adownvote_plan(self, plan_id: PlanUUID) -> Plan:
+        """Downvote a plan in Portia Cloud asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to downvote.
+
+        Returns:
+            Plan: The updated Plan object with new vote counts.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.put(
+                    url=f"/api/v0/plans/{plan_id}/downvote/",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan.from_response(response_json)
+
+    def delete_plan_vote(self, plan_id: PlanUUID) -> Plan:
+        """Remove a user's vote from a plan in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to remove the vote from.
+
+        Returns:
+            Plan: The updated Plan object with new vote counts.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.delete(
+                url=f"/api/v0/plans/{plan_id}/vote/",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan.from_response(response_json)
+
+    async def adelete_plan_vote(self, plan_id: PlanUUID) -> Plan:
+        """Remove a user's vote from a plan in Portia Cloud asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The ID of the plan to remove the vote from.
+
+        Returns:
+            Plan: The updated Plan object with new vote counts.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.delete(
+                    url=f"/api/v0/plans/{plan_id}/vote/",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+            response_json = response.json()
+            return Plan.from_response(response_json)

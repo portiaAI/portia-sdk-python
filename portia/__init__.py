@@ -93,7 +93,16 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
+from portia.plan import (
+    Plan,
+    PlanBuilder,
+    PlanContext,
+    PlanInput,
+    PlanUUID,
+    Step,
+    UserPlanVote,
+    Variable,
+)
 from portia.plan_run import PlanRun, PlanRunState
 
 # Core classes
@@ -193,6 +202,7 @@ __all__ = [
     "ToolRetryError",
     "ToolRunContext",
     "UserInputStep",
+    "UserPlanVote",
     "UserVerificationClarification",
     "UserVerifyStep",
     "ValueConfirmationClarification",

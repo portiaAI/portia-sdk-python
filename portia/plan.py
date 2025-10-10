@@ -20,6 +20,7 @@ tools, inputs, and outputs defined in the plan.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
@@ -419,6 +420,12 @@ class Plan(BaseModel):
         plan_context (PlanContext): The context for when the plan was created.
         steps (list[Step]): The set of steps that make up the plan.
         inputs (list[PlanInput]): The inputs required by the plan.
+        upvotes (int): The number of upvotes the plan has received.
+        downvotes (int): The number of downvotes the plan has received.
+        created_by (str | None): The user ID who created the plan.
+        created_at (datetime | None): The timestamp when the plan was created.
+        num_runs (int): The number of times this plan has been executed.
+        is_upvoted (bool): Whether the current user has upvoted this plan.
 
     """
 
@@ -437,6 +444,30 @@ class Plan(BaseModel):
         default=None,
         exclude=True,
         description="The optional structured output schema for the query.",
+    )
+    upvotes: int = Field(
+        default=0,
+        description="The number of upvotes the plan has received.",
+    )
+    downvotes: int = Field(
+        default=0,
+        description="The number of downvotes the plan has received.",
+    )
+    created_by: str | None = Field(
+        default=None,
+        description="The user ID who created the plan.",
+    )
+    created_at: datetime | None = Field(
+        default=None,
+        description="The timestamp when the plan was created.",
+    )
+    num_runs: int = Field(
+        default=0,
+        description="The number of times this plan has been executed.",
+    )
+    is_upvoted: bool = Field(
+        default=False,
+        description="Whether the current user has upvoted this plan.",
     )
 
     def __str__(self) -> str:
@@ -464,6 +495,16 @@ class Plan(BaseModel):
             Plan: The plan.
 
         """
+        # Parse created_at timestamp if present
+        created_at = None
+        if response_json.get("created_at"):
+            created_at_str = response_json["created_at"]
+            # Handle both ISO format strings and datetime objects
+            if isinstance(created_at_str, str):
+                created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            elif isinstance(created_at_str, datetime):
+                created_at = created_at_str
+
         return cls(
             id=PlanUUID.from_string(response_json["id"]),
             plan_context=PlanContext(
@@ -474,6 +515,12 @@ class Plan(BaseModel):
             plan_inputs=[
                 PlanInput.model_validate(input_) for input_ in response_json.get("plan_inputs", [])
             ],
+            upvotes=response_json.get("upvotes", 0),
+            downvotes=response_json.get("downvotes", 0),
+            created_by=response_json.get("created_by"),
+            created_at=created_at,
+            num_runs=response_json.get("num_runs", 0),
+            is_upvoted=response_json.get("is_upvoted", False),
         )
 
     def pretty_print(self) -> str:
@@ -532,6 +579,47 @@ class Plan(BaseModel):
         return self
 
 
+class UserPlanVote(BaseModel):
+    """A record of a user's vote on a plan.
+
+    This model tracks individual user votes on plans to prevent duplicate voting
+    and enable vote toggling.
+
+    Args:
+        user_id (str): The ID of the user who voted.
+        plan_id (PlanUUID): The ID of the plan that was voted on.
+        vote_status (str): The status of the vote, either 'up' or 'down'.
+
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str = Field(
+        description="The ID of the user who voted.",
+    )
+    plan_id: PlanUUID = Field(
+        description="The ID of the plan that was voted on.",
+    )
+    vote_status: str = Field(
+        description="The status of the vote, either 'up' or 'down'.",
+    )
+
+    @model_validator(mode="after")
+    def validate_vote_status(self) -> Self:
+        """Validate that vote_status is either 'up' or 'down'.
+
+        Returns:
+            UserPlanVote: The validated vote.
+
+        Raises:
+            ValueError: If vote_status is not 'up' or 'down'.
+
+        """
+        if self.vote_status not in ["up", "down"]:
+            raise ValueError("vote_status must be either 'up' or 'down'")
+        return self
+
+
 class ReadOnlyPlan(Plan):
     """A read-only copy of a plan, passed to agents for reference.
 
@@ -558,4 +646,10 @@ class ReadOnlyPlan(Plan):
             steps=plan.steps,
             plan_inputs=plan.plan_inputs,
             structured_output_schema=plan.structured_output_schema,
+            upvotes=plan.upvotes,
+            downvotes=plan.downvotes,
+            created_by=plan.created_by,
+            created_at=plan.created_at,
+            num_runs=plan.num_runs,
+            is_upvoted=plan.is_upvoted,
         )
