@@ -483,6 +483,7 @@ def test_default_config_deprecated_args() -> None:
         assert any("planning_model_name is deprecated" in str(warning.message) for warning in w)
         assert any("execution_model_name is deprecated" in str(warning.message) for warning in w)
 
+
 def test_config_storage_class_logic(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test storage class default logic."""
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")

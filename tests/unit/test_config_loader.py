@@ -367,3 +367,14 @@ def test_load_config_from_toml_handles_unexpected_exception(tmp_path: Path) -> N
         pytest.raises(ConfigNotFoundError, match="Unexpected error"),
     ):
         loader.load_config_from_toml()
+
+
+def test_merge_with_env_invalid_integer_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that invalid integer values in env vars are ignored."""
+    loader = ConfigLoader()
+    monkeypatch.setenv("PORTIA_LARGE_OUTPUT_THRESHOLD_TOKENS", "not-a-number")
+
+    config = {}
+    merged = loader.merge_with_env(config)
+
+    assert "large_output_threshold_tokens" not in merged
