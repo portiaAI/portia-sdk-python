@@ -101,7 +101,7 @@ class ConfigLoader:
             raise InvalidConfigError(
                 "config_file", f"Invalid TOML syntax in {self.config_file}: {e}"
             ) from e
-        except (InvalidConfigError, ConfigNotFoundError) as e:
+        except (ConfigNotFoundError) as e:
             raise ConfigNotFoundError(f"Error reading config file {self.config_file}: {e}") from e
 
         profiles = toml_data.get("profile", {})
@@ -130,7 +130,9 @@ class ConfigLoader:
             if current_value in (None, "", []):
                 env_value = os.getenv(env_var)
                 if env_value:
-                    merged_config[config_key] = self._parse_env_value(config_key, env_value)
+                    parsed_value = self._parse_env_value(config_key, env_value)
+                    if parsed_value is not None:
+                        merged_config[config_key] = parsed_value
 
         for config_key, env_var in self.ENV_VAR_MAPPING.items():
             _merge_env_var(config_key, env_var)
@@ -143,11 +145,11 @@ class ConfigLoader:
         if config_key in ["json_log_serialize", "argument_clarifications_enabled"]:
             return env_value.lower() in ("true", "1", "yes", "on")
         if config_key in ["large_output_threshold_tokens"]:
-            import contextlib
-
-            with contextlib.suppress(ValueError):
+            try:
                 return int(env_value)
-            return env_value  # fallback if int conversion fails
+            except ValueError:
+                # Return None to indicate invalid value (will be filtered out)
+                return None
         return env_value
 
     def _merge_feature_flags(self, merged_config: dict[str, Any]) -> None:
