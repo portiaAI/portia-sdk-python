@@ -1,6 +1,8 @@
 """Unit tests for config_loader.py."""
 
+import tomllib
 from pathlib import Path
+from typing import Any, Never
 from unittest.mock import patch
 
 import pytest
@@ -378,3 +380,25 @@ def test_merge_with_env_invalid_integer_conversion(monkeypatch: pytest.MonkeyPat
     merged = loader.merge_with_env(config)
 
     assert "large_output_threshold_tokens" not in merged
+
+
+def test_load_config_from_toml_handles_chained_config_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that the `except ConfigNotFoundError` block is covered.
+
+    This test uses monkeypatching to force `tomllib.load` to raise a
+    ConfigNotFoundError, simulating a scenario where the exception handling
+    logic is triggered.
+    """
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("[profile.default]\nkey = 'value'")
+    loader = ConfigLoader(config_file=config_file)
+    def mock_raise_config_error(*_args: Any, **_kwargs: Any) -> Never:
+        raise ConfigNotFoundError("mocked internal error")
+
+    monkeypatch.setattr(tomllib, "load", mock_raise_config_error)
+    with pytest.raises(ConfigNotFoundError) as exc_info:
+        loader.load_config_from_toml("default")
+    assert "Error reading config file" in str(exc_info.value)
+    assert "mocked internal error" in str(exc_info.value)
