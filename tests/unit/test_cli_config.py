@@ -471,14 +471,17 @@ def test_default_config_deprecated_args() -> None:
     """Test deprecated arguments in default_config."""
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        # Pass a deprecated argument to trigger the warning
-        default_config(llm_model_name="openai/gpt-4o")
+        # Pass deprecated arguments to trigger the warnings
+        default_config(
+            llm_model_name="openai/gpt-4o",
+            planning_model_name="openai/gpt-4o",
+            execution_model_name="openai/gpt-4o",
+        )
 
         assert len(w) > 0
-        assert "llm_model_name is deprecated" in str(w[0].message)
-
-        # Test deprecated model keys
+        assert any("llm_model_name is deprecated" in str(warning.message) for warning in w)
         assert any("planning_model_name is deprecated" in str(warning.message) for warning in w)
+        assert any("execution_model_name is deprecated" in str(warning.message) for warning in w)
 
 def test_config_storage_class_logic(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test storage class default logic."""
