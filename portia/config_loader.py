@@ -129,8 +129,9 @@ class ConfigLoader:
         """
         merged_config = config.copy()
 
-        def _merge_env_var(config_key: str, env_var: str) -> None:
+        for config_key, env_var in self.ENV_VAR_MAPPING.items():
             current_value = merged_config.get(config_key)
+            # Only merge env var if current value is missing, None, empty string, or empty list
             if current_value in (None, "", []):
                 env_value = os.getenv(env_var)
                 if env_value:
@@ -138,11 +139,9 @@ class ConfigLoader:
                     if parsed_value is not None:
                         merged_config[config_key] = parsed_value
 
-        for config_key, env_var in self.ENV_VAR_MAPPING.items():
-            _merge_env_var(config_key, env_var)
-
         self._merge_feature_flags(merged_config)
         return merged_config
+
 
     def _parse_env_value(self, config_key: str, env_value: str) -> bool | int | str | None:
         """Parse environment variable value based on config key."""
