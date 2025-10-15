@@ -154,6 +154,7 @@ class CLIExecutionHooks(ExecutionHooks):
     """Execution hooks for the CLI."""
 
     clarification_handler: ClarificationHandler | None = CLIClarificationHandler()
+CLIExecutionHooks.model_rebuild()
 
 
 @click.group(context_settings={"max_content_width": 240})

@@ -767,6 +767,11 @@ def test_browser_tool_multiple_calls(
     mock_ctx.end_user = end_user
     mock_ctx.plan = plan
     mock_ctx.plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
+    
+    mock_session = MagicMock()
+    mock_session.id = "test_session_id"
+    mock_session.connect_url = "test_connect_url"
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
 
     # Test first browser tool call (should set up session and not clean up)
     mock_browserbase_provider.setup_browser(mock_ctx)
