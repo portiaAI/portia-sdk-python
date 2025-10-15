@@ -7,11 +7,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from portia.clarification_handler import ClarificationHandler  # noqa: F401
 from portia.cli import cli
 from portia.config import Config, StorageClass
 from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.clarification_handler import ClarificationHandler # noqa: F401
+
 
 @pytest.fixture(autouse=True)
 def mock_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:

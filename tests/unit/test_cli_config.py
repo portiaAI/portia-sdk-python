@@ -5,6 +5,7 @@ import tempfile
 import warnings
 from collections.abc import Generator
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -26,7 +27,10 @@ from portia.config_loader import (
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.clarification_handler import ClarificationHandler # noqa: F401
+
+if TYPE_CHECKING:
+    from portia.clarification_handler import ClarificationHandler
+
 
 @pytest.fixture
 def temp_config_dir() -> Generator[Path, None, None]:
@@ -643,3 +647,7 @@ def test_config_loader_wrappers(temp_config_dir: Path) -> None:
     assert result["llm_provider"] == "openai"
     result2 = get_config("foo", config_file=cfg_file)
     assert result2["llm_provider"] == "openai"
+
+
+if False:
+    _dummy: ClarificationHandler
