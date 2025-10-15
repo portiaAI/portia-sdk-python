@@ -321,7 +321,10 @@ def test_browser_infra_local_setup_browser(
 
     mock_logger_instance = MagicMock()
     mock_logger = MagicMock(return_value=mock_logger_instance)
-    with patch("portia.open_source_tools.browser_tool.logger", mock_logger):
+    with (
+        patch("portia.open_source_tools.browser_tool.logger", mock_logger),
+        patch("portia.open_source_tools.browser_tool.Browser") as mock_browser,
+    ):
         browser = local_browser_provider.setup_browser(context)
 
         # Verify warning was logged for end_user
@@ -330,7 +333,7 @@ def test_browser_infra_local_setup_browser(
         assert "does not support end users" in mock_logger_instance.warning.call_args[0][0]
 
         # Verify browser instance
-        assert isinstance(browser, Browser)
+        assert browser == mock_browser.return_value
 
 
 def test_browser_infra_local_construct_auth_clarification_url(
@@ -767,7 +770,7 @@ def test_browser_tool_multiple_calls(
     mock_ctx.end_user = end_user
     mock_ctx.plan = plan
     mock_ctx.plan_run = PlanRun(plan_id=plan.id, current_step_index=0, end_user_id="test")
-    
+
     mock_session = MagicMock()
     mock_session.id = "test_session_id"
     mock_session.connect_url = "test_connect_url"

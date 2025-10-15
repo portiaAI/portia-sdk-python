@@ -101,8 +101,12 @@ class ConfigLoader:
             raise InvalidConfigError(
                 "config_file", f"Invalid TOML syntax in {self.config_file}: {e}"
             ) from e
-        except (ConfigNotFoundError) as e:
+        except ConfigNotFoundError as e:
             raise ConfigNotFoundError(f"Error reading config file {self.config_file}: {e}") from e
+        except Exception as e:
+            raise ConfigNotFoundError(
+                f"Unexpected error loading config file {self.config_file}: {e}"
+            ) from e
 
         profiles = toml_data.get("profile", {})
         if profile not in profiles:
@@ -140,7 +144,7 @@ class ConfigLoader:
         self._merge_feature_flags(merged_config)
         return merged_config
 
-    def _parse_env_value(self, config_key: str, env_value: str) -> bool | int | str:
+    def _parse_env_value(self, config_key: str, env_value: str) -> bool | int | str | None:
         """Parse environment variable value based on config key."""
         if config_key in ["json_log_serialize", "argument_clarifications_enabled"]:
             return env_value.lower() in ("true", "1", "yes", "on")

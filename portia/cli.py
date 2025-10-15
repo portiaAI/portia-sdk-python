@@ -154,6 +154,8 @@ class CLIExecutionHooks(ExecutionHooks):
     """Execution hooks for the CLI."""
 
     clarification_handler: ClarificationHandler | None = CLIClarificationHandler()
+
+
 CLIExecutionHooks.model_rebuild()
 
 
