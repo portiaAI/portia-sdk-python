@@ -142,7 +142,6 @@ class ConfigLoader:
         self._merge_feature_flags(merged_config)
         return merged_config
 
-
     def _parse_env_value(self, config_key: str, env_value: str) -> bool | int | str | None:
         """Parse environment variable value based on config key."""
         if config_key in ["json_log_serialize", "argument_clarifications_enabled"]:

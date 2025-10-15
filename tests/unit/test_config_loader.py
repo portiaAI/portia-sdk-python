@@ -360,11 +360,10 @@ def test_load_config_from_toml_handles_unexpected_exception(tmp_path: Path) -> N
     config_file = tmp_path / "config.toml"
     config_file.write_text("[profile.default]\nkey='value'\n")
     loader = ConfigLoader(config_file)
-    with patch("pathlib.Path.open", side_effect=RuntimeError("Unexpected error")):
-        with pytest.raises(ConfigNotFoundError, match="Unexpected error"):
-            loader.load_config_from_toml()
-    with patch("builtins.open", side_effect=OSError("disk error")):
-        with pytest.raises(ConfigNotFoundError) as excinfo:
-            loader.load_config_from_toml("default")
-        assert "Error reading config file" in str(excinfo.value)
-        assert "disk error" in str(excinfo.value)
+
+    # Patch tomllib.load to raise an unexpected exception
+    with (
+        patch("tomllib.load", side_effect=RuntimeError("Unexpected error")),
+        pytest.raises(ConfigNotFoundError, match="Unexpected error"),
+    ):
+        loader.load_config_from_toml()

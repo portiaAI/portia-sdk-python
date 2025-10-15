@@ -765,7 +765,7 @@ def test_default_config_all_env_overrides(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setenv("PORTIA_API_ENDPOINT", "https://api.env.test")
     monkeypatch.setenv("PORTIA_DASHBOARD_URL", "https://dash.env.test")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.env.test")
-    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-aws-key-id")  
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-aws-key-id")
     aws_secret = secrets.token_hex(16)
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", aws_secret)
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
@@ -783,6 +783,7 @@ def test_default_config_all_env_overrides(monkeypatch: pytest.MonkeyPatch) -> No
     assert cfg.aws_default_region == "us-west-2"
     assert cfg.aws_credentials_profile_name == "my_aws_profile"
     assert cfg.llm_redis_cache_url == "redis://localhost:6379/1"
+
 
 def make_minimal_config() -> Config:
     """Make a minimal valid Config for testing."""

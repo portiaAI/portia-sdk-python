@@ -774,7 +774,7 @@ def test_browser_tool_multiple_calls(
     mock_session = MagicMock()
     mock_session.id = "test_session_id"
     mock_session.connect_url = "test_connect_url"
-    mock_browserbase_provider.bb.sessions.create.return_value = mock_session
+    mock_browserbase_provider.bb.sessions.create.return_value = mock_session  # type: ignore[attr-defined]
 
     # Test first browser tool call (should set up session and not clean up)
     mock_browserbase_provider.setup_browser(mock_ctx)
