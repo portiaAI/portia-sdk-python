@@ -1,5 +1,6 @@
 """CLI entrypoint for Portia SDK."""
 
+# ruff: noqa: TC001
 from __future__ import annotations
 
 import builtins
@@ -15,7 +16,6 @@ import toml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
-
 
 from portia.clarification_handler import ClarificationHandler
 from portia.cli_clarification_handler import CLIClarificationHandler
