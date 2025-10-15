@@ -26,7 +26,7 @@ from portia.config_loader import (
 from portia.errors import ConfigNotFoundError, InvalidConfigError
 from portia.model import GenerativeModel, LLMProvider
 from portia.open_source_tools.llm_tool import LLMTool
-
+from portia.clarification_handler import ClarificationHandler
 
 @pytest.fixture
 def temp_config_dir() -> Generator[Path, None, None]:
