@@ -16,8 +16,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_core import PydanticUndefined
 
-if TYPE_CHECKING:
-    from portia.clarification_handler import ClarificationHandler
+
+from portia.clarification_handler import ClarificationHandler
 from portia.cli_clarification_handler import CLIClarificationHandler
 from portia.config import Config, GenerativeModelsConfig
 from portia.config_loader import (
