@@ -97,6 +97,7 @@ class LLMProvider(Enum):
         AZURE_OPENAI: Azure OpenAI provider.
         GROK: xAI Grok provider.
         GROQ: Groq provider.
+        COHERE: Cohere provider.
 
     """
 
@@ -111,6 +112,7 @@ class LLMProvider(Enum):
     OPENROUTER = "openrouter"
     GROK = "grok"
     GROQ = "groq"
+    COHERE = "cohere"
     GOOGLE_GENERATIVE_AI = "google"  # noqa: PIE796 - Alias for GOOGLE member
 
 
@@ -1351,6 +1353,90 @@ class GoogleGenAiGenerativeModel(LangChainGenerativeModel):
             client=wrapped_gemini_client,
             mode=instructor.Mode.GENAI_STRUCTURED_OUTPUTS,
             use_async=True,
+        )
+
+
+class CohereGenerativeModel(LangChainGenerativeModel):
+    """Cohere model implementation."""
+
+    provider: LLMProvider = LLMProvider.COHERE
+
+    def __init__(
+        self,
+        *,
+        model_name: str = "command-r-plus",
+        api_key: SecretStr,
+        max_retries: int = 3,
+        temperature: float = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize with Cohere client.
+
+        Args:
+            model_name: Name of the Cohere model
+            api_key: API key for Cohere
+            max_retries: Maximum number of retries
+            temperature: Temperature parameter for model sampling
+            **kwargs: Additional keyword arguments to pass to ChatCohere
+
+        """
+        from langchain_cohere import ChatCohere  # noqa: PLC0415
+
+        client = ChatCohere(
+            model=model_name,
+            cohere_api_key=api_key,
+            max_retries=max_retries,
+            temperature=temperature,
+            **kwargs,
+        )
+        super().__init__(client, model_name)
+
+    def get_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Call the model in structured output mode targeting the given Pydantic model.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT]): The Pydantic model to use for the response.
+            **kwargs: Additional keyword arguments to pass to the model.
+
+        Returns:
+            BaseModelT: The structured response from the model.
+
+        """
+        return super().get_structured_response(
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
+        )
+
+    async def aget_structured_response(
+        self,
+        messages: list[Message],
+        schema: type[BaseModelT],
+        **kwargs: Any,
+    ) -> BaseModelT:
+        """Call the model in structured output mode targeting the given Pydantic model async.
+
+        Args:
+            messages (list[Message]): The list of messages to send to the model.
+            schema (type[BaseModelT]): The Pydantic model to use for the response.
+            **kwargs: Additional keyword arguments to pass to the model.
+
+        Returns:
+            BaseModelT: The structured response from the model.
+
+        """
+        return await super().aget_structured_response(
+            messages,
+            schema,
+            method="function_calling",
+            **kwargs,
         )
 
 

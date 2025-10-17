@@ -29,6 +29,7 @@ from portia.logger import logger
 from portia.model import (
     AnthropicGenerativeModel,
     AzureOpenAIGenerativeModel,
+    CohereGenerativeModel,
     GenerativeModel,
     GrokGenerativeModel,
     LangChainGenerativeModel,
@@ -464,6 +465,10 @@ class Config(BaseModel):
         default_factory=lambda: SecretStr(os.getenv("XAI_API_KEY") or ""),
         description="The API Key for xAI Grok. Must be set if llm-provider is GROK",
     )
+    cohere_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(os.getenv("COHERE_API_KEY") or ""),
+        description="The API Key for Cohere. Must be set if llm-provider is COHERE",
+    )
     ollama_base_url: str = Field(
         default_factory=lambda: os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1",
         description="The base URL for Ollama. Must be set if llm-provider is OLLAMA",
@@ -655,6 +660,8 @@ class Config(BaseModel):
                         return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-70b-8192"
+                    case LLMProvider.COHERE:
+                        return "cohere/command-r-plus"
                 return None
             case "introspection_model":
                 match llm_provider:
@@ -674,6 +681,8 @@ class Config(BaseModel):
                         return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
+                    case LLMProvider.COHERE:
+                        return "cohere/command-r"
                 return None
             case "default_model":
                 match llm_provider:
@@ -695,6 +704,8 @@ class Config(BaseModel):
                         return "grok/grok-4-0709"
                     case LLMProvider.GROQ:
                         return "groq/llama3-8b-8192"
+                    case LLMProvider.COHERE:
+                        return "cohere/command-r"
                 return None
 
     @model_validator(mode="after")
@@ -906,6 +917,7 @@ class Config(BaseModel):
         - google
         - azure-openai
         - grok
+        - cohere
 
         Args:
             model_string (str): The model string to parse. E.G. "openai/gpt-4o"
@@ -1015,11 +1027,17 @@ class Config(BaseModel):
                     api_key=self.must_get_api_key("grok_api_key"),
                     **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
                 )
+            case LLMProvider.COHERE:
+                return CohereGenerativeModel(
+                    model_name=model_name,
+                    api_key=self.must_get_api_key("cohere_api_key"),
+                    **MODEL_EXTRA_KWARGS.get(f"{llm_provider.value}/{model_name}", {}),
+                )
             case LLMProvider.CUSTOM:
                 raise ValueError(f"Cannot construct a custom model from a string {model_name}")
 
 
-def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911
+def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa: ANN003, PLR0911, C901
     """Get the default LLM provider from the API keys.
 
     Returns:
@@ -1052,6 +1070,8 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
         return LLMProvider.GROK
     if os.getenv("GROQ_API_KEY") or kwargs.get("groq_api_key"):
         return LLMProvider.GROQ
+    if os.getenv("COHERE_API_KEY") or kwargs.get("cohere_api_key"):
+        return LLMProvider.COHERE
     return None
 
 
