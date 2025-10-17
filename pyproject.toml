@@ -41,6 +41,7 @@ dependencies = [
     "langchain-google-genai>=2.1.8,<3 ; python_version >= '3.11' and python_version < '4.0'",
     "google-genai>=1.18.0",
     "pydash>=8.0.0,<9",
+    "langchain-cohere>=0.3.5,<0.4 ; python_version >= '3.11' and python_version < '4.0'",
 ]
 
 [project.optional-dependencies]

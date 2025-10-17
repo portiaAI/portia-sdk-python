@@ -32,6 +32,7 @@ MODELS = [
     "mistralai/mistral-small-latest",
     "google/gemini-2.0-flash",
     "azure-openai/gpt-4o-mini",
+    "cohere/command-r",
 ]
 
 LOW_CAPABILITY_MODELS = [
