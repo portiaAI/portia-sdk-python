@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -21,17 +21,17 @@ from portia.execution_agents.one_shot_agent import OneShotAgent
 from portia.logger import logger
 from portia.model import GenerativeModel  # noqa: TC001
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Step
+from portia.plan import Step as StepData
 from portia.tool import Tool  # noqa: TC001
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.execution_agents.base_execution_agent import BaseExecutionAgent
     from portia.run_context import RunContext
 
 
-class SingleToolAgentStep(StepV2):
+class SingleToolAgentStep(Step):
     """A step where an LLM agent intelligently uses a specific tool to complete a task.
 
     Unlike InvokeToolStep which requires you to specify exact tool arguments, this step
@@ -125,7 +125,7 @@ class SingleToolAgentStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this SingleToolAgentStep to a Step."""
         return Step(
             task=self.task,

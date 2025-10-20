@@ -1,4 +1,4 @@
-"""Data model for plans assembled with :class:`PlanBuilderV2`."""
+"""Data model for plans assembled with :class:`PlanBuilder`."""
 
 from __future__ import annotations
 
@@ -8,30 +8,28 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from portia.builder.reference import default_step_name
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 from portia.logger import logger
-from portia.plan import Plan, PlanContext, PlanInput
+from portia.plan import PlanInput
+from portia.plan import Step as StepData
 from portia.prefixed_uuid import PlanUUID
 
 
-class PlanV2(BaseModel):
+class Plan(BaseModel):
     """An ordered collection of executable steps that can be executed by Portia.
 
-    A PlanV2 defines a sequence of StepV2 objects that are executed in order to accomplish a
+    A Plan defines a sequence of Step objects that are executed in order to accomplish a
     specific task. Plans can include inputs, conditional logic, tool invocations, agent calls
     and structured outputs.
-
-    This class is the successor to the Plan class in Portia. You should use this class rather than
-    the Plan class.
     """
 
     id: PlanUUID = Field(
         default_factory=PlanUUID,
         description="Unique identifier for the plan, automatically generated if not provided.",
     )
-    steps: list[StepV2] = Field(
+    steps: list[Step] = Field(
         description=(
-            "Ordered sequence of steps to be executed. Each step is a StepV2 instance representing "
+            "Ordered sequence of steps to be executed. Each step is a Step instance representing "
             "a specific action, tool invocation, agent call or control flow element."
         )
     )
@@ -96,26 +94,16 @@ class PlanV2(BaseModel):
 
         return self
 
-    def to_legacy_plan(self, plan_context: PlanContext) -> Plan:
-        """Convert this plan to the legacy Plan format.
+    def to_step_data_list(self) -> list[StepData]:
+        """Convert all steps to StepData objects for UI serialization.
 
-        This method enables backward compatibility with systems that still use the
-        original plan representation. It transforms each StepV2 into its legacy
-        equivalent while preserving all execution semantics.
-
-        Args:
-            plan_context: Context information including the original query and tool registry.
+        This method is used to convert the plan's steps into a format that can be
+        displayed in the Portia Dashboard.
 
         """
-        return Plan(
-            id=self.id,
-            plan_context=plan_context,
-            steps=[step.to_legacy_step(self) for step in self.steps],
-            plan_inputs=self.plan_inputs,
-            structured_output_schema=self.final_output_schema,
-        )
+        return [step.to_step_data(self) for step in self.steps]
 
-    def step_output_name(self, step: int | str | StepV2) -> str:
+    def step_output_name(self, step: int | str | Step) -> str:
         """Generate the output variable name for a given step.
 
         Creates a standardized variable name that can be used to reference the output
@@ -126,11 +114,11 @@ class PlanV2(BaseModel):
             step: The step to get the output name for. Can be:
                 - int: Index of the step in the plan (negative values count from the end)
                 - str: Name of the step
-                - StepV2: The step instance itself
+                - Step: The step instance itself
 
         """
         try:
-            if isinstance(step, StepV2):
+            if isinstance(step, Step):
                 step_num = self.steps.index(step)
             elif isinstance(step, str):
                 step_num = self.idx_by_name(step)
@@ -162,12 +150,12 @@ class PlanV2(BaseModel):
     def pretty_print(self) -> str:
         """Return a human-readable summary of the plan."""
         tools = []
-        legacy_steps = []
+        step_data_list = []
         for step in self.steps:
-            legacy_step = step.to_legacy_step(self)
-            if legacy_step.tool_id:
-                tools.append(legacy_step.tool_id)
-            legacy_steps.append(legacy_step)
+            step_data = step.to_step_data(self)
+            if step_data.tool_id:
+                tools.append(step_data.tool_id)
+            step_data_list.append(step_data)
 
         unique_tools = sorted(set(tools))
 
@@ -183,7 +171,7 @@ class PlanV2(BaseModel):
                 + "\n"
             )
 
-        steps_section = "Steps:\n" + "\n".join([step.pretty_print() for step in legacy_steps])
+        steps_section = "Steps:\n" + "\n".join([step.pretty_print() for step in step_data_list])
 
         final_output_section = ""
         if self.final_output_schema:

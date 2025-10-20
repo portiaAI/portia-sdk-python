@@ -66,7 +66,7 @@ class ToolCallTelemetryEvent(BaseTelemetryEvent):
 
 
 @dataclass
-class PlanV2StepExecutionTelemetryEvent(BaseTelemetryEvent):
+class PlanStepExecutionTelemetryEvent(BaseTelemetryEvent):
     """Telemetry event for tracking PlanV2 step execution.
 
     Attributes:
@@ -83,7 +83,7 @@ class PlanV2StepExecutionTelemetryEvent(BaseTelemetryEvent):
 
 
 @dataclass
-class PlanV2BuildTelemetryEvent(BaseTelemetryEvent):
+class PlanBuildTelemetryEvent(BaseTelemetryEvent):
     """Telemetry event for tracking PlanV2 builds.
 
     Attributes:

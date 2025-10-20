@@ -68,8 +68,7 @@ class FileReaderTool(Tool[str]):
                 return UserVerificationClarification(
                     plan_run_id=ctx.plan_run.id,
                     user_guidance=(
-                        f"Found {filename} at: {alt_file_paths[0]}. "
-                        "Do you want to read this file?"
+                        f"Found {filename} at: {alt_file_paths[0]}. Do you want to read this file?"
                     ),
                     source="File reader tool",
                 )

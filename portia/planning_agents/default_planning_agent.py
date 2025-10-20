@@ -145,14 +145,14 @@ class DefaultPlanningAgent(BasePlanningAgent):
         if tool_error:
             return StepsOrError(
                 steps=response.steps,
-                error=f"Attempt {i+1}: {tool_error}",
+                error=f"Attempt {i + 1}: {tool_error}",
             )
 
         input_error = self._validate_inputs_in_response(response.steps, plan_inputs)
         if input_error:
             return StepsOrError(
                 steps=response.steps,
-                error=f"Attempt {i+1}: {input_error}",
+                error=f"Attempt {i + 1}: {input_error}",
             )
 
         # If we get here, we've processed the response successfully
@@ -247,7 +247,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
             for input_var in step.inputs:
                 if input_var.name not in plan_inputs_names and input_var.name not in step_outputs:
                     return (
-                        f"Step {i+1} uses input '{input_var.name}' which is neither a plan input "
+                        f"Step {i + 1} uses input '{input_var.name}' which is neither a plan input "
                         f"nor an output from a previous step"
                     )
 

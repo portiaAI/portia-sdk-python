@@ -10,27 +10,24 @@ for each step in a plan, providing detailed breakdowns and explanations.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
 import litellm
 from pydantic import BaseModel, Field
 
 from portia.builder.llm_step import LLMStep
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.single_tool_agent_step import SingleToolAgentStep
+from portia.builder.step import Step as BuilderStep
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.logger import logger
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, Step
+from portia.plan import LegacyPlan, PlanContext
 from portia.plan_run import PlanRun, PlanRunState
 from portia.token_check import estimate_tokens
 from portia.tool import ToolRunContext
-
-if TYPE_CHECKING:
-    from portia.builder.step_v2 import StepV2
-
 
 LITELLM_PRICING_URL = (
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -120,7 +117,7 @@ Please provide your estimate with a brief explanation of your reasoning.
         self.config = config or Config.from_default()
         self.estimation_tool = LLMTool(structured_output_schema=LLMEstimationResult)
 
-    def plan_estimate(self, plan: Plan | PlanV2) -> PlanCostEstimate:
+    def plan_estimate(self, plan: Plan | LegacyPlan) -> PlanCostEstimate:
         """Estimate the cost of running a plan.
 
         Args:
@@ -132,11 +129,11 @@ Please provide your estimate with a brief explanation of your reasoning.
         """
         logger().info("Starting cost estimation for plan")
 
-        if isinstance(plan, Plan):
+        if isinstance(plan, LegacyPlan):
             return self._estimate_v1_plan(plan)
         return self._estimate_v2_plan(plan)
 
-    async def aplan_estimate(self, plan: Plan | PlanV2) -> PlanCostEstimate:
+    async def aplan_estimate(self, plan: Plan | LegacyPlan) -> PlanCostEstimate:
         """Asynchronously estimate the cost of running a plan.
 
         Args:
@@ -169,7 +166,7 @@ Please provide your estimate with a brief explanation of your reasoning.
             limitations=self._get_limitations_explanation(),
         )
 
-    def _estimate_v2_plan(self, plan: PlanV2) -> PlanCostEstimate:
+    def _estimate_v2_plan(self, plan: Plan) -> PlanCostEstimate:
         """Estimate costs for a V2 plan."""
         step_estimates = []
         total_cost = 0.0
@@ -190,7 +187,7 @@ Please provide your estimate with a brief explanation of your reasoning.
             limitations=self._get_limitations_explanation(),
         )
 
-    def _estimate_v1_step_cost(self, step: Step, model_name: str) -> StepCostEstimate:
+    def _estimate_v1_step_cost(self, step: StepData, model_name: str) -> StepCostEstimate:
         """Estimate cost for a V1 plan step."""
         step_name = f"Step {step.output}"
         step_type = "V1Step"
@@ -250,15 +247,15 @@ Please provide your estimate with a brief explanation of your reasoning.
             introspection_cost=introspection_cost,
         )
 
-    def _estimate_v2_step_cost(self, step: StepV2, model_name: str) -> StepCostEstimate:
+    def _estimate_v2_step_cost(self, step: BuilderStep, model_name: str) -> StepCostEstimate:
         """Estimate cost for a V2 plan step using LLM-driven estimation."""
         step_type = type(step).__name__
 
         task = self._extract_step_task(step)
 
         try:
-            dummy_plan = PlanV2(steps=[step])
-            tools = step.to_legacy_step(dummy_plan).tool_id or ""
+            dummy_plan = Plan(steps=[step])
+            tools = step.to_step_data(dummy_plan).tool_id or ""
         except (ValueError, AttributeError) as e:
             logger().debug(f"Failed to convert step to legacy format: {e}")
             tools = ""
@@ -313,13 +310,13 @@ Please provide your estimate with a brief explanation of your reasoning.
             introspection_cost=introspection_cost,
         )
 
-    def _extract_step_task(self, step: StepV2) -> str:
+    def _extract_step_task(self, step: BuilderStep) -> str:
         """Extract the task description from a step."""
         if isinstance(step, LLMStep | ReActAgentStep | SingleToolAgentStep):
             return step.task
         return f"Execute {type(step).__name__}"
 
-    def _estimate_input_context(self, step: StepV2) -> int:
+    def _estimate_input_context(self, step: BuilderStep) -> int:
         """Estimate the input context size for a step."""
         base_context = 1000
 
