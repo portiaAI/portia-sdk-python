@@ -11,10 +11,10 @@ implementations:
 
 Example:
     ```python
-    from portia.builder import PlanBuilderV2
+    from portia.builder import PlanBuilder
     from portia.builder.reference import StepOutput, Input
 
-    builder = PlanBuilderV2()
+    builder = PlanBuilder()
     builder.input("user_query", description="The user's search query")
 
     # Step 1: Search for information
@@ -33,7 +33,7 @@ import sys
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from inspect import signature
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self, TypeVar
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -47,7 +47,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from portia.logger import logger
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext, StepOutputValue
 
 _KWARGS_ARG_REGEX = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$")
@@ -126,7 +126,7 @@ class Reference(BaseModel, ABC):
     _converters: ClassVar[list[Callable[[str], Any]]] = _DEFAULT_CONVERTERS
 
     @abstractmethod
-    def get_legacy_name(self, plan: PlanV2) -> str:
+    def get_legacy_name(self, plan: Plan) -> str:
         """Get the reference name for compatibility with legacy Portia plans.
 
         Args:
@@ -153,7 +153,7 @@ class Reference(BaseModel, ABC):
         raise NotImplementedError  # pragma: no cover
 
     @classmethod
-    def from_str(cls: type[T], input_str: str) -> T:
+    def from_str(cls, input_str: str) -> Self:
         """Create a reference from a string representation.
 
         Args:
@@ -245,10 +245,10 @@ class StepOutput(Reference):
 
     Example:
         ```python
-        from portia.builder import PlanBuilderV2
+        from portia.builder import PlanBuilder
         from portia.builder.reference import StepOutput
 
-        builder = PlanBuilderV2()
+        builder = PlanBuilder()
 
         # Create a step that produces some output using a search tool
         builder.single_tool_agent_step("search", "search_tool",
@@ -303,14 +303,14 @@ class StepOutput(Reference):
         super().__init__(step=step, path=path, full=full)  # type: ignore[call-arg]
 
     @override
-    def get_legacy_name(self, plan: PlanV2) -> str:
+    def get_legacy_name(self, plan: Plan) -> str:
         """Get the reference name for compatibility with legacy Portia plans."""
         return plan.step_output_name(self.step)
 
     def __str__(self) -> str:
         """Get the string representation of the step output."""
         # We use double braces around the StepOutput to allow string interpolation for StepOutputs
-        # used in PlanBuilderV2 steps.
+        # used in PlanBuilder steps.
         # The double braces are used when the plan is running to template the StepOutput value so it
         # can be substituted at runtime.
         step_repr = f"'{self.step}'" if isinstance(self.step, str) else str(self.step)
@@ -393,10 +393,10 @@ class Input(Reference):
 
     Example:
         ```python
-        from portia.builder import PlanBuilderV2
+        from portia.builder import PlanBuilder
         from portia.builder.reference import Input
 
-        builder = PlanBuilderV2()
+        builder = PlanBuilder()
 
         # Define an input that will be provided at runtime
         builder.input("user_query", description="The user's search query")
@@ -436,7 +436,7 @@ class Input(Reference):
         super().__init__(name=name, path=path)  # type: ignore[call-arg]
 
     @override
-    def get_legacy_name(self, plan: PlanV2) -> str:
+    def get_legacy_name(self, plan: Plan) -> str:
         """Get the reference name for compatibility with legacy Portia plans."""
         return self.name
 
@@ -472,7 +472,7 @@ class Input(Reference):
     def __str__(self) -> str:
         """Get the string representation of the input."""
         # We use double braces around the Input to allow string interpolation for Inputs used
-        # in PlanBuilderV2 steps. The double braces are used when the plan is running to template
+        # in PlanBuilder steps. The double braces are used when the plan is running to template
         # the input value so it can be substituted at runtime.
         if self.path:
             return f"{{{{ Input('{self.name}', path='{self.path}') }}}}"

@@ -7,15 +7,15 @@ from langsmith import traceable
 from pydantic import Field, model_validator
 
 from portia.builder.loops import LoopStepResult, LoopStepType, LoopType
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan
 from portia.builder.reference import Reference
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
-from portia.plan import Step
+from portia.plan import Step as StepData
 from portia.run_context import RunContext
 
 
-class LoopStep(StepV2):
+class LoopStep(Step):
     """A step that represents a loop in a loop block.
 
     This step handles loop logic such as while, do-while, and for-each loops that
@@ -102,7 +102,7 @@ class LoopStep(StepV2):
         return LoopStepResult(loop_result=conditional_result, value=conditional_result)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this LoopStep to a PlanStep."""
         if isinstance(self.condition, str):
             cond_str = self.condition

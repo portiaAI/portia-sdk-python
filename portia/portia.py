@@ -33,7 +33,7 @@ from portia.builder.conditionals import ConditionalBlockClauseType, ConditionalS
 from portia.builder.exit import ExitStepResult
 from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopStepResult, LoopStepType
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan
 from portia.clarification import (
     Clarification,
     ClarificationCategory,
@@ -85,7 +85,7 @@ from portia.storage import (
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
 from portia.telemetry.views import (
-    PlanV2StepExecutionTelemetryEvent,
+    PlanStepExecutionTelemetryEvent,
     PortiaFunctionCallTelemetryEvent,
 )
 from portia.tool import PortiaRemoteTool, Tool, ToolRunContext
@@ -850,7 +850,7 @@ class Portia:
 
     def run_plan(
         self,
-        plan: Plan | PlanUUID | UUID | PlanV2,
+        plan: Plan | PlanUUID | UUID,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
@@ -861,7 +861,7 @@ class Portia:
         """Run a plan.
 
         Args:
-            plan (Plan | PlanUUID | UUID | PlanV2): The plan to run, or the ID of the plan to load from
+            plan (Plan | PlanUUID | UUID): The plan to run, or the ID of the plan to load from
               storage.
             end_user (str | EndUser | None = None): The end user to use.
             plan_run_inputs (list[PlanInput] | list[dict[str, Serializable]] | dict[str, Serializable] | None):
@@ -880,7 +880,7 @@ class Portia:
                 function_name="portia_run_plan",
                 function_call_details={
                     "plan_type": "PlanBuilderNew"
-                    if isinstance(plan, PlanV2)
+                    if isinstance(plan, Plan)
                     else type(plan).__name__,
                     "end_user_provided": end_user is not None,
                     "plan_run_inputs_provided": plan_run_inputs is not None,
@@ -888,7 +888,7 @@ class Portia:
             )
         )
 
-        if isinstance(plan, PlanV2):
+        if isinstance(plan, Plan):
             try:
                 with asyncio.Runner() as runner:
                     return runner.run(
@@ -913,7 +913,7 @@ class Portia:
 
     async def arun_plan(
         self,
-        plan: Plan | PlanUUID | UUID | PlanV2,
+        plan: Plan | PlanUUID | UUID,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
@@ -943,14 +943,14 @@ class Portia:
                 function_name="portia_arun_plan",
                 function_call_details={
                     "plan_type": "PlanBuilderNew"
-                    if isinstance(plan, PlanV2)
+                    if isinstance(plan, Plan)
                     else type(plan).__name__,
                     "end_user_provided": end_user is not None,
                     "plan_run_inputs_provided": plan_run_inputs is not None,
                 },
             )
         )
-        if isinstance(plan, PlanV2):
+        if isinstance(plan, Plan):
             return await self.run_builder_plan(
                 plan=plan,
                 end_user=self.initialize_end_user(end_user),
@@ -1043,7 +1043,7 @@ class Portia:
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
-        plan: PlanV2 | None = None,
+        plan: Plan | None = None,
     ) -> PlanRun:
         """Resume a PlanRun.
 
@@ -1057,7 +1057,7 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
-            plan (PlanV2 | None): If using a plan built with the Plan Builder, the plan must be
+            plan (Plan | None): If using a plan built with the Plan Builder, the plan must be
                 passed in here in order to resume.
 
         Returns:
@@ -1077,10 +1077,10 @@ class Portia:
                 },
             )
         )
-        if isinstance(plan, PlanV2):
+        if isinstance(plan, Plan):
             if not plan_run:  # pragma: no cover
                 raise NotImplementedError(
-                    "We do not yet support retrieving plan runs by ID with PlanV2"
+                    "We do not yet support retrieving plan runs by ID with Plan"
                 )
             with asyncio.Runner() as runner:
                 return runner.run(self.resume_builder_plan(plan, plan_run=plan_run))
@@ -1090,7 +1090,7 @@ class Portia:
         self,
         plan_run: PlanRun | None = None,
         plan_run_id: PlanRunUUID | str | None = None,
-        plan: PlanV2 | None = None,
+        plan: Plan | None = None,
     ) -> PlanRun:
         """Resume a PlanRun.
 
@@ -1104,7 +1104,7 @@ class Portia:
             plan_run (PlanRun | None): The PlanRun to resume. Defaults to None.
             plan_run_id (RunUUID | str | None): The ID of the PlanRun to resume. Defaults to
                 None.
-            plan (PlanV2 | None): If using a plan built with the Plan Builder, the plan must be
+            plan (Plan | None): If using a plan built with the Plan Builder, the plan must be
                 passed in here in order to resume.
 
         Returns:
@@ -1125,10 +1125,10 @@ class Portia:
             )
         )
 
-        if isinstance(plan, PlanV2):
+        if isinstance(plan, Plan):
             if not plan_run:  # pragma: no cover
                 raise NotImplementedError(
-                    "We do not yet support retrieving plan runs by ID with PlanV2"
+                    "We do not yet support retrieving plan runs by ID with Plan"
                 )
             return await self.resume_builder_plan(plan, plan_run=plan_run)
 
@@ -1270,7 +1270,7 @@ class Portia:
             if missing_inputs:
                 raise ValueError(f"Missing required plan input values: {', '.join(missing_inputs)}")
 
-            # Pragma no cover as PlanV2 only uses async method
+            # Pragma no cover as Plan only uses async method
             for plan_input in plan.plan_inputs:  # pragma: no cover
                 if plan_input.value is not None:  # pragma: no cover
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(  # pragma: no cover
@@ -1300,7 +1300,7 @@ class Portia:
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(
                         value=input_values_by_name[plan_input.name].value
                     )
-                # Pragma no cover as PlanV2 only uses async method
+                # Pragma no cover as Plan only uses async method
                 elif plan_input.value is not None:  # pragma: no cover
                     plan_run.plan_run_inputs[plan_input.name] = LocalDataValue(  # pragma: no cover
                         value=plan_input.value
@@ -2607,7 +2607,7 @@ class Portia:
                 continue
 
             if "," in step.tool_id:
-                # A comma can only appear in the tool ID with PlanV2 ReAct agent steps where they
+                # A comma can only appear in the tool ID with Plan ReAct agent steps where they
                 # are using more than one tool in a single step.
                 tools_remaining.update(step.tool_id.split(","))
             else:
@@ -2645,7 +2645,7 @@ class Portia:
     @traceable(name="Portia - Run Plan")
     async def run_builder_plan(
         self,
-        plan: PlanV2,
+        plan: Plan,
         end_user: EndUser,
         plan_run_inputs: list[PlanInput]
         | list[dict[str, Serializable]]
@@ -2680,7 +2680,7 @@ class Portia:
 
     async def resume_builder_plan(
         self,
-        plan: PlanV2,
+        plan: Plan,
         plan_run: PlanRun,
         end_user: EndUser | None = None,
         legacy_plan: Plan | None = None,
@@ -2729,7 +2729,7 @@ class Portia:
 
         return plan_run
 
-    async def _execute_builder_plan(self, plan: PlanV2, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
+    async def _execute_builder_plan(self, plan: Plan, run_data: RunContext) -> PlanRun:  # noqa: C901, PLR0912, PLR0915
         """Execute a Portia plan."""
         self._set_plan_run_state(run_data.plan_run, PlanRunState.IN_PROGRESS)
         self._log_execute_start(run_data.plan_run, run_data.legacy_plan)
@@ -2757,7 +2757,7 @@ class Portia:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
                 self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
+                    PlanStepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=False,
                         tool_id=step.to_legacy_step(plan).tool_id,
@@ -2768,7 +2768,7 @@ class Portia:
                 )
             else:
                 self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
+                    PlanStepExecutionTelemetryEvent(
                         step_type=step.__class__.__name__,
                         success=True,
                         tool_id=step.to_legacy_step(plan).tool_id,

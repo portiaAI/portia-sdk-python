@@ -1,4 +1,4 @@
-"""Implementation of the various step types used in :class:`PlanV2`."""
+"""Implementation of the various step types used in :class:`Plan`."""
 
 from __future__ import annotations
 
@@ -15,14 +15,15 @@ from portia.builder.conditionals import (
 from portia.builder.loops import LoopBlock
 from portia.builder.reference import Input, Reference, StepOutput
 from portia.execution_agents.output import LocalDataValue
-from portia.plan import PlanInput, Step, Variable
+from portia.plan import PlanInput, Variable
+from portia.plan import Step as StepData
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class StepV2(BaseModel, ABC):
+class Step(BaseModel, ABC):
     """Abstract base class for all steps executed within a plan.
 
     Each step represents an action that can be performed during plan execution,
@@ -51,8 +52,8 @@ class StepV2(BaseModel, ABC):
         raise NotImplementedError  # pragma: no cover
 
     @abstractmethod
-    def to_legacy_step(self, plan: PlanV2) -> Step:
-        """Convert this step to the legacy Step format.
+    def to_step_data(self, plan: Plan) -> StepData:
+        """Convert this step to a StepData object for UI serialization.
 
         This is primarily used to determine how the steps should be presented in the Portia
         Dashboard.
@@ -174,7 +175,7 @@ class StepV2(BaseModel, ABC):
     def _resolve_input_names_for_printing(
         self,
         _input: Any,  # noqa: ANN401
-        plan: PlanV2,
+        plan: Plan,
     ) -> Any | None:  # noqa: ANN401
         """Resolve any References in the provided input to their name (note: not to their value).
 
@@ -192,11 +193,11 @@ class StepV2(BaseModel, ABC):
             return [self._resolve_input_names_for_printing(v, plan) for v in _input]
         return _input
 
-    def _inputs_to_legacy_plan_variables(self, inputs: list[Any], plan: PlanV2) -> list[Variable]:
+    def _inputs_to_legacy_plan_variables(self, inputs: list[Any], plan: Plan) -> list[Variable]:
         """Convert a list of inputs to a list of legacy plan variables."""
         return [Variable(name=v.get_legacy_name(plan)) for v in inputs if isinstance(v, Reference)]
 
-    def _get_legacy_condition(self, plan: PlanV2) -> str | None:
+    def _get_legacy_condition(self, plan: Plan) -> str | None:
         """Get the legacy condition for a step."""
         if self.conditional_block is None:
             return None

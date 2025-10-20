@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -21,14 +21,14 @@ from portia.clarification import (
     InputClarification,
     MultipleChoiceClarification,
 )
-from portia.plan import Step
+from portia.plan import Step as StepData
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class UserInputStep(StepV2):
+class UserInputStep(Step):
     """A step that requests input from the user and returns their response.
 
     This pauses plan execution and prompts the user to provide input. If options are
@@ -96,7 +96,7 @@ class UserInputStep(StepV2):
         return previous_clarification.response
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this UserInputStep to a legacy Step."""
         input_type = "Multiple choice" if self.options else "Text input"
         return Step(
