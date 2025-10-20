@@ -81,6 +81,7 @@ from portia.storage import (
     DiskFileStorage,
     InMemoryStorage,
     PortiaCloudStorage,
+    RedisStorage,
     StorageError,
 )
 from portia.telemetry.telemetry_service import BaseProductTelemetry, ProductTelemetry
@@ -160,6 +161,8 @@ class Portia:
                 self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
+            case StorageClass.REDIS:
+                self.storage = RedisStorage(redis_url=self.config.storage_redis_url or "")
 
     def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
         """Handle initializing the end_user based on the provided type."""

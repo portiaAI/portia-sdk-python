@@ -26,6 +26,7 @@ from portia.storage import (
     PlanRunListResponse,
     PlanStorage,
     PortiaCloudStorage,
+    RedisStorage,
     RunStorage,
 )
 from tests.utils import get_test_config, get_test_plan_run, get_test_tool_call
@@ -1150,3 +1151,204 @@ def test_get_plan_by_query_edge_cases() -> None:
 
     found_plan = storage.get_plan_by_query(special_query)
     assert found_plan.plan_context.query == special_query
+
+
+def test_redis_storage_save_and_get_plan() -> None:
+    """Test RedisStorage save_plan and get_plan methods."""
+    with patch("portia.storage.REDIS_AVAILABLE", True):
+        mock_redis = MagicMock()
+        mock_redis.from_url.return_value = mock_redis
+        mock_redis_async = MagicMock()
+        mock_redis_async.from_url.return_value = mock_redis_async
+
+        with (
+            patch("portia.storage.redis", mock_redis),
+            patch("portia.storage.redis_async", mock_redis_async),
+        ):
+            storage = RedisStorage(redis_url="redis://localhost:6379/0")
+            plan, plan_run = get_test_plan_run()
+
+            # Test save_plan
+            storage.save_plan(plan)
+            mock_redis.set.assert_called_once_with(
+                f"portia:plan:{plan.id}",
+                plan.model_dump_json(),
+            )
+
+            # Test get_plan
+            mock_redis.get.return_value = plan.model_dump_json()
+            retrieved_plan = storage.get_plan(plan.id)
+            assert retrieved_plan.id == plan.id
+            mock_redis.get.assert_called_once_with(f"portia:plan:{plan.id}")
+
+            # Test get_plan when plan doesn't exist
+            mock_redis.get.return_value = None
+            from portia.errors import PlanNotFoundError
+
+            with pytest.raises(PlanNotFoundError):
+                storage.get_plan(PlanUUID())
+
+
+def test_redis_storage_save_and_get_plan_run() -> None:
+    """Test RedisStorage save_plan_run and get_plan_run methods."""
+    with patch("portia.storage.REDIS_AVAILABLE", True):
+        mock_redis = MagicMock()
+        mock_redis.from_url.return_value = mock_redis
+        mock_redis_async = MagicMock()
+        mock_redis_async.from_url.return_value = mock_redis_async
+
+        with (
+            patch("portia.storage.redis", mock_redis),
+            patch("portia.storage.redis_async", mock_redis_async),
+        ):
+            storage = RedisStorage(redis_url="redis://localhost:6379/0")
+            plan, plan_run = get_test_plan_run()
+
+            # Test save_plan_run
+            storage.save_plan_run(plan_run)
+            mock_redis.set.assert_called_once_with(
+                f"portia:run:{plan_run.id}",
+                plan_run.model_dump_json(),
+            )
+
+            # Test get_plan_run
+            mock_redis.get.return_value = plan_run.model_dump_json()
+            retrieved_run = storage.get_plan_run(plan_run.id)
+            assert retrieved_run.id == plan_run.id
+            mock_redis.get.assert_called_once_with(f"portia:run:{plan_run.id}")
+
+            # Test get_plan_run when run doesn't exist
+            mock_redis.get.return_value = None
+            from portia.errors import PlanRunNotFoundError
+
+            with pytest.raises(PlanRunNotFoundError):
+                storage.get_plan_run(PlanRunUUID())
+
+
+def test_redis_storage_plan_exists() -> None:
+    """Test RedisStorage plan_exists method."""
+    with patch("portia.storage.REDIS_AVAILABLE", True):
+        mock_redis = MagicMock()
+        mock_redis.from_url.return_value = mock_redis
+        mock_redis_async = MagicMock()
+        mock_redis_async.from_url.return_value = mock_redis_async
+
+        with (
+            patch("portia.storage.redis", mock_redis),
+            patch("portia.storage.redis_async", mock_redis_async),
+        ):
+            storage = RedisStorage(redis_url="redis://localhost:6379/0")
+            plan, _ = get_test_plan_run()
+
+            # Test when plan exists
+            mock_redis.exists.return_value = 1
+            assert storage.plan_exists(plan.id) is True
+            mock_redis.exists.assert_called_once_with(f"portia:plan:{plan.id}")
+
+            # Test when plan doesn't exist
+            mock_redis.exists.return_value = 0
+            assert storage.plan_exists(PlanUUID()) is False
+
+
+def test_redis_storage_get_plan_runs() -> None:
+    """Test RedisStorage get_plan_runs method."""
+    with patch("portia.storage.REDIS_AVAILABLE", True):
+        mock_redis = MagicMock()
+        mock_redis.from_url.return_value = mock_redis
+        mock_redis_async = MagicMock()
+        mock_redis_async.from_url.return_value = mock_redis_async
+
+        with (
+            patch("portia.storage.redis", mock_redis),
+            patch("portia.storage.redis_async", mock_redis_async),
+        ):
+            storage = RedisStorage(redis_url="redis://localhost:6379/0")
+            plan, plan_run = get_test_plan_run()
+
+            # Mock scan_iter to return run keys
+            mock_redis.scan_iter.return_value = [f"portia:run:{plan_run.id}"]
+            mock_redis.get.return_value = plan_run.model_dump_json()
+
+            result = storage.get_plan_runs()
+            assert len(result.results) == 1
+            assert result.results[0].id == plan_run.id
+            assert result.count == 1
+
+
+def test_redis_storage_output() -> None:
+    """Test RedisStorage save_plan_run_output and get_plan_run_output methods."""
+    with patch("portia.storage.REDIS_AVAILABLE", True):
+        mock_redis = MagicMock()
+        mock_redis.from_url.return_value = mock_redis
+        mock_redis_async = MagicMock()
+        mock_redis_async.from_url.return_value = mock_redis_async
+
+        with (
+            patch("portia.storage.redis", mock_redis),
+            patch("portia.storage.redis_async", mock_redis_async),
+        ):
+            storage = RedisStorage(redis_url="redis://localhost:6379/0")
+            plan, plan_run = get_test_plan_run()
+            output = LocalDataValue(value="test value", summary="test summary")
+
+            # Test save_plan_run_output
+            result = storage.save_plan_run_output("test_output", output, plan_run.id)
+            assert isinstance(result, AgentMemoryValue)
+            assert result.output_name == "test_output"
+            assert result.plan_run_id == plan_run.id
+            mock_redis.set.assert_called_once_with(
+                f"portia:output:{plan_run.id}:test_output",
+                output.model_dump_json(),
+            )
+
+            # Test get_plan_run_output
+            mock_redis.get.return_value = output.model_dump_json()
+            retrieved_output = storage.get_plan_run_output("test_output", plan_run.id)
+            assert retrieved_output.value == output.value
+            assert retrieved_output.summary == output.summary
+
+
+def test_redis_storage_end_user() -> None:
+    """Test RedisStorage end user methods."""
+    with patch("portia.storage.REDIS_AVAILABLE", True):
+        mock_redis = MagicMock()
+        mock_redis.from_url.return_value = mock_redis
+        mock_redis_async = MagicMock()
+        mock_redis_async.from_url.return_value = mock_redis_async
+
+        with (
+            patch("portia.storage.redis", mock_redis),
+            patch("portia.storage.redis_async", mock_redis_async),
+        ):
+            storage = RedisStorage(redis_url="redis://localhost:6379/0")
+            end_user = EndUser(
+                external_id="123",
+                additional_data={"favorite_sport": "football"},
+            )
+
+            # Test save_end_user (no existing user)
+            mock_redis.get.return_value = None
+            saved_user = storage.save_end_user(end_user)
+            assert saved_user.external_id == "123"
+            mock_redis.set.assert_called_once_with(
+                "portia:user:123",
+                end_user.model_dump_json(),
+            )
+
+            # Test get_end_user
+            mock_redis.get.return_value = end_user.model_dump_json()
+            retrieved_user = storage.get_end_user("123")
+            assert retrieved_user is not None
+            assert retrieved_user.external_id == "123"
+            assert retrieved_user.get_additional_data("favorite_sport") == "football"
+
+            # Test get_end_user when user doesn't exist
+            mock_redis.get.return_value = None
+            assert storage.get_end_user("nonexistent") is None
+
+
+def test_redis_storage_not_available() -> None:
+    """Test RedisStorage raises ImportError when redis is not available."""
+    with patch("portia.storage.REDIS_AVAILABLE", False):
+        with pytest.raises(ImportError, match="Redis package is not installed"):
+            RedisStorage(redis_url="redis://localhost:6379/0")

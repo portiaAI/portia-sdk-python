@@ -48,12 +48,14 @@ class StorageClass(Enum):
         MEMORY: Stored in memory.
         DISK: Stored on disk.
         CLOUD: Stored in the cloud.
+        REDIS: Stored in Redis.
 
     """
 
     MEMORY = "MEMORY"
     DISK = "DISK"
     CLOUD = "CLOUD"
+    REDIS = "REDIS"
 
 
 class Model(NamedTuple):
@@ -565,6 +567,12 @@ class Config(BaseModel):
         "and runs are written in a JSON format.",
     )
 
+    storage_redis_url: str | None = Field(
+        default_factory=lambda: os.getenv("PORTIA_STORAGE_REDIS_URL"),
+        description="Redis URL for storage when storage_class is set to REDIS. "
+        "Format: redis://[[username]:[password]]@localhost:6379/0",
+    )
+
     # Logging Options
 
     # default_log_level controls the minimal log level, i.e. setting to DEBUG will print all logs
@@ -741,6 +749,14 @@ class Config(BaseModel):
                 "A Portia API key must be provided if using cloud storage. Follow the steps at "
                 "https://docs.portialabs.ai/setup-account to obtain one if you don't already "
                 "have one",
+            )
+
+        # Redis URL must be provided if using Redis storage
+        if self.storage_class == StorageClass.REDIS and not self.storage_redis_url:
+            raise InvalidConfigError(
+                "storage_redis_url",
+                "A Redis URL must be provided if using Redis storage via PORTIA_STORAGE_REDIS_URL "
+                "environment variable or storage_redis_url config parameter",
             )
 
         # Check that all models passed as strings are instantiable, i.e. they have the
