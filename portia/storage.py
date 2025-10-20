@@ -2,9 +2,9 @@
 
 This module defines a set of storage classes that provide different backends for saving, retrieving,
 and managing plans, runs, and tool calls. These storage classes include both in-memory and
-file-based storage, as well as integration with the Portia Cloud API. Each class is responsible
-for handling interactions with its respective storage medium, including validating responses
-and raising appropriate exceptions when necessary.
+file-based storage, as well as integration with the Portia Cloud API and Redis. Each class is
+responsible for handling interactions with its respective storage medium, including validating
+responses and raising appropriate exceptions when necessary.
 
 Classes:
     - Storage (Base Class): A base class that defines common interfaces for all storage types,
@@ -15,9 +15,12 @@ Classes:
       and tool calls as local files in the filesystem.
     - PortiaCloudStorage: A cloud-based implementation of the `Storage` class that interacts with
     the Portia Cloud API to save and retrieve plans, runs, and tool call records.
+    - RedisStorage: A Redis-based implementation of the `Storage` class for storing plans, runs,
+    and tool calls in Redis. Provides high-performance, persistent, and network-accessible storage
+    suitable for distributed systems.
 
 Each storage class handles the following tasks:
-    - Sending and receiving data to its respective storage medium - memory, file system, or API.
+    - Sending and receiving data to its respective storage medium - memory, file system, Redis, or API.
     - Validating responses from storage and raising errors when necessary.
     - Handling exceptions and re-raising them as custom `StorageError` exceptions to provide
     more informative error handling.
@@ -60,6 +63,17 @@ if TYPE_CHECKING:
     from portia.config import Config
 
 T = TypeVar("T", bound=BaseModel)
+
+# Try to import redis, but allow it to be optional
+try:
+    import redis
+    import redis.asyncio as redis_async
+
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None  # type: ignore
+    redis_async = None  # type: ignore
 
 
 class PlanStorage(ABC):
@@ -1945,3 +1959,626 @@ class PortiaCloudStorage(Storage):
                 phone_number=response_json["phone_number"],
                 additional_data=response_json["additional_data"],
             )
+
+
+class RedisStorage(Storage):
+    """Redis-based implementation of the Storage interface.
+
+    Stores serialized Plan and Run objects as JSON strings in Redis.
+    Provides a high-performance, persistent, and network-accessible storage option
+    suitable for distributed systems and multi-instance deployments.
+    """
+
+    def __init__(self, redis_url: str) -> None:
+        """Initialize the RedisStorage instance.
+
+        Args:
+            redis_url (str): The Redis connection URL (e.g., "redis://localhost:6379/0").
+
+        Raises:
+            ImportError: If redis package is not installed.
+
+        """
+        if not REDIS_AVAILABLE:
+            raise ImportError(
+                "Redis package is not installed. Install it with: pip install portia-sdk-python[cache]"
+            )
+
+        self.redis_url = redis_url
+        # Create sync and async clients
+        self._sync_client = redis.from_url(redis_url, decode_responses=True)
+        self._async_client = redis_async.from_url(redis_url, decode_responses=True)
+
+    def _plan_key(self, plan_id: PlanUUID) -> str:
+        """Generate Redis key for a plan.
+
+        Args:
+            plan_id (PlanUUID): The plan ID.
+
+        Returns:
+            str: The Redis key for the plan.
+
+        """
+        return f"portia:plan:{plan_id}"
+
+    def _run_key(self, run_id: PlanRunUUID) -> str:
+        """Generate Redis key for a plan run.
+
+        Args:
+            run_id (PlanRunUUID): The plan run ID.
+
+        Returns:
+            str: The Redis key for the plan run.
+
+        """
+        return f"portia:run:{run_id}"
+
+    def _output_key(self, plan_run_id: PlanRunUUID, output_name: str) -> str:
+        """Generate Redis key for a plan run output.
+
+        Args:
+            plan_run_id (PlanRunUUID): The plan run ID.
+            output_name (str): The output name.
+
+        Returns:
+            str: The Redis key for the output.
+
+        """
+        return f"portia:output:{plan_run_id}:{output_name}"
+
+    def _end_user_key(self, external_id: str) -> str:
+        """Generate Redis key for an end user.
+
+        Args:
+            external_id (str): The external ID of the end user.
+
+        Returns:
+            str: The Redis key for the end user.
+
+        """
+        return f"portia:user:{external_id}"
+
+    def save_plan(self, plan: Plan) -> None:
+        """Save a Plan object to Redis.
+
+        Args:
+            plan (Plan): The Plan object to save.
+
+        Raises:
+            StorageError: If the save operation fails.
+
+        """
+        try:
+            key = self._plan_key(plan.id)
+            value = plan.model_dump_json()
+            self._sync_client.set(key, value)
+            logger().debug(f"Saved plan {plan.id} to Redis")
+        except Exception as e:
+            raise StorageError(f"Failed to save plan to Redis: {e}") from e
+
+    async def asave_plan(self, plan: Plan) -> None:
+        """Save a Plan object to Redis asynchronously.
+
+        Args:
+            plan (Plan): The Plan object to save.
+
+        Raises:
+            StorageError: If the save operation fails.
+
+        """
+        try:
+            key = self._plan_key(plan.id)
+            value = plan.model_dump_json()
+            await self._async_client.set(key, value)
+            logger().debug(f"Saved plan {plan.id} to Redis (async)")
+        except Exception as e:
+            raise StorageError(f"Failed to save plan to Redis: {e}") from e
+
+    def get_plan(self, plan_id: PlanUUID) -> Plan:
+        """Retrieve a Plan object by its ID.
+
+        Args:
+            plan_id (PlanUUID): The ID of the Plan to retrieve.
+
+        Returns:
+            Plan: The retrieved Plan object.
+
+        Raises:
+            PlanNotFoundError: If the Plan is not found or validation fails.
+
+        """
+        try:
+            key = self._plan_key(plan_id)
+            value = self._sync_client.get(key)
+            if value is None:
+                raise PlanNotFoundError(plan_id)
+            return Plan.model_validate_json(value)
+        except PlanNotFoundError:
+            raise
+        except Exception as e:
+            raise PlanNotFoundError(plan_id) from e
+
+    async def aget_plan(self, plan_id: PlanUUID) -> Plan:
+        """Retrieve a Plan object by its ID asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The ID of the Plan to retrieve.
+
+        Returns:
+            Plan: The retrieved Plan object.
+
+        Raises:
+            PlanNotFoundError: If the Plan is not found or validation fails.
+
+        """
+        try:
+            key = self._plan_key(plan_id)
+            value = await self._async_client.get(key)
+            if value is None:
+                raise PlanNotFoundError(plan_id)
+            return Plan.model_validate_json(value)
+        except PlanNotFoundError:
+            raise
+        except Exception as e:
+            raise PlanNotFoundError(plan_id) from e
+
+    def get_plan_by_query(self, query: str) -> Plan:
+        """Get a plan by query.
+
+        This scans all plans and returns the first one matching the query.
+
+        Args:
+            query (str): The query to get a plan for.
+
+        Returns:
+            Plan: The plan matching the query.
+
+        Raises:
+            StorageError: If no plan is found for the query.
+
+        """
+        try:
+            # Scan for all plan keys
+            for key in self._sync_client.scan_iter(match="portia:plan:*"):
+                value = self._sync_client.get(key)
+                if value:
+                    plan = Plan.model_validate_json(value)
+                    if plan.plan_context.query == query:
+                        return plan
+            raise StorageError(f"No plan found for query: {query}")
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to get plan by query: {e}") from e
+
+    async def aget_plan_by_query(self, query: str) -> Plan:
+        """Get a plan by query asynchronously.
+
+        This scans all plans and returns the first one matching the query.
+
+        Args:
+            query (str): The query to get a plan for.
+
+        Returns:
+            Plan: The plan matching the query.
+
+        Raises:
+            StorageError: If no plan is found for the query.
+
+        """
+        try:
+            # Scan for all plan keys
+            async for key in self._async_client.scan_iter(match="portia:plan:*"):
+                value = await self._async_client.get(key)
+                if value:
+                    plan = Plan.model_validate_json(value)
+                    if plan.plan_context.query == query:
+                        return plan
+            raise StorageError(f"No plan found for query: {query}")
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to get plan by query: {e}") from e
+
+    def plan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists in Redis.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        try:
+            key = self._plan_key(plan_id)
+            return bool(self._sync_client.exists(key))
+        except Exception:
+            return False
+
+    async def aplan_exists(self, plan_id: PlanUUID) -> bool:
+        """Check if a plan exists in Redis asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to check.
+
+        Returns:
+            bool: True if the plan exists, False otherwise.
+
+        """
+        try:
+            key = self._plan_key(plan_id)
+            return bool(await self._async_client.exists(key))
+        except Exception:
+            return False
+
+    def save_plan_run(self, plan_run: PlanRun) -> None:
+        """Save a PlanRun object to Redis.
+
+        Args:
+            plan_run (PlanRun): The PlanRun object to save.
+
+        Raises:
+            StorageError: If the save operation fails.
+
+        """
+        try:
+            key = self._run_key(plan_run.id)
+            value = plan_run.model_dump_json()
+            self._sync_client.set(key, value)
+            logger().debug(f"Saved plan run {plan_run.id} to Redis")
+        except Exception as e:
+            raise StorageError(f"Failed to save plan run to Redis: {e}") from e
+
+    async def asave_plan_run(self, plan_run: PlanRun) -> None:
+        """Save a PlanRun object to Redis asynchronously.
+
+        Args:
+            plan_run (PlanRun): The PlanRun object to save.
+
+        Raises:
+            StorageError: If the save operation fails.
+
+        """
+        try:
+            key = self._run_key(plan_run.id)
+            value = plan_run.model_dump_json()
+            await self._async_client.set(key, value)
+            logger().debug(f"Saved plan run {plan_run.id} to Redis (async)")
+        except Exception as e:
+            raise StorageError(f"Failed to save plan run to Redis: {e}") from e
+
+    def get_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+        """Retrieve a PlanRun object by its ID.
+
+        Args:
+            plan_run_id (PlanRunUUID): The ID of the PlanRun to retrieve.
+
+        Returns:
+            PlanRun: The retrieved PlanRun object.
+
+        Raises:
+            PlanRunNotFoundError: If the PlanRun is not found or validation fails.
+
+        """
+        try:
+            key = self._run_key(plan_run_id)
+            value = self._sync_client.get(key)
+            if value is None:
+                raise PlanRunNotFoundError(plan_run_id)
+            return PlanRun.model_validate_json(value)
+        except PlanRunNotFoundError:
+            raise
+        except Exception as e:
+            raise PlanRunNotFoundError(plan_run_id) from e
+
+    async def aget_plan_run(self, plan_run_id: PlanRunUUID) -> PlanRun:
+        """Retrieve a PlanRun object by its ID asynchronously.
+
+        Args:
+            plan_run_id (PlanRunUUID): The ID of the PlanRun to retrieve.
+
+        Returns:
+            PlanRun: The retrieved PlanRun object.
+
+        Raises:
+            PlanRunNotFoundError: If the PlanRun is not found or validation fails.
+
+        """
+        try:
+            key = self._run_key(plan_run_id)
+            value = await self._async_client.get(key)
+            if value is None:
+                raise PlanRunNotFoundError(plan_run_id)
+            return PlanRun.model_validate_json(value)
+        except PlanRunNotFoundError:
+            raise
+        except Exception as e:
+            raise PlanRunNotFoundError(plan_run_id) from e
+
+    def get_plan_runs(
+        self,
+        run_state: PlanRunState | None = None,
+        page: int | None = None,  # noqa: ARG002
+    ) -> PlanRunListResponse:
+        """Find all plan runs in storage that match state.
+
+        Args:
+            run_state (PlanRunState | None): Optionally filter runs by their state.
+            page (int | None): Optional pagination data (not used for Redis storage).
+
+        Returns:
+            PlanRunListResponse: A response containing the matching plan runs.
+
+        """
+        try:
+            plan_runs = []
+            for key in self._sync_client.scan_iter(match="portia:run:*"):
+                value = self._sync_client.get(key)
+                if value:
+                    plan_run = PlanRun.model_validate_json(value)
+                    if not run_state or plan_run.state == run_state:
+                        plan_runs.append(plan_run)
+
+            return PlanRunListResponse(
+                results=plan_runs,
+                count=len(plan_runs),
+                current_page=1,
+                total_pages=1,
+            )
+        except Exception as e:
+            raise StorageError(f"Failed to get plan runs from Redis: {e}") from e
+
+    async def aget_plan_runs(
+        self,
+        run_state: PlanRunState | None = None,
+        page: int | None = None,  # noqa: ARG002
+    ) -> PlanRunListResponse:
+        """Find all plan runs in storage that match state asynchronously.
+
+        Args:
+            run_state (PlanRunState | None): Optionally filter runs by their state.
+            page (int | None): Optional pagination data (not used for Redis storage).
+
+        Returns:
+            PlanRunListResponse: A response containing the matching plan runs.
+
+        """
+        try:
+            plan_runs = []
+            async for key in self._async_client.scan_iter(match="portia:run:*"):
+                value = await self._async_client.get(key)
+                if value:
+                    plan_run = PlanRun.model_validate_json(value)
+                    if not run_state or plan_run.state == run_state:
+                        plan_runs.append(plan_run)
+
+            return PlanRunListResponse(
+                results=plan_runs,
+                count=len(plan_runs),
+                current_page=1,
+                total_pages=1,
+            )
+        except Exception as e:
+            raise StorageError(f"Failed to get plan runs from Redis: {e}") from e
+
+    def save_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> Output:
+        """Save Output from a plan run to Redis.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        Returns:
+            Output: An AgentMemoryValue reference to the stored output.
+
+        """
+        try:
+            _check_size(output_name, output)
+            if output.get_summary() is None:
+                logger().warning(f"Storing Output {output} with no summary")
+            if not isinstance(output, LocalDataValue):
+                logger().warning(f"Storing output that is already in agent memory: {output}")
+                return output
+
+            key = self._output_key(plan_run_id, output_name)
+            value = output.model_dump_json()
+            self._sync_client.set(key, value)
+
+            return AgentMemoryValue(
+                output_name=output_name,
+                plan_run_id=plan_run_id,
+                summary=output.get_summary() or "",
+            )
+        except Exception as e:
+            raise StorageError(f"Failed to save plan run output to Redis: {e}") from e
+
+    async def asave_plan_run_output(
+        self,
+        output_name: str,
+        output: Output,
+        plan_run_id: PlanRunUUID,
+    ) -> Output:
+        """Save Output from a plan run to Redis asynchronously.
+
+        Args:
+            output_name (str): The name of the output within the plan
+            output (Output): The Output object to save
+            plan_run_id (PlanRunUUID): The ID of the current plan run
+
+        Returns:
+            Output: An AgentMemoryValue reference to the stored output.
+
+        """
+        try:
+            _check_size(output_name, output)
+            if output.get_summary() is None:
+                logger().warning(f"Storing Output {output} with no summary")
+            if not isinstance(output, LocalDataValue):
+                logger().warning(f"Storing output that is already in agent memory: {output}")
+                return output
+
+            key = self._output_key(plan_run_id, output_name)
+            value = output.model_dump_json()
+            await self._async_client.set(key, value)
+
+            return AgentMemoryValue(
+                output_name=output_name,
+                plan_run_id=plan_run_id,
+                summary=output.get_summary() or "",
+            )
+        except Exception as e:
+            raise StorageError(f"Failed to save plan run output to Redis: {e}") from e
+
+    def get_plan_run_output(self, output_name: str, plan_run_id: PlanRunUUID) -> LocalDataValue:
+        """Retrieve an Output from Redis.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            LocalDataValue: The retrieved Output object
+
+        Raises:
+            StorageError: If the output is not found or deserialization fails
+
+        """
+        try:
+            key = self._output_key(plan_run_id, output_name)
+            value = self._sync_client.get(key)
+            if value is None:
+                raise StorageError(f"Output {output_name} not found for plan run {plan_run_id}")
+            return LocalDataValue.model_validate_json(value)
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to get plan run output from Redis: {e}") from e
+
+    async def aget_plan_run_output(
+        self, output_name: str, plan_run_id: PlanRunUUID
+    ) -> LocalDataValue:
+        """Retrieve an Output from Redis asynchronously.
+
+        Args:
+            output_name (str): The name of the output to retrieve
+            plan_run_id (PlanRunUUID): The ID of the plan run
+
+        Returns:
+            LocalDataValue: The retrieved Output object
+
+        Raises:
+            StorageError: If the output is not found or deserialization fails
+
+        """
+        try:
+            key = self._output_key(plan_run_id, output_name)
+            value = await self._async_client.get(key)
+            if value is None:
+                raise StorageError(f"Output {output_name} not found for plan run {plan_run_id}")
+            return LocalDataValue.model_validate_json(value)
+        except StorageError:
+            raise
+        except Exception as e:
+            raise StorageError(f"Failed to get plan run output from Redis: {e}") from e
+
+    def save_tool_call(self, tool_call: ToolCallRecord) -> None:
+        """Log the tool call (same as InMemoryStorage).
+
+        Args:
+            tool_call (ToolCallRecord): The ToolCallRecord object to log.
+
+        """
+        return log_tool_call(tool_call)
+
+    def save_end_user(self, end_user: EndUser) -> EndUser:
+        """Save an end user to Redis.
+
+        Args:
+            end_user (EndUser): The EndUser object to save.
+
+        Returns:
+            EndUser: The saved EndUser object with merged additional data.
+
+        """
+        try:
+            existing_end_user = self.get_end_user(end_user.external_id)
+            if existing_end_user:
+                end_user.additional_data = {
+                    **existing_end_user.additional_data,
+                    **end_user.additional_data,
+                }
+            key = self._end_user_key(end_user.external_id)
+            value = end_user.model_dump_json()
+            self._sync_client.set(key, value)
+            return end_user
+        except Exception as e:
+            raise StorageError(f"Failed to save end user to Redis: {e}") from e
+
+    async def asave_end_user(self, end_user: EndUser) -> EndUser:
+        """Save an end user to Redis asynchronously.
+
+        Args:
+            end_user (EndUser): The EndUser object to save.
+
+        Returns:
+            EndUser: The saved EndUser object with merged additional data.
+
+        """
+        try:
+            existing_end_user = await self.aget_end_user(end_user.external_id)
+            if existing_end_user:
+                end_user.additional_data = {
+                    **existing_end_user.additional_data,
+                    **end_user.additional_data,
+                }
+            key = self._end_user_key(end_user.external_id)
+            value = end_user.model_dump_json()
+            await self._async_client.set(key, value)
+            return end_user
+        except Exception as e:
+            raise StorageError(f"Failed to save end user to Redis: {e}") from e
+
+    def get_end_user(self, external_id: str) -> EndUser | None:
+        """Get an end user from Redis.
+
+        Args:
+            external_id (str): The id of the end user to get.
+
+        Returns:
+            EndUser | None: The EndUser object or None if not found.
+
+        """
+        try:
+            key = self._end_user_key(external_id)
+            value = self._sync_client.get(key)
+            if value is None:
+                return None
+            return EndUser.model_validate_json(value)
+        except Exception:
+            return None
+
+    async def aget_end_user(self, external_id: str) -> EndUser | None:
+        """Get an end user from Redis asynchronously.
+
+        Args:
+            external_id (str): The id of the end user to get.
+
+        Returns:
+            EndUser | None: The EndUser object or None if not found.
+
+        """
+        try:
+            key = self._end_user_key(external_id)
+            value = await self._async_client.get(key)
+            if value is None:
+                return None
+            return EndUser.model_validate_json(value)
+        except Exception:
+            return None
