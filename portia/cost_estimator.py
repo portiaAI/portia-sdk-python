@@ -23,7 +23,6 @@ from portia.config import Config
 from portia.end_user import EndUser
 from portia.logger import logger
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, Step
 from portia.plan_run import PlanRun, PlanRunState
 from portia.token_check import estimate_tokens
 from portia.tool import ToolRunContext
@@ -120,7 +119,7 @@ Please provide your estimate with a brief explanation of your reasoning.
         self.config = config or Config.from_default()
         self.estimation_tool = LLMTool(structured_output_schema=LLMEstimationResult)
 
-    def plan_estimate(self, plan: Plan | PlanV2) -> PlanCostEstimate:
+    def plan_estimate(self, plan: PlanV2) -> PlanCostEstimate:
         """Estimate the cost of running a plan.
 
         Args:
@@ -132,11 +131,9 @@ Please provide your estimate with a brief explanation of your reasoning.
         """
         logger().info("Starting cost estimation for plan")
 
-        if isinstance(plan, Plan):
-            return self._estimate_v1_plan(plan)
         return self._estimate_v2_plan(plan)
 
-    async def aplan_estimate(self, plan: Plan | PlanV2) -> PlanCostEstimate:
+    async def aplan_estimate(self, plan: PlanV2) -> PlanCostEstimate:
         """Asynchronously estimate the cost of running a plan.
 
         Args:
@@ -147,27 +144,6 @@ Please provide your estimate with a brief explanation of your reasoning.
 
         """
         return await asyncio.to_thread(self.plan_estimate, plan)
-
-    def _estimate_v1_plan(self, plan: Plan) -> PlanCostEstimate:
-        """Estimate costs for a V1 plan."""
-        step_estimates = []
-        total_cost = 0.0
-
-        execution_model = self.config.get_execution_model()
-        model_name = execution_model.model_name if execution_model else "gpt-4o"
-
-        for step in plan.steps:
-            estimate = self._estimate_v1_step_cost(step, model_name)
-            step_estimates.append(estimate)
-            total_cost += estimate.estimated_cost
-
-        return PlanCostEstimate(
-            total_estimated_cost=total_cost,
-            step_estimates=step_estimates,
-            model_used=model_name,
-            methodology=self._get_methodology_explanation(),
-            limitations=self._get_limitations_explanation(),
-        )
 
     def _estimate_v2_plan(self, plan: PlanV2) -> PlanCostEstimate:
         """Estimate costs for a V2 plan."""
@@ -188,66 +164,6 @@ Please provide your estimate with a brief explanation of your reasoning.
             model_used=model_name,
             methodology=self._get_methodology_explanation(),
             limitations=self._get_limitations_explanation(),
-        )
-
-    def _estimate_v1_step_cost(self, step: Step, model_name: str) -> StepCostEstimate:
-        """Estimate cost for a V1 plan step."""
-        step_name = f"Step {step.output}"
-        step_type = "V1Step"
-        task = step.task
-
-        tools = step.tool_id or ""
-        input_context_tokens = estimate_tokens(task) + 500  # Base context estimation
-
-        estimation_result = self._get_llm_estimation(
-            "ExecutionAgentStep", task, model_name, tools, input_context_tokens
-        )
-
-        base_cost = self._calculate_cost(
-            estimation_result["estimated_input_tokens"] * estimation_result["number_of_llm_calls"],
-            estimation_result["estimated_output_tokens"] * estimation_result["number_of_llm_calls"],
-            model_name,
-        )
-
-        has_condition = step.condition is not None
-        introspection_cost = 0.0
-
-        if has_condition:
-            introspection_model = self.config.get_introspection_model()
-            if introspection_model is not None:
-                introspection_model_name = introspection_model.model_name
-                introspection_cost = self._calculate_introspection_cost(
-                    introspection_model_name
-                )  # pragma: no cover
-            else:
-                default_model = self.config.get_default_model()  # pragma: no cover
-                introspection_model_name = (
-                    default_model.model_name if default_model else "gpt-4o"
-                )  # pragma: no cover
-                introspection_cost = self._calculate_introspection_cost(
-                    introspection_model_name
-                )  # pragma: no cover
-
-        total_cost = base_cost + introspection_cost
-
-        return StepCostEstimate(
-            step_name=step_name,
-            step_type=step_type,
-            estimated_input_tokens=estimation_result["estimated_input_tokens"]
-            * estimation_result["number_of_llm_calls"],
-            estimated_output_tokens=estimation_result["estimated_output_tokens"]
-            * estimation_result["number_of_llm_calls"],
-            estimated_cost=total_cost,
-            cost_breakdown={"execution": base_cost, "introspection": introspection_cost},
-            explanation=(
-                f"LLM-driven estimation for V1 step: "
-                f"{estimation_result['estimated_input_tokens']} input x "
-                f"{estimation_result['number_of_llm_calls']} calls + "
-                f"{estimation_result['estimated_output_tokens']} output x "
-                f"{estimation_result['number_of_llm_calls']} calls"
-            ),
-            has_condition=has_condition,
-            introspection_cost=introspection_cost,
         )
 
     def _estimate_v2_step_cost(self, step: StepV2, model_name: str) -> StepCostEstimate:
@@ -334,9 +250,8 @@ Please provide your estimate with a brief explanation of your reasoning.
         self, step_type: str, task: str, model_name: str, tools: str, input_context_tokens: int
     ) -> dict[str, Any]:
         """Use LLM to estimate token usage for a step."""
-        plan = Plan(
-            plan_context=PlanContext(query="cost_estimation", tool_ids=[]),
-            plan_inputs=[],
+        plan = PlanV2(
+            label="cost_estimation",
             steps=[],
         )
 

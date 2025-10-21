@@ -14,6 +14,7 @@ from portia.planning_agents.base_planning_agent import BasePlanningAgent, StepsO
 from portia.planning_agents.context import render_prompt_insert_defaults
 
 if TYPE_CHECKING:
+    from portia.builder.plan_v2 import PlanV2
     from portia.config import Config
     from portia.end_user import EndUser
     from portia.plan import Plan, PlanInput, Step
@@ -80,7 +81,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
         query: str,
         tool_list: list[Tool],
         end_user: EndUser,
-        examples: list[Plan] | None = None,
+        examples: list[PlanV2 | Plan] | None = None,
         plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""
@@ -171,7 +172,7 @@ class DefaultPlanningAgent(BasePlanningAgent):
         query: str,
         tool_list: list[Tool],
         end_user: EndUser,
-        examples: list[Plan] | None = None,
+        examples: list[PlanV2 | Plan] | None = None,
         plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
         """Generate a plan or error using an LLM from a query and a list of tools."""

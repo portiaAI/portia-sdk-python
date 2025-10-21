@@ -9,6 +9,7 @@ from portia.templates.example_plans import DEFAULT_EXAMPLE_PLANS
 from portia.templates.render import render_template
 
 if TYPE_CHECKING:
+    from portia.builder.plan_v2 import PlanV2
     from portia.end_user import EndUser
     from portia.plan import Plan, PlanInput
     from portia.tool import Tool
@@ -18,7 +19,7 @@ def render_prompt_insert_defaults(
     query: str,
     tool_list: list[Tool],
     end_user: EndUser,
-    examples: list[Plan] | None = None,
+    examples: list[PlanV2 | Plan] | None = None,
     plan_inputs: list[PlanInput] | None = None,
     previous_errors: list[str] | None = None,
 ) -> str:

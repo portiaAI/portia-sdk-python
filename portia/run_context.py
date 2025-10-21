@@ -8,7 +8,6 @@ from portia.builder.plan_v2 import PlanV2
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_hooks import ExecutionHooks
-from portia.plan import Plan
 from portia.plan_run import PlanRun
 from portia.storage import Storage
 from portia.telemetry.telemetry_service import BaseProductTelemetry
@@ -31,7 +30,6 @@ class RunContext(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     plan: PlanV2 = Field(description="The Portia plan being executed.")
-    legacy_plan: Plan = Field(description="The legacy plan representation.")
     plan_run: PlanRun = Field(description="The current plan run instance.")
     end_user: EndUser = Field(description="The end user executing the plan.")
     step_output_values: list[StepOutputValue] = Field(
@@ -48,7 +46,7 @@ class RunContext(BaseModel):
         return ToolRunContext(
             end_user=self.end_user,
             plan_run=self.plan_run,
-            plan=self.legacy_plan,
+            plan=self.plan,
             config=self.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )

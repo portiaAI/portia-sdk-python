@@ -37,15 +37,15 @@ Use the following information to construct a plan in response to the following u
     <Example>
         <Request>
             <Tools>
-                {{example.plan_context.tool_ids | safe }}
+                {% if example.plan_context is defined %}{{example.plan_context.tool_ids | safe }}{% else %}{{ example.steps | map(attribute='tool_id') | select | list | unique | sort }}{% endif %}
             </Tools>
             <Query>
-                {{example.plan_context.query}}
+                {% if example.plan_context is defined %}{{example.plan_context.query}}{% else %}{{example.label}}{% endif %}
             </Query>
         </Request>
         <Response>
             [{% for step in example.steps %}
-                {{step.model_dump(exclude_none=True) | tojson}},
+                {% if step.to_legacy_step is defined %}{{step.to_legacy_step(example).model_dump(exclude_none=True) | tojson}},{% else %}{{step.model_dump(exclude_none=True) | tojson}},{% endif %}
             {% endfor %}]
         </Response>
     </Example>{% endfor %}
