@@ -394,9 +394,10 @@ def test_load_config_from_toml_handles_chained_config_not_found(
     config_file = tmp_path / "config.toml"
     config_file.write_text("[profile.default]\nkey = 'value'")
     loader = ConfigLoader(config_file=config_file)
+    
     def mock_raise_config_error(*_args: Any, **_kwargs: Any) -> Never:
         raise ConfigNotFoundError("mocked internal error")
-
+    
     monkeypatch.setattr(tomllib, "load", mock_raise_config_error)
     with pytest.raises(ConfigNotFoundError) as exc_info:
         loader.load_config_from_toml("default")
