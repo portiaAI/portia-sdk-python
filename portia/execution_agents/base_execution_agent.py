@@ -20,8 +20,9 @@ from portia.execution_agents.execution_utils import (
     is_soft_tool_error,
 )
 from portia.execution_agents.output import LocalDataValue
+from portia.builder.plan_v2 import PlanV2
 from portia.logger import logger
-from portia.plan import Plan, ReadOnlyStep, Step
+from portia.plan import ReadOnlyStep, Step
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.telemetry_service import ProductTelemetry
 
@@ -51,7 +52,7 @@ class BaseExecutionAgent:
 
     def __init__(
         self,
-        plan: Plan,
+        plan: PlanV2,
         plan_run: PlanRun,
         config: Config,
         end_user: EndUser,
@@ -67,7 +68,7 @@ class BaseExecutionAgent:
         of the execute_sync method.
 
         Args:
-            plan (Plan): The plan containing the steps.
+            plan (PlanV2): The plan containing the steps.
             plan_run (PlanRun): The run that contains the step and related data.
             config (Config): The configuration settings for the agent.
             end_user (EndUser): The end user for the execution.
@@ -85,11 +86,13 @@ class BaseExecutionAgent:
         self.execution_hooks = execution_hooks
         self.telemetry = ProductTelemetry()
         self.new_clarifications: list[Clarification] = []
+        # Convert PlanV2 to legacy steps for execution
+        self._legacy_steps = [step.to_legacy_step(plan) for step in plan.steps]
 
     @property
     def step(self) -> Step:
         """Get the current step from the plan."""
-        return self.plan.steps[self.plan_run.current_step_index]
+        return self._legacy_steps[self.plan_run.current_step_index]
 
     @abstractmethod
     def execute_sync(self) -> Output:

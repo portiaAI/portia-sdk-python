@@ -5,9 +5,9 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
 
+from portia.builder.plan_v2 import PlanV2
 from portia.common import PortiaEnum
 from portia.config import Config
-from portia.plan import Plan
 from portia.plan_run import PlanRun
 from portia.storage import AgentMemory
 
@@ -61,7 +61,7 @@ class BaseIntrospectionAgent(ABC):
     @abstractmethod
     def pre_step_introspection(
         self,
-        plan: Plan,
+        plan: PlanV2,
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """pre_step_introspection is introspection run before a plan happens.."""
@@ -69,7 +69,7 @@ class BaseIntrospectionAgent(ABC):
 
     async def apre_step_introspection(
         self,
-        plan: Plan,
+        plan: PlanV2,
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """pre_step_introspection is introspection run before a plan happens.."""
