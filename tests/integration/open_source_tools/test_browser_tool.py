@@ -65,6 +65,40 @@ def test_portia_run_query(
 
 @pytest.mark.daily
 @pytest.mark.flaky(reruns=3)
+def test_browser_tool_allowed_domains_blocks_invalid_url() -> None:
+    """Test that browser tool with allowed_domains blocks navigation to invalid domains."""
+    config = Config.from_default(
+        llm_provider=LLMProvider.ANTHROPIC,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    allowed_domains = ["portialabs.ai"]
+    browser_tool = BrowserTool(
+        infrastructure_option=BrowserInfrastructureOption.REMOTE,
+        allowed_domains=allowed_domains,
+    )
+    
+    tool_registry = ToolRegistry([browser_tool])
+    portia = Portia(config=config, tools=tool_registry)
+    
+    query = (
+        "Go to https://example.com and retrieve the page title"
+    )
+
+    plan_run = portia.run(query)
+    
+    final_output = plan_run.outputs.final_output
+    if final_output:
+        output_text = final_output.get_value().lower()
+        assert "example domain" not in output_text
+        assert "this domain is for use in illustrative examples" not in output_text
+    
+    assert plan_run.state in [PlanRunState.COMPLETE, PlanRunState.ERROR], \
+           f"Unexpected plan state: {plan_run.state}"
+
+
+@pytest.mark.daily
+@pytest.mark.flaky(reruns=3)
 def test_portia_run_query_multi_step() -> None:
     """Test running a query that passes data to the browser tool."""
     config = Config.from_default(
@@ -186,10 +220,8 @@ async def test_portia_arun_calls_browser_tool_arun() -> None:
         storage_class=StorageClass.MEMORY,
     )
 
-    # Reset tracking before test
     TestBrowserTool.reset_tracking()
 
-    # Create a test browser tool that tracks arun calls
     browser_tool = TestBrowserTool(infrastructure_option=BrowserInfrastructureOption.REMOTE)
 
     tool_registry = ToolRegistry([browser_tool])
@@ -200,13 +232,9 @@ async def test_portia_arun_calls_browser_tool_arun() -> None:
         "section of the homepage."
     )
 
-    # Call portia.arun which should internally call browser_tool.arun
     plan_run = await portia.arun(query)
 
-    # Verify that the browser tool's arun method was called
     assert TestBrowserTool.arun_called, "browser_tool.arun method was not called"
-
-    # Verify that the plan run completed successfully
     assert plan_run.state == PlanRunState.COMPLETE
     assert plan_run.outputs.final_output
     assert (
