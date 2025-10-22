@@ -616,7 +616,7 @@ class Config(BaseModel):
             return False
         return estimate_tokens(str(value)) > self.large_output_threshold_tokens
 
-    def get_agent_default_model(  # noqa: PLR0911, PLR0912
+    def get_agent_default_model(  # noqa: PLR0911, PLR0912 , C901
         self,
         agent_key: str,
         llm_provider: LLMProvider | None = None,
@@ -768,7 +768,7 @@ class Config(BaseModel):
         return default_config(**kwargs)
 
     @classmethod
-    def from_local_config(
+    def from_local_config(  # noqa: C901
         cls, profile: str = "default", config_file: Path | None = None, **overrides: Any
     ) -> Config:
         """Create Config instance from TOML profile with proper precedence.
@@ -1015,7 +1015,7 @@ class Config(BaseModel):
         llm_provider = LLMProvider(provider)
         return self._construct_model_from_name(llm_provider, model_name)
 
-    def _construct_model_from_name(  # noqa: PLR0911
+    def _construct_model_from_name(  # noqa: PLR0911, C901
         self,
         llm_provider: LLMProvider,
         model_name: str,
@@ -1149,7 +1149,7 @@ def llm_provider_default_from_api_keys(**kwargs) -> LLMProvider | None:  # noqa:
     return None
 
 
-def default_config(**kwargs) -> Config:  # noqa: ANN003, PLR0915, PLR0912
+def default_config(**kwargs) -> Config:  # noqa: ANN003, PLR0915, PLR0912, C901
     """Return default config with values that can be overridden.
 
     Returns:

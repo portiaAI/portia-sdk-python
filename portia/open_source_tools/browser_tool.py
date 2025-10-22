@@ -25,7 +25,7 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from browser_use import Agent, Browser, BrowserProfile, Controller
+from browser_use import Agent, Browser, BrowserConfig, Controller
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pydantic_core import PydanticUndefined
 
@@ -330,7 +330,7 @@ class BrowserTool(Tool[str | BaseModel]):
         llm = model.to_langchain()
         agent = Agent(
             task=task_description,
-            llm=llm,  # type: ignore[reportArgumentType]
+            llm=llm,
             browser=self.infrastructure_provider.setup_browser(ctx),
             controller=Controller(output_model=output_model),
         )
@@ -493,9 +493,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "end users and so will be ignored.",
             )
         return Browser(
-            profile=BrowserProfile(  # type: ignore[call-arg]
-                chrome_instance_path=self.chrome_path,  # type: ignore[call-arg]
-                extra_chromium_args=self.extra_chromium_args or [],  # type: ignore[call-arg]
+            config=BrowserConfig(
+                chrome_instance_path=self.chrome_path,
+                extra_chromium_args=self.extra_chromium_args or [],
             ),
         )
 
@@ -774,7 +774,9 @@ if BROWSERBASE_AVAILABLE:
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
             return Browser(
-                cdp_url=session_connect_url,
+                config=BrowserConfig(
+                    cdp_url=session_connect_url,
+                ),
             )
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
