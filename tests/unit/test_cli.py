@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+from portia.clarification_handler import ClarificationHandler  # noqa: F401
 from portia.cli import cli
 from portia.config import Config, StorageClass
 from portia.model import GenerativeModel, LLMProvider
