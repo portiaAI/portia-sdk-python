@@ -25,8 +25,8 @@ from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
-from browser_use import Agent, Browser, BrowserConfig, Controller
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from browser_use import Agent, Browser, BrowserConfig, BrowserContextConfig, Controller
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 from pydantic_core import PydanticUndefined
 
 from portia import logger
@@ -245,6 +245,55 @@ class BrowserTool(Tool[str | BaseModel]):
         description="Optional structured output schema for the browser tool's task output.",
     )
 
+    allowed_domains: list[str] | None = Field(
+        default=None,
+        description=(
+            "List of allowed domains for browser navigation. "
+            "If specified, navigation will be restricted to these domains only."
+        ),
+    )
+
+    @field_validator("allowed_domains", mode="before")
+    @classmethod
+    def validate_allowed_domains(cls, v: list[str] | None) -> list[str] | None:
+        """Validate and normalize allowed_domains field.
+
+        Args:
+            v: The value to validate, either a list of domain strings or None
+
+        Returns:
+            Validated and normalized list of domains or None
+
+        Raises:
+            ValueError: If v is not a list or None, or if any domain value is invalid
+
+        """
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            # For Pydantic-style field validation, prefer ValueError over TypeError
+            raise ValueError(  # noqa: TRY004
+                "allowed_domains must be a list of domain strings"
+            )
+        validated = []
+        for domain in v:
+            if not isinstance(domain, str) or not domain.strip():
+                raise ValueError(f"Invalid domain value: {domain}")
+            domain_clean = domain.strip().lower()
+            # Security warnings based on browser-use docs
+            if domain_clean == "*":
+                logger().warning(
+                    "Universal wildcard '*' allows access to ANY domain. "
+                    "This is extremely dangerous. Use specific domain patterns instead."
+                )
+            elif "*" in domain_clean:
+                logger().warning(
+                    f"Wildcard pattern '{domain_clean}' may match unintended domains. "
+                    "Per browser-use docs, be very cautious with wildcards."
+                )
+            validated.append(domain_clean)
+        return validated
+
     @cached_property
     def infrastructure_provider(self) -> BrowserInfrastructureProvider:
         """Get the infrastructure provider instance (cached)."""
@@ -328,16 +377,24 @@ class BrowserTool(Tool[str | BaseModel]):
     ) -> BM:
         model = ctx.config.get_generative_model(self.model) or ctx.config.get_default_model()
         llm = model.to_langchain()
+
+        browser = self.infrastructure_provider.setup_browser(
+            ctx, self.allowed_domains
+        )  # Pass allowed_domains
+
         agent = Agent(
             task=task_description,
             llm=llm,
-            browser=self.infrastructure_provider.setup_browser(ctx),
+            browser=browser,
             controller=Controller(output_model=output_model),
         )
+
         result = await agent.run()
         final_result = result.final_result()
+
         if not isinstance(final_result, str):
             raise ToolHardError(f"Expected final result to be a string, got {type(final_result)}")
+
         return output_model.model_validate(json.loads(final_result))
 
     def _handle_login_requirement(
@@ -447,7 +504,9 @@ class BrowserInfrastructureProvider(ABC):
     """Abstract base class for browser infrastructure providers."""
 
     @abstractmethod
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(
+        self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
+    ) -> Browser:
         """Get a Browser instance.
 
         This is called at the start of every step using this tool.
@@ -474,7 +533,9 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         self.chrome_path = chrome_path or self.get_chrome_instance_path()
         self.extra_chromium_args = extra_chromium_args or self.get_extra_chromium_args()
 
-    def setup_browser(self, ctx: ToolRunContext) -> Browser:
+    def setup_browser(
+        self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
+    ) -> Browser:
         """Get a Browser instance.
 
         Note: This provider does not support end_user_id.
@@ -482,6 +543,7 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
         Args:
             ctx (ToolRunContext): The context for the tool run, containing execution context
                 and other relevant information.
+            allowed_domains (list[str] | None): List of allowed domains for navigation restriction.
 
         Returns:
             Browser: A configured Browser instance for local browser automation.
@@ -492,12 +554,18 @@ class BrowserInfrastructureProviderLocal(BrowserInfrastructureProvider):
                 "BrowserTool is using a local browser instance and does not support "
                 "end users and so will be ignored.",
             )
-        return Browser(
-            config=BrowserConfig(
-                chrome_instance_path=self.chrome_path,
-                extra_chromium_args=self.extra_chromium_args or [],
-            ),
+
+        browser_config = BrowserConfig(
+            chrome_instance_path=self.chrome_path,
+            extra_chromium_args=self.extra_chromium_args or [],
         )
+
+        if allowed_domains:
+            browser_config.new_context_config = BrowserContextConfig(
+                allowed_domains=allowed_domains
+            )
+
+        return Browser(config=browser_config)
 
     def construct_auth_clarification_url(
         self,
@@ -758,7 +826,9 @@ if BROWSERBASE_AVAILABLE:
             live_view_link = self.bb.sessions.debug(session_id)
             return HttpUrl(live_view_link.pages[-1].debugger_fullscreen_url)
 
-        def setup_browser(self, ctx: ToolRunContext) -> Browser:
+        def setup_browser(
+            self, ctx: ToolRunContext, allowed_domains: list[str] | None = None
+        ) -> Browser:
             """Set up a Browser instance connected to BrowserBase.
 
             Creates or retrieves a BrowserBase session and configures a Browser instance
@@ -766,6 +836,8 @@ if BROWSERBASE_AVAILABLE:
 
             Args:
                 ctx (ToolRunContext): The tool run context containing execution information.
+                allowed_domains (list[str] | None): List of allowed domains for
+                    navigation restriction.
 
             Returns:
                 Browser: A configured Browser instance connected to the BrowserBase session.
@@ -773,11 +845,14 @@ if BROWSERBASE_AVAILABLE:
             """
             session_connect_url = self.get_or_create_session(ctx, self.bb)
 
-            return Browser(
-                config=BrowserConfig(
-                    cdp_url=session_connect_url,
-                ),
-            )
+            browser_config = BrowserConfig(cdp_url=session_connect_url)
+
+            if allowed_domains:
+                browser_config.new_context_config = BrowserContextConfig(
+                    allowed_domains=allowed_domains
+                )
+
+            return Browser(config=browser_config)
 
         def _is_first_browser_tool_call(self, plan_run: PlanRun, plan: Plan) -> bool:
             """Check if the current call is the first browser call in the plan run.
