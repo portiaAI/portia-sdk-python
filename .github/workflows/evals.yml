@@ -48,6 +48,7 @@ jobs:
           path: platform
           repository: portiaAI/platform
           token: ${{ secrets.PORTIA_GH_TOKEN }}
+          ref: main
 
       - name: Install UV
         run: pip install uv
@@ -190,14 +191,3 @@ jobs:
             echo "One or more evaluations failed."
             exit 1
           fi
-
-
-      - name: Setup Redis CLI
-        if: failure()
-        uses: shogo82148/actions-setup-redis@v1
-      - name: Clear LLM cache
-        if: failure()
-        working-directory: ./platform
-        run: |
-          echo "LLM_REDIS_CACHE_URL=${{ secrets.LLM_REDIS_CACHE_URL }}" > .env
-          ./scripts/clear_llm_cache.sh
