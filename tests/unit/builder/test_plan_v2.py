@@ -55,6 +55,7 @@ def test_initialization_default_values() -> None:
     assert plan.summarize is False
     assert plan.final_output_schema is None
     assert plan.label == "Run the plan built with the Plan Builder"
+    assert plan.is_upvoted is False
 
 
 def test_initialization_custom_values() -> None:
@@ -394,3 +395,36 @@ def test_pretty_plan() -> None:
 
     output = plan.pretty_print()
     assert isinstance(output, str)
+
+
+def test_is_upvoted_field() -> None:
+    """Test is_upvoted field."""
+    # Test default value
+    plan = PlanV2(steps=[])
+    assert plan.is_upvoted is False
+
+    # Test setting to True
+    plan_upvoted = PlanV2(steps=[], is_upvoted=True)
+    assert plan_upvoted.is_upvoted is True
+
+    # Test setting to False explicitly
+    plan_not_upvoted = PlanV2(steps=[], is_upvoted=False)
+    assert plan_not_upvoted.is_upvoted is False
+
+
+def test_is_upvoted_serialization() -> None:
+    """Test is_upvoted field serialization."""
+    plan = PlanV2(steps=[], is_upvoted=True)
+
+    # Test model_dump includes is_upvoted
+    plan_dict = plan.model_dump()
+    assert "is_upvoted" in plan_dict
+    assert plan_dict["is_upvoted"] is True
+
+    # Test model_dump_json includes is_upvoted
+    plan_json = plan.model_dump_json()
+    assert "is_upvoted" in plan_json
+
+    # Test deserialization
+    plan_from_dict = PlanV2.model_validate(plan_dict)
+    assert plan_from_dict.is_upvoted is True

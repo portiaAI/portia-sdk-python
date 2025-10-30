@@ -438,6 +438,13 @@ class Plan(BaseModel):
         exclude=True,
         description="The optional structured output schema for the query.",
     )
+    is_upvoted: bool = Field(
+        default=False,
+        description=(
+            "Whether the plan has been upvoted by a user. This field is used to store "
+            "user feedback on plan quality for cloud-stored plans. Defaults to False."
+        ),
+    )
 
     def __str__(self) -> str:
         """Return the string representation of the plan.
@@ -474,6 +481,7 @@ class Plan(BaseModel):
             plan_inputs=[
                 PlanInput.model_validate(input_) for input_ in response_json.get("plan_inputs", [])
             ],
+            is_upvoted=response_json.get("is_upvoted", False),
         )
 
     def pretty_print(self) -> str:
