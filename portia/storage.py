@@ -1101,6 +1101,7 @@ class PortiaCloudStorage(Storage):
                         {**input_.model_dump(mode="json"), "description": input_.description}
                         for input_ in plan.plan_inputs
                     ],
+                    "is_upvoted": plan.is_upvoted,
                 },
             )
         except Exception as e:
@@ -1131,6 +1132,7 @@ class PortiaCloudStorage(Storage):
                             {**input_.model_dump(mode="json"), "description": input_.description}
                             for input_ in plan.plan_inputs
                         ],
+                        "is_upvoted": plan.is_upvoted,
                     },
                 )
         except Exception as e:

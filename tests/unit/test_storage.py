@@ -244,6 +244,7 @@ def test_portia_cloud_storage() -> None:
             PlanInput(name="key1", description="Test input 1"),
             PlanInput(name="key2", description="Test input 2"),
         ],
+        is_upvoted=True,
     )
     plan_run = PlanRun(
         id=PlanRunUUID(uuid=UUID("87654321-4321-8765-4321-876543218765")),
@@ -281,6 +282,7 @@ def test_portia_cloud_storage() -> None:
                     {"name": "key1", "description": "Test input 1", "value": None},
                     {"name": "key2", "description": "Test input 2", "value": None},
                 ],
+                "is_upvoted": True,
             },
         )
 
@@ -426,6 +428,7 @@ def test_portia_cloud_storage_errors() -> None:
                 "query": plan.plan_context.query,
                 "tool_ids": plan.plan_context.tool_ids,
                 "plan_inputs": [],
+                "is_upvoted": False,
             },
         )
     with (
@@ -1150,3 +1153,93 @@ def test_get_plan_by_query_edge_cases() -> None:
 
     found_plan = storage.get_plan_by_query(special_query)
     assert found_plan.plan_context.query == special_query
+
+
+def test_plan_is_upvoted_field_in_storage() -> None:
+    """Test that is_upvoted field is handled correctly by all storage types."""
+    # Test InMemoryStorage
+    in_memory_storage = InMemoryStorage()
+    plan_upvoted = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+        is_upvoted=True,
+    )
+    plan_not_upvoted = Plan(
+        plan_context=PlanContext(query="test query 2", tool_ids=[]),
+        steps=[],
+        is_upvoted=False,
+    )
+
+    in_memory_storage.save_plan(plan_upvoted)
+    in_memory_storage.save_plan(plan_not_upvoted)
+
+    retrieved_upvoted = in_memory_storage.get_plan(plan_upvoted.id)
+    retrieved_not_upvoted = in_memory_storage.get_plan(plan_not_upvoted.id)
+
+    assert retrieved_upvoted.is_upvoted is True
+    assert retrieved_not_upvoted.is_upvoted is False
+
+
+def test_plan_is_upvoted_field_in_disk_storage(tmp_path: Path) -> None:
+    """Test that is_upvoted field is persisted correctly in DiskFileStorage."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+
+    plan_upvoted = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+        is_upvoted=True,
+    )
+    plan_default = Plan(
+        plan_context=PlanContext(query="test query 2", tool_ids=[]),
+        steps=[],
+    )
+
+    storage.save_plan(plan_upvoted)
+    storage.save_plan(plan_default)
+
+    retrieved_upvoted = storage.get_plan(plan_upvoted.id)
+    retrieved_default = storage.get_plan(plan_default.id)
+
+    assert retrieved_upvoted.is_upvoted is True
+    assert retrieved_default.is_upvoted is False
+
+
+def test_plan_is_upvoted_from_response() -> None:
+    """Test that Plan.from_response correctly deserializes is_upvoted field."""
+    # Test with is_upvoted=True
+    response_upvoted = {
+        "id": "plan-00000000-0000-0000-0000-000000000000",
+        "query": "test query",
+        "tool_ids": [],
+        "steps": [],
+        "plan_inputs": [],
+        "is_upvoted": True,
+    }
+
+    plan_upvoted = Plan.from_response(response_upvoted)
+    assert plan_upvoted.is_upvoted is True
+
+    # Test with is_upvoted=False
+    response_not_upvoted = {
+        "id": "plan-00000000-0000-0000-0000-000000000001",
+        "query": "test query 2",
+        "tool_ids": [],
+        "steps": [],
+        "plan_inputs": [],
+        "is_upvoted": False,
+    }
+
+    plan_not_upvoted = Plan.from_response(response_not_upvoted)
+    assert plan_not_upvoted.is_upvoted is False
+
+    # Test with missing is_upvoted (should default to False)
+    response_missing = {
+        "id": "plan-00000000-0000-0000-0000-000000000002",
+        "query": "test query 3",
+        "tool_ids": [],
+        "steps": [],
+        "plan_inputs": [],
+    }
+
+    plan_missing = Plan.from_response(response_missing)
+    assert plan_missing.is_upvoted is False

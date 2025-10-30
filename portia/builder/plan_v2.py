@@ -68,6 +68,13 @@ class PlanV2(BaseModel):
             "users identify the plan's purpose."
         ),
     )
+    is_upvoted: bool = Field(
+        default=False,
+        description=(
+            "Whether the plan has been upvoted by a user. This field is used to store "
+            "user feedback on plan quality for cloud-stored plans. Defaults to False."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_plan(self) -> Self:
