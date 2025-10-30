@@ -1,8 +1,6 @@
 name: Daily Integration Tests
 
 on:
-  schedule:
-    - cron: '0 9 * * *'  # Run at 9 AM UTC daily
   workflow_dispatch:  # Allow manual triggering
 
 # Add concurrency to cancel in-progress runs
