@@ -419,6 +419,7 @@ class Plan(BaseModel):
         plan_context (PlanContext): The context for when the plan was created.
         steps (list[Step]): The set of steps that make up the plan.
         inputs (list[PlanInput]): The inputs required by the plan.
+        is_upvoted (bool): Whether the plan has been upvoted by the user.
 
     """
 
@@ -437,6 +438,10 @@ class Plan(BaseModel):
         default=None,
         exclude=True,
         description="The optional structured output schema for the query.",
+    )
+    is_upvoted: bool = Field(
+        default=False,
+        description="Whether the plan has been upvoted by the user.",
     )
 
     def __str__(self) -> str:
@@ -474,6 +479,7 @@ class Plan(BaseModel):
             plan_inputs=[
                 PlanInput.model_validate(input_) for input_ in response_json.get("plan_inputs", [])
             ],
+            is_upvoted=response_json.get("is_upvoted", False),
         )
 
     def pretty_print(self) -> str:

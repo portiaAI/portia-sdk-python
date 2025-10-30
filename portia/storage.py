@@ -149,6 +149,32 @@ class PlanStorage(ABC):
         """
         raise NotImplementedError("get_similar_plans is not implemented")  # pragma: no cover
 
+    @abstractmethod
+    def upvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as upvoted.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to upvote.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("upvote_plan is not implemented")
+
+    @abstractmethod
+    def downvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as not upvoted (downvoted).
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to downvote.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("downvote_plan is not implemented")
+
     async def asave_plan(self, plan: Plan) -> None:
         """Save a plan asynchronously using threaded execution.
 
@@ -206,6 +232,24 @@ class PlanStorage(ABC):
 
         """
         return await asyncio.to_thread(self.get_similar_plans, query, threshold, limit)
+
+    async def aupvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as upvoted asynchronously using threaded execution.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to upvote.
+
+        """
+        await asyncio.to_thread(self.upvote_plan, plan_id)
+
+    async def adownvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as not upvoted (downvoted) asynchronously using threaded execution.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to downvote.
+
+        """
+        await asyncio.to_thread(self.downvote_plan, plan_id)
 
 
 class PlanRunListResponse(BaseModel):
@@ -585,6 +629,40 @@ class InMemoryStorage(Storage):
         """
         return plan_id in self.plans
 
+    def upvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as upvoted.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to upvote.
+
+        Raises:
+            PlanNotFoundError: If the plan is not found.
+
+        """
+        if plan_id not in self.plans:
+            raise PlanNotFoundError(plan_id)
+        plan = self.plans[plan_id]
+        # Create a new plan with updated is_upvoted field
+        updated_plan = plan.model_copy(update={"is_upvoted": True})
+        self.plans[plan_id] = updated_plan
+
+    def downvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as not upvoted (downvoted).
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to downvote.
+
+        Raises:
+            PlanNotFoundError: If the plan is not found.
+
+        """
+        if plan_id not in self.plans:
+            raise PlanNotFoundError(plan_id)
+        plan = self.plans[plan_id]
+        # Create a new plan with updated is_upvoted field
+        updated_plan = plan.model_copy(update={"is_upvoted": False})
+        self.plans[plan_id] = updated_plan
+
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Add run to dict.
 
@@ -839,6 +917,34 @@ class DiskFileStorage(Storage):
 
         """
         return Path(self.storage_dir, f"{plan_id}.json").exists()
+
+    def upvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as upvoted.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to upvote.
+
+        Raises:
+            PlanNotFoundError: If the plan is not found.
+
+        """
+        plan = self.get_plan(plan_id)
+        updated_plan = plan.model_copy(update={"is_upvoted": True})
+        self.save_plan(updated_plan)
+
+    def downvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as not upvoted (downvoted).
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to downvote.
+
+        Raises:
+            PlanNotFoundError: If the plan is not found.
+
+        """
+        plan = self.get_plan(plan_id)
+        updated_plan = plan.model_copy(update={"is_upvoted": False})
+        self.save_plan(updated_plan)
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun object to the storage.
@@ -1255,6 +1361,84 @@ class PortiaCloudStorage(Storage):
             return False
         else:
             return response.is_success
+
+    def upvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as upvoted in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to upvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.post(
+                url=f"/api/v1/plans/{plan_id}/upvote",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    async def aupvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as upvoted in Portia Cloud asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to upvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url=f"/api/v1/plans/{plan_id}/upvote",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    def downvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as not upvoted (downvoted) in Portia Cloud.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to downvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            response = self.client.post(
+                url=f"/api/v1/plans/{plan_id}/downvote",
+            )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
+
+    async def adownvote_plan(self, plan_id: PlanUUID) -> None:
+        """Mark a plan as not upvoted (downvoted) in Portia Cloud asynchronously.
+
+        Args:
+            plan_id (PlanUUID): The UUID of the plan to downvote.
+
+        Raises:
+            StorageError: If the request to Portia Cloud fails.
+
+        """
+        try:
+            async with self.client_builder.async_client() as client:
+                response = await client.post(
+                    url=f"/api/v1/plans/{plan_id}/downvote",
+                )
+        except Exception as e:
+            raise StorageError(e) from e
+        else:
+            self.check_response(response)
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun to Portia Cloud.

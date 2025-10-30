@@ -121,3 +121,105 @@ def test_disk_file_storage_invalid_run_retrieval(tmp_path: Path) -> None:
 
     with pytest.raises(PlanRunNotFoundError):
         storage.get_plan_run(PlanRunUUID())
+
+
+def test_in_memory_storage_upvote_plan() -> None:
+    """Test upvoting a plan in InMemoryStorage."""
+    storage = InMemoryStorage()
+    plan = Plan(plan_context=PlanContext(query="query", tool_ids=[]), steps=[])
+    storage.save_plan(plan)
+
+    # Initially plan should not be upvoted
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is False
+
+    # Upvote the plan
+    storage.upvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is True
+
+
+def test_in_memory_storage_downvote_plan() -> None:
+    """Test downvoting a plan in InMemoryStorage."""
+    storage = InMemoryStorage()
+    plan = Plan(plan_context=PlanContext(query="query", tool_ids=[]), steps=[])
+    storage.save_plan(plan)
+
+    # Upvote first
+    storage.upvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is True
+
+    # Now downvote
+    storage.downvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is False
+
+
+def test_in_memory_storage_upvote_nonexistent_plan() -> None:
+    """Test upvoting a non-existent plan raises error."""
+    storage = InMemoryStorage()
+    non_existent_id = PlanUUID()
+
+    with pytest.raises(PlanNotFoundError):
+        storage.upvote_plan(non_existent_id)
+
+
+def test_in_memory_storage_downvote_nonexistent_plan() -> None:
+    """Test downvoting a non-existent plan raises error."""
+    storage = InMemoryStorage()
+    non_existent_id = PlanUUID()
+
+    with pytest.raises(PlanNotFoundError):
+        storage.downvote_plan(non_existent_id)
+
+
+def test_disk_file_storage_upvote_plan(tmp_path: Path) -> None:
+    """Test upvoting a plan in DiskFileStorage."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    plan = Plan(plan_context=PlanContext(query="query", tool_ids=[]), steps=[])
+    storage.save_plan(plan)
+
+    # Initially plan should not be upvoted
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is False
+
+    # Upvote the plan
+    storage.upvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is True
+
+
+def test_disk_file_storage_downvote_plan(tmp_path: Path) -> None:
+    """Test downvoting a plan in DiskFileStorage."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    plan = Plan(plan_context=PlanContext(query="query", tool_ids=[]), steps=[])
+    storage.save_plan(plan)
+
+    # Upvote first
+    storage.upvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is True
+
+    # Now downvote
+    storage.downvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is False
+
+
+def test_disk_file_storage_upvote_nonexistent_plan(tmp_path: Path) -> None:
+    """Test upvoting a non-existent plan raises error."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    non_existent_id = PlanUUID()
+
+    with pytest.raises(PlanNotFoundError):
+        storage.upvote_plan(non_existent_id)
+
+
+def test_disk_file_storage_downvote_nonexistent_plan(tmp_path: Path) -> None:
+    """Test downvoting a non-existent plan raises error."""
+    storage = DiskFileStorage(storage_dir=str(tmp_path))
+    non_existent_id = PlanUUID()
+
+    with pytest.raises(PlanNotFoundError):
+        storage.downvote_plan(non_existent_id)
