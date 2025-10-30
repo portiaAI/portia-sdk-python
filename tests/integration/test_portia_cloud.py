@@ -126,3 +126,44 @@ def test_portia_end_user_update_with_cloud() -> None:
     end_user = storage.get_end_user("123")
     assert end_user
     assert end_user.name == "Jeff"
+
+
+@pytest.mark.skip(reason="Requires backend API endpoints to be implemented")
+def test_portia_cloud_storage_upvote_plan() -> None:
+    """Test upvoting a plan in cloud storage."""
+    config = Config.from_default()
+    storage = PortiaCloudStorage(config)
+    (plan, _) = get_test_plan_run()
+    storage.save_plan(plan)
+
+    # Initially plan should not be upvoted
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is False
+
+    # Upvote the plan
+    storage.upvote_plan(plan.id)
+
+    # Retrieve plan again and verify it's upvoted
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is True
+
+
+@pytest.mark.skip(reason="Requires backend API endpoints to be implemented")
+def test_portia_cloud_storage_downvote_plan() -> None:
+    """Test downvoting a plan in cloud storage."""
+    config = Config.from_default()
+    storage = PortiaCloudStorage(config)
+    (plan, _) = get_test_plan_run()
+    storage.save_plan(plan)
+
+    # Upvote first
+    storage.upvote_plan(plan.id)
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is True
+
+    # Now downvote
+    storage.downvote_plan(plan.id)
+
+    # Retrieve plan again and verify it's not upvoted
+    retrieved_plan = storage.get_plan(plan.id)
+    assert retrieved_plan.is_upvoted is False
