@@ -1150,3 +1150,175 @@ def test_get_plan_by_query_edge_cases() -> None:
 
     found_plan = storage.get_plan_by_query(special_query)
     assert found_plan.plan_context.query == special_query
+
+
+def test_upvote_plan_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test upvote_plan method with PortiaCloudStorage."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    endpoint = config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/{plan.id}/upvote/"
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+
+    # Test successful upvote
+    storage.upvote_plan(plan.id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    assert str(requests[0].url) == url
+
+
+def test_downvote_plan_portia_cloud_storage(httpx_mock: HTTPXMock) -> None:
+    """Test downvote_plan method with PortiaCloudStorage."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    endpoint = config.portia_api_endpoint
+    url = f"{endpoint}/api/v0/plans/{plan.id}/downvote/"
+    httpx_mock.add_response(
+        url=url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+
+    # Test successful downvote
+    storage.downvote_plan(plan.id)
+
+    # Verify the request was made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    assert str(requests[0].url) == url
+
+
+def test_upvote_plan_error_handling() -> None:
+    """Test upvote_plan error handling with PortiaCloudStorage."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test with API failure
+    mock_exception = RuntimeError("API error")
+    with (
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        pytest.raises(StorageError, match="API error"),
+    ):
+        storage.upvote_plan(plan.id)
+
+    mock_post.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/upvote/")
+
+    # Test with unsuccessful response
+    mock_response = MagicMock()
+    mock_response.is_success = False
+    mock_response.content = b"Plan not found"
+    with (
+        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
+        pytest.raises(StorageError),
+    ):
+        storage.upvote_plan(plan.id)
+
+    mock_post.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/upvote/")
+
+
+def test_downvote_plan_error_handling() -> None:
+    """Test downvote_plan error handling with PortiaCloudStorage."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    # Test with API failure
+    mock_exception = RuntimeError("API error")
+    with (
+        patch.object(storage.client, "post", side_effect=mock_exception) as mock_post,
+        pytest.raises(StorageError, match="API error"),
+    ):
+        storage.downvote_plan(plan.id)
+
+    mock_post.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/downvote/")
+
+    # Test with unsuccessful response
+    mock_response = MagicMock()
+    mock_response.is_success = False
+    mock_response.content = b"Plan not found"
+    with (
+        patch.object(storage.client, "post", return_value=mock_response) as mock_post,
+        pytest.raises(StorageError),
+    ):
+        storage.downvote_plan(plan.id)
+
+    mock_post.assert_called_once_with(url=f"/api/v0/plans/{plan.id}/downvote/")
+
+
+def test_upvote_downvote_idempotency(httpx_mock: HTTPXMock) -> None:
+    """Test that upvote/downvote can be called multiple times (idempotency)."""
+    config = get_test_config(portia_api_key="test_api_key")
+    storage = PortiaCloudStorage(config)
+
+    plan = Plan(
+        id=PlanUUID(uuid=UUID("12345678-1234-5678-1234-567812345678")),
+        plan_context=PlanContext(query="test query", tool_ids=[]),
+        steps=[],
+    )
+
+    endpoint = config.portia_api_endpoint
+    upvote_url = f"{endpoint}/api/v0/plans/{plan.id}/upvote/"
+    downvote_url = f"{endpoint}/api/v0/plans/{plan.id}/downvote/"
+
+    # Mock successful responses
+    httpx_mock.add_response(
+        url=upvote_url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+    httpx_mock.add_response(
+        url=downvote_url,
+        status_code=200,
+        method="POST",
+        json={"status": "success"},
+    )
+
+    # Test upvoting twice (idempotent)
+    storage.upvote_plan(plan.id)
+    storage.upvote_plan(plan.id)
+
+    # Test downvoting twice (idempotent)
+    storage.downvote_plan(plan.id)
+    storage.downvote_plan(plan.id)
+
+    # Verify all requests were made
+    requests = httpx_mock.get_requests()
+    assert len(requests) == 4
+    assert sum(1 for r in requests if "upvote" in str(r.url)) == 2
+    assert sum(1 for r in requests if "downvote" in str(r.url)) == 2
