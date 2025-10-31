@@ -1134,6 +1134,166 @@ class Portia:
 
         return await self._aresume(plan_run, plan_run_id)
 
+    def upvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Upvote a plan to mark it as a positive example for User-Led Learning.
+
+        When a plan is upvoted, it sets the plan's liked status to True, which triggers
+        embedding creation for use in similarity matching. Upvoted plans can then be
+        retrieved and used as examples to improve future planning.
+
+        Note: This method requires PortiaCloudStorage to be configured.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to upvote.
+
+        Raises:
+            NotImplementedError: If not using PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails.
+
+        Example:
+            ```python
+            portia = Portia(api_key="your_api_key")
+            plan = portia.plan("Create a sales report")
+            portia.upvote_plan(plan.id)
+            ```
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_upvote_plan",
+                function_call_details={"plan_id": str(plan_id)},
+            )
+        )
+
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise NotImplementedError(
+                "upvote_plan is only supported with PortiaCloudStorage. "
+                "Please configure Portia with an API key to use this feature."
+            )
+
+        parsed_id = PlanUUID.from_string(plan_id) if isinstance(plan_id, str) else plan_id
+        self.storage.upvote_plan(parsed_id)
+
+    async def aupvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Upvote a plan to mark it as a positive example for User-Led Learning (async).
+
+        When a plan is upvoted, it sets the plan's liked status to True, which triggers
+        embedding creation for use in similarity matching. Upvoted plans can then be
+        retrieved and used as examples to improve future planning.
+
+        Note: This method requires PortiaCloudStorage to be configured.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to upvote.
+
+        Raises:
+            NotImplementedError: If not using PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails.
+
+        Example:
+            ```python
+            portia = Portia(api_key="your_api_key")
+            plan = await portia.aplan("Create a sales report")
+            await portia.aupvote_plan(plan.id)
+            ```
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_aupvote_plan",
+                function_call_details={"plan_id": str(plan_id)},
+            )
+        )
+
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise NotImplementedError(
+                "aupvote_plan is only supported with PortiaCloudStorage. "
+                "Please configure Portia with an API key to use this feature."
+            )
+
+        parsed_id = PlanUUID.from_string(plan_id) if isinstance(plan_id, str) else plan_id
+        await self.storage.aupvote_plan(parsed_id)
+
+    def downvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Downvote a plan to remove it from User-Led Learning examples.
+
+        When a plan is downvoted, it sets the plan's liked status to False, which triggers
+        embedding deletion to remove the plan from similarity matching. This ensures that
+        poor or incorrect plans are not used as examples for future planning.
+
+        Note: This method requires PortiaCloudStorage to be configured.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to downvote.
+
+        Raises:
+            NotImplementedError: If not using PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails.
+
+        Example:
+            ```python
+            portia = Portia(api_key="your_api_key")
+            plan = portia.plan("Create a sales report")
+            portia.downvote_plan(plan.id)
+            ```
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_downvote_plan",
+                function_call_details={"plan_id": str(plan_id)},
+            )
+        )
+
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise NotImplementedError(
+                "downvote_plan is only supported with PortiaCloudStorage. "
+                "Please configure Portia with an API key to use this feature."
+            )
+
+        parsed_id = PlanUUID.from_string(plan_id) if isinstance(plan_id, str) else plan_id
+        self.storage.downvote_plan(parsed_id)
+
+    async def adownvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Downvote a plan to remove it from User-Led Learning examples (async).
+
+        When a plan is downvoted, it sets the plan's liked status to False, which triggers
+        embedding deletion to remove the plan from similarity matching. This ensures that
+        poor or incorrect plans are not used as examples for future planning.
+
+        Note: This method requires PortiaCloudStorage to be configured.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to downvote.
+
+        Raises:
+            NotImplementedError: If not using PortiaCloudStorage.
+            StorageError: If the request to Portia Cloud fails.
+
+        Example:
+            ```python
+            portia = Portia(api_key="your_api_key")
+            plan = await portia.aplan("Create a sales report")
+            await portia.adownvote_plan(plan.id)
+            ```
+
+        """
+        self.telemetry.capture(
+            PortiaFunctionCallTelemetryEvent(
+                function_name="portia_adownvote_plan",
+                function_call_details={"plan_id": str(plan_id)},
+            )
+        )
+
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise NotImplementedError(
+                "adownvote_plan is only supported with PortiaCloudStorage. "
+                "Please configure Portia with an API key to use this feature."
+            )
+
+        parsed_id = PlanUUID.from_string(plan_id) if isinstance(plan_id, str) else plan_id
+        await self.storage.adownvote_plan(parsed_id)
+
     def _resume(
         self,
         plan_run: PlanRun | None = None,

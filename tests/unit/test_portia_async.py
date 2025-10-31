@@ -2051,3 +2051,179 @@ async def test_portia__aresolve_string_example_plan(portia: Portia) -> None:
     # Test error case: plan ID string with invalid UUID format
     with pytest.raises(ValueError, match="badly formed hexadecimal UUID string"):
         await portia._aresolve_string_example_plan("plan-invalid-uuid-format")
+
+
+def test_portia_upvote_plan_with_cloud_storage() -> None:
+    """Test upvoting a plan with PortiaCloudStorage."""
+    from unittest.mock import MagicMock, patch  # noqa: PLC0415
+
+    from portia import Portia  # noqa: PLC0415
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # Create Portia with cloud storage
+    with patch("portia.portia.PortiaCloudStorage") as mock_storage_class:
+        mock_storage = MagicMock()
+        mock_storage_class.return_value = mock_storage
+
+        portia = Portia(api_key="test_api_key")
+        portia.storage = mock_storage
+
+        # Create a test plan
+        test_plan = Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+        )
+
+        # Test upvote with PlanUUID
+        portia.upvote_plan(test_plan.id)
+        mock_storage.upvote_plan.assert_called_once_with(test_plan.id)
+
+        # Test upvote with string plan ID
+        mock_storage.reset_mock()
+        portia.upvote_plan(str(test_plan.id))
+        mock_storage.upvote_plan.assert_called_once()
+
+
+def test_portia_downvote_plan_with_cloud_storage() -> None:
+    """Test downvoting a plan with PortiaCloudStorage."""
+    from unittest.mock import MagicMock, patch  # noqa: PLC0415
+
+    from portia import Portia  # noqa: PLC0415
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # Create Portia with cloud storage
+    with patch("portia.portia.PortiaCloudStorage") as mock_storage_class:
+        mock_storage = MagicMock()
+        mock_storage_class.return_value = mock_storage
+
+        portia = Portia(api_key="test_api_key")
+        portia.storage = mock_storage
+
+        # Create a test plan
+        test_plan = Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+        )
+
+        # Test downvote with PlanUUID
+        portia.downvote_plan(test_plan.id)
+        mock_storage.downvote_plan.assert_called_once_with(test_plan.id)
+
+        # Test downvote with string plan ID
+        mock_storage.reset_mock()
+        portia.downvote_plan(str(test_plan.id))
+        mock_storage.downvote_plan.assert_called_once()
+
+
+def test_portia_upvote_plan_without_cloud_storage(portia: Portia) -> None:
+    """Test that upvoting without cloud storage raises NotImplementedError."""
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # portia fixture uses InMemoryStorage
+    test_plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+    )
+
+    with pytest.raises(NotImplementedError, match="only supported with PortiaCloudStorage"):
+        portia.upvote_plan(test_plan.id)
+
+
+def test_portia_downvote_plan_without_cloud_storage(portia: Portia) -> None:
+    """Test that downvoting without cloud storage raises NotImplementedError."""
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # portia fixture uses InMemoryStorage
+    test_plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+    )
+
+    with pytest.raises(NotImplementedError, match="only supported with PortiaCloudStorage"):
+        portia.downvote_plan(test_plan.id)
+
+
+@pytest.mark.asyncio
+async def test_portia_aupvote_plan_with_cloud_storage() -> None:
+    """Test upvoting a plan asynchronously with PortiaCloudStorage."""
+    from unittest.mock import AsyncMock, MagicMock, patch  # noqa: PLC0415
+
+    from portia import Portia  # noqa: PLC0415
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # Create Portia with cloud storage
+    with patch("portia.portia.PortiaCloudStorage") as mock_storage_class:
+        mock_storage = MagicMock()
+        mock_storage.aupvote_plan = AsyncMock()
+        mock_storage_class.return_value = mock_storage
+
+        portia = Portia(api_key="test_api_key")
+        portia.storage = mock_storage
+
+        # Create a test plan
+        test_plan = Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+        )
+
+        # Test async upvote
+        await portia.aupvote_plan(test_plan.id)
+        mock_storage.aupvote_plan.assert_called_once_with(test_plan.id)
+
+
+@pytest.mark.asyncio
+async def test_portia_adownvote_plan_with_cloud_storage() -> None:
+    """Test downvoting a plan asynchronously with PortiaCloudStorage."""
+    from unittest.mock import AsyncMock, MagicMock, patch  # noqa: PLC0415
+
+    from portia import Portia  # noqa: PLC0415
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # Create Portia with cloud storage
+    with patch("portia.portia.PortiaCloudStorage") as mock_storage_class:
+        mock_storage = MagicMock()
+        mock_storage.adownvote_plan = AsyncMock()
+        mock_storage_class.return_value = mock_storage
+
+        portia = Portia(api_key="test_api_key")
+        portia.storage = mock_storage
+
+        # Create a test plan
+        test_plan = Plan(
+            plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+            steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+        )
+
+        # Test async downvote
+        await portia.adownvote_plan(test_plan.id)
+        mock_storage.adownvote_plan.assert_called_once_with(test_plan.id)
+
+
+@pytest.mark.asyncio
+async def test_portia_aupvote_plan_without_cloud_storage(portia: Portia) -> None:
+    """Test that async upvoting without cloud storage raises NotImplementedError."""
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # portia fixture uses InMemoryStorage
+    test_plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+    )
+
+    with pytest.raises(NotImplementedError, match="only supported with PortiaCloudStorage"):
+        await portia.aupvote_plan(test_plan.id)
+
+
+@pytest.mark.asyncio
+async def test_portia_adownvote_plan_without_cloud_storage(portia: Portia) -> None:
+    """Test that async downvoting without cloud storage raises NotImplementedError."""
+    from portia.plan import Plan, PlanContext, Step  # noqa: PLC0415
+
+    # portia fixture uses InMemoryStorage
+    test_plan = Plan(
+        plan_context=PlanContext(query="test query", tool_ids=["tool1"]),
+        steps=[Step(task="Test task", tool_id="tool1", inputs=[], output="$result")],
+    )
+
+    with pytest.raises(NotImplementedError, match="only supported with PortiaCloudStorage"):
+        await portia.adownvote_plan(test_plan.id)
