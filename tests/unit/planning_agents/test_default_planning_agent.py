@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from portia.builder.plan_v2 import PlanV2
 from portia.end_user import EndUser
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, Step, Variable
@@ -64,7 +65,7 @@ def test_base_classes() -> None:
             query: str,
             tool_list: list[Tool],
             end_user: EndUser,
-            examples: list[Plan] | None = None,
+            examples: list[PlanV2 | Plan] | None = None,
             plan_inputs: list[PlanInput] | None = None,  # noqa: ARG002
         ) -> StepsOrError:
             return super().generate_steps_or_error(query, tool_list, end_user, examples)  # type: ignore  # noqa: PGH003

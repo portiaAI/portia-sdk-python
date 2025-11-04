@@ -1,20 +1,23 @@
-"""Storage classes for managing the saving and retrieval of plans, runs, and tool calls.
+"""Storage classes for managing the saving and retrieval of runs, and tool calls.
+
+DEPRECATED: Plan storage has been removed. The plan is the code.
 
 This module defines a set of storage classes that provide different backends for saving, retrieving,
-and managing plans, runs, and tool calls. These storage classes include both in-memory and
-file-based storage, as well as integration with the Portia Cloud API. Each class is responsible
-for handling interactions with its respective storage medium, including validating responses
-and raising appropriate exceptions when necessary.
+and managing runs and tool calls. Plan storage methods are deprecated and raise NotImplementedError.
+These storage classes include both in-memory and file-based storage, as well as integration with
+the Portia Cloud API. Each class is responsible for handling interactions with its respective
+storage medium, including validating responses and raising appropriate exceptions when necessary.
 
 Classes:
     - Storage (Base Class): A base class that defines common interfaces for all storage types,
-    ensuring consistent methods for saving and retrieving plans, runs, and tool calls.
-    - InMemoryStorage: An in-memory implementation of the `Storage` class for storing plans,
-    runs, and tool calls in a temporary, volatile storage medium.
-    - FileStorage: A file-based implementation of the `Storage` class for storing plans, runs,
+    ensuring consistent methods for saving and retrieving runs and tool calls.
+    Plan-related methods are deprecated.
+    - InMemoryStorage: An in-memory implementation of the `Storage` class for storing runs
+    and tool calls in a temporary, volatile storage medium.
+    - FileStorage: A file-based implementation of the `Storage` class for storing runs
       and tool calls as local files in the filesystem.
     - PortiaCloudStorage: A cloud-based implementation of the `Storage` class that interacts with
-    the Portia Cloud API to save and retrieve plans, runs, and tool call records.
+    the Portia Cloud API to save and retrieve runs and tool call records.
 
 Each storage class handles the following tasks:
     - Sending and receiving data to its respective storage medium - memory, file system, or API.
@@ -65,15 +68,18 @@ T = TypeVar("T", bound=BaseModel)
 class PlanStorage(ABC):
     """Abstract base class for storing and retrieving plans.
 
+    DEPRECATED: Plan storage is deprecated. The plan is the code.
+    These methods are maintained for backward compatibility but should not be used.
+
     Subclasses must implement the methods to save and retrieve plans.
 
     Methods:
         save_plan(self, plan: Plan) -> None:
-            Save a plan.
+            Save a plan. DEPRECATED - raises NotImplementedError.
         get_plan(self, plan_id: PlanUUID) -> Plan:
-            Get a plan by ID.
+            Get a plan by ID. DEPRECATED - raises NotImplementedError.
         plan_exists(self, plan_id: PlanUUID) -> bool:
-            Check if a plan exists without raising an error.
+            Check if a plan exists without raising an error. DEPRECATED - raises NotImplementedError.
 
     """
 
@@ -81,18 +87,24 @@ class PlanStorage(ABC):
     def save_plan(self, plan: Plan) -> None:
         """Save a plan.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
+
         Args:
             plan (Plan): The Plan object to save.
 
         Raises:
-            NotImplementedError: If the method is not implemented.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        raise NotImplementedError("save_plan is not implemented")
+        raise NotImplementedError("save_plan is deprecated - the plan is the code")
 
     @abstractmethod
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a plan by its ID.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to retrieve.
@@ -101,24 +113,33 @@ class PlanStorage(ABC):
             Plan: The Plan object associated with the provided plan_id.
 
         Raises:
-            NotImplementedError: If the method is not implemented.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        raise NotImplementedError("get_plan is not implemented")
+        raise NotImplementedError("get_plan is deprecated - the plan is the code")
 
     @abstractmethod
     def get_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
+
         Args:
             query (str): The query to get a plan for.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        raise NotImplementedError("get_plan_by_query is not implemented")
+        raise NotImplementedError("get_plan_by_query is deprecated - the plan is the code")
 
     @abstractmethod
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists without raising an error.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to check.
@@ -127,13 +148,16 @@ class PlanStorage(ABC):
             bool: True if the plan exists, False otherwise.
 
         Raises:
-            NotImplementedError: If the method is not implemented.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        raise NotImplementedError("plan_exists is not implemented")
+        raise NotImplementedError("plan_exists is deprecated - the plan is the code")
 
     def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 10) -> list[Plan]:
         """Get similar plans to the query.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
 
         Args:
             query (str): The query to get similar plans for.
@@ -144,22 +168,31 @@ class PlanStorage(ABC):
             list[Plan]: The list of similar plans.
 
         Raises:
-            NotImplementedError: If the method is not implemented.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        raise NotImplementedError("get_similar_plans is not implemented")  # pragma: no cover
+        raise NotImplementedError("get_similar_plans is deprecated - the plan is the code")  # pragma: no cover
 
     async def asave_plan(self, plan: Plan) -> None:
         """Save a plan asynchronously using threaded execution.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
+
         Args:
             plan (Plan): The Plan object to save.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        await asyncio.to_thread(self.save_plan, plan)
+        raise NotImplementedError("asave_plan is deprecated - the plan is the code")
 
     async def aget_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a plan by its ID asynchronously using threaded execution.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to retrieve.
@@ -167,20 +200,32 @@ class PlanStorage(ABC):
         Returns:
             Plan: The Plan object associated with the provided plan_id.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        return await asyncio.to_thread(self.get_plan, plan_id)
+        raise NotImplementedError("aget_plan is deprecated - the plan is the code")
 
     async def aget_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query asynchronously using threaded execution.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
+
         Args:
             query (str): The query to get a plan for.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        return await asyncio.to_thread(self.get_plan_by_query, query)
+        raise NotImplementedError("aget_plan_by_query is deprecated - the plan is the code")
 
     async def aplan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists without raising an error asynchronously using threaded execution.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to check.
@@ -188,14 +233,20 @@ class PlanStorage(ABC):
         Returns:
             bool: True if the plan exists, False otherwise.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        return await asyncio.to_thread(self.plan_exists, plan_id)
+        raise NotImplementedError("aplan_exists is deprecated - the plan is the code")
 
     async def aget_similar_plans(
         self, query: str, threshold: float = 0.5, limit: int = 10
     ) -> list[Plan]:
         """Get similar plans to the query asynchronously using threaded execution.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+        This method should no longer be used.
+
         Args:
             query (str): The query to get similar plans for.
             threshold (float): The threshold for similarity.
@@ -204,8 +255,11 @@ class PlanStorage(ABC):
         Returns:
             list[Plan]: The list of similar plans.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        return await asyncio.to_thread(self.get_similar_plans, query, threshold, limit)
+        raise NotImplementedError("aget_similar_plans is deprecated - the plan is the code")
 
 
 class PlanRunListResponse(BaseModel):
@@ -517,19 +571,20 @@ def log_tool_call(tool_call: ToolCallRecord) -> None:
 
 
 class InMemoryStorage(Storage):
-    """Simple storage class that keeps plans + runs in memory.
+    """Simple storage class that keeps runs in memory.
+
+    DEPRECATED: Plan storage has been removed. The plan is the code.
+    Plan-related methods will raise NotImplementedError.
 
     Tool Calls are logged via the LogAdditionalStorage.
     """
 
-    plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
     outputs: defaultdict[PlanRunUUID, dict[str, LocalDataValue]]
     end_users: dict[str, EndUser]
 
     def __init__(self) -> None:
         """Initialize Storage."""
-        self.plans = {}
         self.runs = {}
         self.outputs = defaultdict(dict)
         self.end_users = {}
@@ -537,14 +592,21 @@ class InMemoryStorage(Storage):
     def save_plan(self, plan: Plan) -> None:
         """Add plan to dict.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan (Plan): The Plan object to save.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        self.plans[plan.id] = plan
+        raise NotImplementedError("save_plan is deprecated - the plan is the code")
 
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Get plan from dict.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to retrieve.
@@ -553,28 +615,29 @@ class InMemoryStorage(Storage):
             Plan: The Plan object associated with the provided plan_id.
 
         Raises:
-            PlanNotFoundError: If the plan is not found.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        if plan_id in self.plans:
-            return self.plans[plan_id]
-        raise PlanNotFoundError(plan_id)
+        raise NotImplementedError("get_plan is deprecated - the plan is the code")
 
     def get_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             query (str): The query to get a plan for.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        plan: Plan | None = None
-        for plan in self.plans.values():
-            if plan.plan_context.query == query:
-                return plan
-        raise StorageError(f"No plan found for query: {query}")
+        raise NotImplementedError("get_plan_by_query is deprecated - the plan is the code")
 
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists in memory.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to check.
@@ -582,8 +645,11 @@ class InMemoryStorage(Storage):
         Returns:
             bool: True if the plan exists, False otherwise.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        return plan_id in self.plans
+        raise NotImplementedError("plan_exists is deprecated - the plan is the code")
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Add run to dict.
@@ -721,7 +787,10 @@ class InMemoryStorage(Storage):
 class DiskFileStorage(Storage):
     """Disk-based implementation of the Storage interface.
 
-    Stores serialized Plan and Run objects as JSON files on disk.
+    DEPRECATED: Plan storage has been removed. The plan is the code.
+    Plan-related methods will raise NotImplementedError.
+
+    Stores serialized Run objects as JSON files on disk.
     """
 
     def __init__(self, storage_dir: str | None) -> None:
@@ -748,11 +817,11 @@ class DiskFileStorage(Storage):
             Path(self.storage_dir, file_path).parent.mkdir(parents=True, exist_ok=True)
 
     def _write(self, file_path: str, content: BaseModel) -> None:
-        """Write a serialized Plan or Run to a JSON file.
+        """Write a serialized Run to a JSON file.
 
         Args:
             file_path (str): Path of the file to write.
-            content (BaseModel): The Plan or Run object to serialize.
+            content (BaseModel): The Run object to serialize.
 
         """
         self._ensure_storage(file_path)  # Ensure storage directory exists
@@ -781,14 +850,21 @@ class DiskFileStorage(Storage):
     def save_plan(self, plan: Plan) -> None:
         """Save a Plan object to the storage.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan (Plan): The Plan object to save.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        self._write(f"{plan.id}.json", plan)
+        raise NotImplementedError("save_plan is deprecated - the plan is the code")
 
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a Plan object by its ID.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
 
         Args:
             plan_id (PlanUUID): The ID of the Plan to retrieve.
@@ -797,39 +873,29 @@ class DiskFileStorage(Storage):
             Plan: The retrieved Plan object.
 
         Raises:
-            PlanNotFoundError: If the Plan is not found or validation fails.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        try:
-            return self._read(f"{plan_id}.json", Plan)
-        except (ValidationError, FileNotFoundError) as e:
-            raise PlanNotFoundError(plan_id) from e
+        raise NotImplementedError("get_plan is deprecated - the plan is the code")
 
     def get_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query.
 
-        This method will return the first plan that matches the query. This is not always the most
-        recent plan.
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
 
         Args:
             query (str): The query to get a plan for.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        # Get all plan files and sort by modification time (newest first)
-        # Using st_mtime for cross-platform compatibility
-        plan_files = [
-            f
-            for f in Path(self.storage_dir).iterdir()
-            if f.is_file() and f.name.startswith(PLAN_UUID_PREFIX)
-        ]
-        for f in plan_files:
-            plan = self._read(f.name, Plan)
-            if plan.plan_context.query == query:
-                return plan
-        raise StorageError(f"No plan found for query: {query}")
+        raise NotImplementedError("get_plan_by_query is deprecated - the plan is the code")
 
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists on disk.
+
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
 
         Args:
             plan_id (PlanUUID): The UUID of the plan to check.
@@ -837,8 +903,11 @@ class DiskFileStorage(Storage):
         Returns:
             bool: True if the plan exists, False otherwise.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        return Path(self.storage_dir, f"{plan_id}.json").exists()
+        raise NotImplementedError("plan_exists is deprecated - the plan is the code")
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun object to the storage.
@@ -975,7 +1044,11 @@ class DiskFileStorage(Storage):
 
 
 class PortiaCloudStorage(Storage):
-    """Save plans, runs and tool calls to portia cloud."""
+    """Save runs and tool calls to portia cloud.
+
+    DEPRECATED: Plan storage has been removed. The plan is the code.
+    Plan-related methods will raise NotImplementedError.
+    """
 
     DEFAULT_MAX_CACHE_SIZE = 20
 
@@ -1082,65 +1155,36 @@ class PortiaCloudStorage(Storage):
     def save_plan(self, plan: Plan) -> None:
         """Save a plan to Portia Cloud.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan (Plan): The Plan object to save to the cloud.
 
         Raises:
-            StorageError: If the request to Portia Cloud fails.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        try:
-            response = self.client.post(
-                url="/api/v0/plans/",
-                json={
-                    "id": str(plan.id),
-                    "query": plan.plan_context.query,
-                    "tool_ids": plan.plan_context.tool_ids,
-                    "steps": [step.model_dump(mode="json") for step in plan.steps],
-                    "plan_inputs": [
-                        {**input_.model_dump(mode="json"), "description": input_.description}
-                        for input_ in plan.plan_inputs
-                    ],
-                },
-            )
-        except Exception as e:
-            raise StorageError(e) from e
-        else:
-            self.check_response(response)
+        raise NotImplementedError("save_plan is deprecated - the plan is the code")
 
     async def asave_plan(self, plan: Plan) -> None:
         """Save a plan to Portia Cloud.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan (Plan): The Plan object to save to the cloud.
 
         Raises:
-            StorageError: If the request to Portia Cloud fails.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        try:
-            async with self.client_builder.async_client() as client:
-                response = await client.post(
-                    url="/api/v0/plans/",
-                    json={
-                        "id": str(plan.id),
-                        "query": plan.plan_context.query,
-                        "tool_ids": plan.plan_context.tool_ids,
-                        "steps": [step.model_dump(mode="json") for step in plan.steps],
-                        "plan_inputs": [
-                            {**input_.model_dump(mode="json"), "description": input_.description}
-                            for input_ in plan.plan_inputs
-                        ],
-                    },
-                )
-        except Exception as e:
-            raise StorageError(e) from e
-        else:
-            self.check_response(response)
+        raise NotImplementedError("asave_plan is deprecated - the plan is the code")
 
     def get_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a plan from Portia Cloud.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan_id (PlanUUID): The ID of the plan to retrieve.
 
@@ -1148,23 +1192,16 @@ class PortiaCloudStorage(Storage):
             Plan: The Plan object retrieved from Portia Cloud.
 
         Raises:
-            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        try:
-            response = self.client.get(
-                url=f"/api/v0/plans/{plan_id}/",
-            )
-        except Exception as e:
-            raise StorageError(e) from e
-        else:
-            self.check_response(response)
-            response_json = response.json()
-            return Plan.from_response(response_json)
+        raise NotImplementedError("get_plan is deprecated - the plan is the code")
 
     async def aget_plan(self, plan_id: PlanUUID) -> Plan:
         """Retrieve a plan from Portia Cloud.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan_id (PlanUUID): The ID of the plan to retrieve.
 
@@ -1172,89 +1209,72 @@ class PortiaCloudStorage(Storage):
             Plan: The Plan object retrieved from Portia Cloud.
 
         Raises:
-            StorageError: If the request to Portia Cloud fails or the plan does not exist.
+            NotImplementedError: Always raised - plan storage is deprecated.
 
         """
-        try:
-            async with self.client_builder.async_client() as client:
-                response = await client.get(
-                    url=f"/api/v0/plans/{plan_id}/",
-                )
-        except Exception as e:
-            raise StorageError(e) from e
-        else:
-            self.check_response(response)
-            response_json = response.json()
-            return Plan.from_response(response_json)
+        raise NotImplementedError("aget_plan is deprecated - the plan is the code")
 
     def get_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             query (str): The query to get a plan for.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        try:
-            plans = self.get_similar_plans(query, threshold=1.0, limit=1)
-        except Exception as e:
-            raise StorageError(e) from e
-        if not plans:
-            raise StorageError(f"No plan found for query: {query}")
-        return plans[0]
+        raise NotImplementedError("get_plan_by_query is deprecated - the plan is the code")
 
     async def aget_plan_by_query(self, query: str) -> Plan:
         """Get a plan by query asynchronously using threaded execution.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             query (str): The query to get a plan for.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        try:
-            plans = await self.aget_similar_plans(query, threshold=1.0, limit=1)
-        except Exception as e:
-            raise StorageError(e) from e
-        if not plans:
-            raise StorageError(f"No plan found for query: {query}")
-        return plans[0]
+        raise NotImplementedError("aget_plan_by_query is deprecated - the plan is the code")
 
     def plan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists in Portia Cloud.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan_id (PlanUUID): The UUID of the plan to check.
 
         Returns:
             bool: True if the plan exists, False otherwise.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        try:
-            response = self.client.get(
-                url=f"/api/v0/plans/{plan_id}/",
-            )
-        except Exception:  # noqa: BLE001
-            return False
-        else:
-            return response.is_success
+        raise NotImplementedError("plan_exists is deprecated - the plan is the code")
 
     async def aplan_exists(self, plan_id: PlanUUID) -> bool:
         """Check if a plan exists in Portia Cloud.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             plan_id (PlanUUID): The UUID of the plan to check.
 
         Returns:
             bool: True if the plan exists, False otherwise.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        try:
-            async with self.client_builder.async_client() as client:
-                response = await client.get(
-                    url=f"/api/v0/plans/{plan_id}/",
-                )
-        except Exception:  # noqa: BLE001
-            return False
-        else:
-            return response.is_success
+        raise NotImplementedError("aplan_exists is deprecated - the plan is the code")
 
     def save_plan_run(self, plan_run: PlanRun) -> None:
         """Save PlanRun to Portia Cloud.
@@ -1774,6 +1794,8 @@ class PortiaCloudStorage(Storage):
     def get_similar_plans(self, query: str, threshold: float = 0.5, limit: int = 5) -> list[Plan]:
         """Get similar plans to the query.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             query (str): The query to get similar plans for.
             threshold (float): The threshold for similarity.
@@ -1782,27 +1804,19 @@ class PortiaCloudStorage(Storage):
         Returns:
             list[Plan]: The list of similar plans.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        try:
-            response = self.client.post(
-                "/api/v0/plans/embeddings/search/",
-                json={
-                    "query": query,
-                    "threshold": threshold,
-                    "limit": limit,
-                },
-            )
-            self.check_response(response)
-            results = response.json()
-            return [Plan.from_response(result) for result in results]
-        except Exception as e:
-            raise StorageError(e) from e
+        raise NotImplementedError("get_similar_plans is deprecated - the plan is the code")
 
     async def aget_similar_plans(
         self, query: str, threshold: float = 0.5, limit: int = 5
     ) -> list[Plan]:
         """Get similar plans to the query.
 
+        DEPRECATED: Plan storage is deprecated. The plan is the code.
+
         Args:
             query (str): The query to get similar plans for.
             threshold (float): The threshold for similarity.
@@ -1811,22 +1825,11 @@ class PortiaCloudStorage(Storage):
         Returns:
             list[Plan]: The list of similar plans.
 
+        Raises:
+            NotImplementedError: Always raised - plan storage is deprecated.
+
         """
-        try:
-            async with self.client_builder.async_client() as client:
-                response = await client.post(
-                    url="/api/v0/plans/embeddings/search/",
-                    json={
-                        "query": query,
-                        "threshold": threshold,
-                        "limit": limit,
-                    },
-                )
-            self.check_response(response)
-            results = response.json()
-            return [Plan.from_response(result) for result in results]
-        except Exception as e:
-            raise StorageError(e) from e
+        raise NotImplementedError("aget_similar_plans is deprecated - the plan is the code")
 
     def save_end_user(self, end_user: EndUser) -> EndUser:
         """Save an end_user to Portia Cloud.
