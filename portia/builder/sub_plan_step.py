@@ -5,16 +5,16 @@ from typing import Any, override
 from langsmith import traceable
 from pydantic import Field
 
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan
 from portia.builder.reference import Input
-from portia.builder.step_v2 import StepV2
-from portia.plan import PlanInput, Step
+from portia.builder.step import Step
+from portia.plan import PlanInput, Step as StepData
 from portia.portia import Portia
 from portia.run_context import RunContext
 
 
-class SubPlanStep(StepV2):
-    """A step that executes a nested PlanV2 and returns its final result.
+class SubPlanStep(Step):
+    """A step that executes a nested Plan and returns its final result.
 
     This step allows for modular plan composition by executing a complete sub-plan
     within the context of a larger plan. The sub-plan runs with its own input values
@@ -27,7 +27,7 @@ class SubPlanStep(StepV2):
     which can then be referenced by subsequent steps in the parent plan.
     """
 
-    plan: PlanV2 = Field(description="The sub-plan to execute.")
+    plan: Plan = Field(description="The sub-plan to execute.")
     sub_portia: Portia | None = Field(
         default=None, exclude=True, description="Cached Portia instance for sub-plan execution."
     )
@@ -64,7 +64,7 @@ class SubPlanStep(StepV2):
         return plan_run.outputs.final_output.full_value(run_data.storage)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this SubPlanStep to a legacy Step."""
         tools = [s.to_legacy_step(plan).tool_id for s in self.plan.steps]
         inputs = [Input(plan_input.name) for plan_input in self.plan.plan_inputs]

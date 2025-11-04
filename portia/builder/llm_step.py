@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -17,15 +17,15 @@ from pydantic import BaseModel, Field
 
 from portia.model import GenerativeModel  # noqa: TC001
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Step
+from portia.plan import Step as StepData
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class LLMStep(StepV2):
+class LLMStep(Step):
     """A step that executes a task using an LLM without any tool access.
 
     This step is used for pure language model tasks like text generation,
@@ -92,7 +92,7 @@ class LLMStep(StepV2):
         return await wrapped_tool.arun(tool_ctx, task=task, task_data=task_data)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this LLMStep to a legacy Step."""
         return Step(
             task=self.task,

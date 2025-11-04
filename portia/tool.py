@@ -58,7 +58,7 @@ from portia.execution_agents.execution_utils import is_clarification
 from portia.execution_agents.output import LocalDataValue, Output
 from portia.logger import logger
 from portia.mcp_session import McpClientConfig, get_mcp_session
-from portia.plan import Plan
+from portia.plan import LegacyPlan
 from portia.plan_run import PlanRun
 from portia.templates.render import render_template
 
@@ -71,7 +71,7 @@ class ToolRunContext(BaseModel):
 
     Attributes:
         plan_run(PlanRun): The run the tool run is part of.
-        plan(Plan): The plan the tool run is part of.
+        plan(LegacyPlan): The plan the tool run is part of.
         config(Config): The config for the SDK as a whole.
         clarifications(ClarificationListType): Relevant clarifications for this tool plan_run.
 
@@ -81,7 +81,7 @@ class ToolRunContext(BaseModel):
 
     end_user: EndUser
     plan_run: PlanRun
-    plan: Plan
+    plan: LegacyPlan
     config: Config
     clarifications: ClarificationListType
 

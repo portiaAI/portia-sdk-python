@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence  # noqa: TC003
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 from portia.model import GenerativeModel  # noqa: TC001
 
 if sys.version_info >= (3, 12):
@@ -18,16 +18,16 @@ from langsmith import traceable
 from pydantic import BaseModel, Field
 
 from portia.execution_agents.react_agent import ReActAgent
-from portia.plan import Step
+from portia.plan import Step as StepData
 from portia.tool import Tool  # noqa: TC001
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class ReActAgentStep(StepV2):
+class ReActAgentStep(Step):
     """A step where an LLM agent uses ReAct reasoning to complete a task with multiple tools.
 
     Unlike SingleToolAgentStep which is limited to one specific tool and one tool call, this step
@@ -127,7 +127,7 @@ class ReActAgentStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this SingleToolAgentStep to a Step."""
         return Step(
             task=self.task,

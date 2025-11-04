@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING, Any
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -21,16 +21,16 @@ from portia.clarification import (
 from portia.errors import ToolNotFoundError
 from portia.execution_agents.execution_utils import is_clarification
 from portia.model import Message
-from portia.plan import Step
+from portia.plan import Step as StepData
 from portia.tool import Tool  # noqa: TC001
 from portia.tool_wrapper import ToolCallWrapper
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class InvokeToolStep(StepV2):
+class InvokeToolStep(Step):
     """A step that directly invokes a tool with specific arguments.
 
     This performs a direct tool call without LLM involvement, making it suitable
@@ -115,7 +115,7 @@ class InvokeToolStep(StepV2):
         return output_value
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this InvokeToolStep to a legacy Step."""
         args_desc = ", ".join(
             [f"{k}={self._resolve_input_names_for_printing(v, plan)}" for k, v in self.args.items()]

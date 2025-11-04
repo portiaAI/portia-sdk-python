@@ -1,14 +1,14 @@
-"""Context for a PlanV2 run."""
+"""Context for a Plan run."""
 
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan
 from portia.config import Config
 from portia.end_user import EndUser
 from portia.execution_hooks import ExecutionHooks
-from portia.plan import Plan
+from portia.plan import LegacyPlan, PlanContext
 from portia.plan_run import PlanRun
 from portia.storage import Storage
 from portia.telemetry.telemetry_service import BaseProductTelemetry
@@ -30,8 +30,7 @@ class RunContext(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    plan: PlanV2 = Field(description="The Portia plan being executed.")
-    legacy_plan: Plan = Field(description="The legacy plan representation.")
+    plan: Plan = Field(description="The Portia plan being executed.")
     plan_run: PlanRun = Field(description="The current plan run instance.")
     end_user: EndUser = Field(description="The end user executing the plan.")
     step_output_values: list[StepOutputValue] = Field(
@@ -45,10 +44,20 @@ class RunContext(BaseModel):
 
     def get_tool_run_ctx(self) -> ToolRunContext:
         """Get the tool run context."""
+        # Create a LegacyPlan for backward compatibility
+        step_data_list = self.plan.to_step_data_list()
+        tool_ids = list({step.tool_id for step in step_data_list if step.tool_id})
+        legacy_plan = LegacyPlan(
+            id=self.plan.id,
+            plan_context=PlanContext(query=self.plan.label, tool_ids=tool_ids),
+            steps=step_data_list,
+            plan_inputs=self.plan.plan_inputs,
+            structured_output_schema=self.plan.final_output_schema,
+        )
         return ToolRunContext(
             end_user=self.end_user,
             plan_run=self.plan_run,
-            plan=self.legacy_plan,
+            plan=legacy_plan,
             config=self.config,
             clarifications=self.plan_run.get_clarifications_for_step(),
         )

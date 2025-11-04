@@ -12,7 +12,7 @@ from portia.builder.conditionals import (
     ConditionalStepResult,
 )
 from portia.builder.reference import Reference  # noqa: TC001
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -23,14 +23,14 @@ from langsmith import traceable
 from pydantic import Field, field_validator
 
 from portia.execution_agents.conditional_evaluation_agent import ConditionalEvaluationAgent
-from portia.plan import Step
+from portia.plan import Step as StepData
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class ConditionalStep(StepV2):
+class ConditionalStep(Step):
     """A step that represents a conditional clause within a conditional execution block.
 
     This step handles conditional logic such as if, else-if, else, and end-if statements
@@ -104,7 +104,7 @@ class ConditionalStep(StepV2):
         )
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this ConditionalStep to a legacy Step."""
         if isinstance(self.condition, str):
             cond_str = self.condition

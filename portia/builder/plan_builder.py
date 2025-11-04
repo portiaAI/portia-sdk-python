@@ -1,4 +1,4 @@
-"""Builder class for constructing :class:`PlanV2` instances.
+"""Builder class for constructing :class:`Plan` instances.
 
 You can view an example of this class in use in example_builder.py.
 """
@@ -18,17 +18,17 @@ from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.llm_step import LLMStep
 from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopBlock, LoopStepType, LoopType
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Reference, default_step_name
 from portia.builder.single_tool_agent_step import SingleToolAgentStep
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 from portia.builder.sub_plan_step import SubPlanStep
 from portia.builder.user_input import UserInputStep
 from portia.builder.user_verify import UserVerifyStep
 from portia.plan import PlanInput
 from portia.telemetry.telemetry_service import ProductTelemetry
-from portia.telemetry.views import PlanV2BuildTelemetryEvent
+from portia.telemetry.views import PlanBuildTelemetryEvent
 from portia.tool_decorator import tool
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from portia.builder.step_v2 import StepV2
+    from portia.builder.step import Step
     from portia.common import Serializable
     from portia.model import GenerativeModel
     from portia.tool import Tool
@@ -46,7 +46,7 @@ class PlanBuilderError(ValueError):
     """Error in Plan definition."""
 
 
-class PlanBuilderV2:
+class PlanBuilder:
     """Chainable builder used to assemble Portia plans.
 
     See example_builder.py for a complete example of how to use this class.
@@ -59,7 +59,7 @@ class PlanBuilderV2:
             label: Human readable label for the plan shown in the Portia dashboard.
 
         """
-        self.plan = PlanV2(steps=[], label=label)
+        self.plan = Plan(steps=[], label=label)
         self._block_stack: list[ConditionalBlock | LoopBlock] = []
 
     def input(
@@ -68,7 +68,7 @@ class PlanBuilderV2:
         name: str,
         description: str | None = None,
         default_value: Any | None = None,  # noqa: ANN401
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add an input required by the plan.
 
         Inputs are values that are provided when running the plan, rather than when building the
@@ -114,26 +114,26 @@ class PlanBuilderV2:
         over: Reference | Sequence[Any] | None = None,
         args: dict[str, Any] | None = None,
         step_name: str | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Start a new loop block.
 
         This creates a loop that can iterate over a sequence of values or repeat while a condition
         is true. You must specify exactly one of the loop types: while_, do_while_, or over.
 
         For 'while' loops, the condition is checked before each iteration:
-        PlanBuilderV2()
+        PlanBuilder()
             .loop(while_=lambda: some_condition)
             .llm_step(task="Repeats while true")
             .end_loop()
 
         For 'do_while' loops, the condition is checked after each iteration:
-        PlanBuilderV2()
+        PlanBuilder()
             .loop(do_while_=lambda: some_condition)
             .llm_step(task="Runs at least once")
             .end_loop()
 
         For 'for_each' loops, iterate over a sequence or reference:
-        PlanBuilderV2().loop(over=Input("items")).llm_step(task="Process each item").end_loop()
+        PlanBuilder().loop(over=Input("items")).llm_step(task="Process each item").end_loop()
 
         After opening a loop block with this loop method, you must close the block with
         .end_loop() later in the plan.
@@ -189,7 +189,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def end_loop(self, step_name: str | None = None) -> PlanBuilderV2:
+    def end_loop(self, step_name: str | None = None) -> PlanBuilder:
         """Close the most recently opened loop block.
 
         This method must be called to properly close any loop block that was opened with
@@ -197,11 +197,11 @@ class PlanBuilderV2:
         steps outside the loop. For example:
 
         # Simple while loop
-        PlanBuilderV2().loop(while_=lambda: some_condition).llm_step(task="Repeats").end_loop()
+        PlanBuilder().loop(while_=lambda: some_condition).llm_step(task="Repeats").end_loop()
         .llm_step(task="Runs after loop")
 
         # For-each loop over input items
-        PlanBuilderV2().loop(over=Input("items")).llm_step(task="Process item").end_loop()
+        PlanBuilder().loop(over=Input("items")).llm_step(task="Process item").end_loop()
         .llm_step(task="Runs after all items processed")
 
         Failing to call end_loop() after opening a loop block with loop() will result in an
@@ -239,17 +239,17 @@ class PlanBuilderV2:
         self,
         condition: Callable[..., bool] | str,
         args: dict[str, Any] | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Start a new conditional block.
 
         Steps after this if (and before any else, else_if, or endif) are executed only when the
         `condition` evaluates to `True`. For example:
 
         # This will run the llm step
-        PlanBuilderV2().if_(condition=lambda: True).llm_step(task="Will run").endif()
+        PlanBuilder().if_(condition=lambda: True).llm_step(task="Will run").endif()
 
         # This will not run the llm step
-        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run").endif()
+        PlanBuilder().if_(condition=lambda: False).llm_step(task="Won't run").endif()
 
         After opening a conditional block with this if_ method, you must close the block with
         .endif() later in the plan.
@@ -286,7 +286,7 @@ class PlanBuilderV2:
         self,
         condition: Callable[..., bool],
         args: dict[str, Any] | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add an `else if` clause to the current conditional block.
 
         Steps after this else_if (and before any 'else' or 'endif') are executed only when the
@@ -294,15 +294,15 @@ class PlanBuilderV2:
         evaluated to False. For example:
 
         # This will run the llm step
-        PlanBuilderV2().if_(condition=lambda: False).else_if_(condition=lambda: True)
+        PlanBuilder().if_(condition=lambda: False).else_if_(condition=lambda: True)
         .llm_step(task="Will run").endif()
 
         # This will not run the llm step
-        PlanBuilderV2().if_(condition=lambda: False).else_if_(condition=lambda: True)
+        PlanBuilder().if_(condition=lambda: False).else_if_(condition=lambda: True)
         .llm_step(task="Won't run").endif()
 
         # This will not run the llm step
-        PlanBuilderV2().if_(condition=lambda: True).else_if_(condition=lambda: True)
+        PlanBuilder().if_(condition=lambda: True).else_if_(condition=lambda: True)
         .llm_step(task="Won't run").endif()
 
         You must ensure that this conditional block is closed with an endif() call later in
@@ -336,18 +336,18 @@ class PlanBuilderV2:
         )
         return self
 
-    def else_(self) -> PlanBuilderV2:
+    def else_(self) -> PlanBuilder:
         """Add an `else` clause to the current conditional block.
 
         Steps after this else (and before any 'endif') are executed only when all previous
         conditions ('if' and any 'else if') have been evaluated to False. For example:
 
         # This will run the llm step in the else clause
-        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run")
+        PlanBuilder().if_(condition=lambda: False).llm_step(task="Won't run")
         .else_().llm_step(task="Will run").endif()
 
         # This will not run the llm step in the else clause
-        PlanBuilderV2().if_(condition=lambda: True).llm_step(task="Will run")
+        PlanBuilder().if_(condition=lambda: True).llm_step(task="Will run")
         .else_().llm_step(task="Won't run").endif()
 
         You must ensure that this conditional block is closed with an endif() call later in
@@ -373,7 +373,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def endif(self) -> PlanBuilderV2:
+    def endif(self) -> PlanBuilder:
         """Close the most recently opened conditional block.
 
         This method must be called to properly close any conditional block that was opened with
@@ -381,11 +381,11 @@ class PlanBuilderV2:
         unconditional steps. For example:
 
         # Simple if-endif block
-        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run").endif()
+        PlanBuilder().if_(condition=lambda: False).llm_step(task="Won't run").endif()
         .llm_step(task="Will run")
 
         # Complex if-else_if-else-endif block
-        PlanBuilderV2().if_(condition=lambda: False).llm_step(task="Won't run")
+        PlanBuilder().if_(condition=lambda: False).llm_step(task="Won't run")
         .else_if_(condition=lambda: False).llm_step(task="Won't run")
         .else_().llm_step(task="Will run")
         .endif()
@@ -422,7 +422,7 @@ class PlanBuilderV2:
         step_name: str | None = None,
         system_prompt: str | None = None,
         model: str | GenerativeModel | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step that sends a task to an LLM.
 
         The output from the step is a string (if no output schema is provided) or a structured
@@ -464,7 +464,7 @@ class PlanBuilderV2:
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step that invokes a tool directly.
 
         This is a raw tool call without any LLM involvement. The args passed into this method have
@@ -500,7 +500,7 @@ class PlanBuilderV2:
         args: dict[str, Any] | None = None,
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step that calls a Python function.
 
         This step directly calls a python function without any LLM involvement. It is useful for
@@ -536,7 +536,7 @@ class PlanBuilderV2:
         output_schema: type[BaseModel] | None = None,
         step_name: str | None = None,
         model: str | GenerativeModel | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step where an agent uses a single tool to complete a task.
 
         This creates an LLM agent that has access to exactly one tool and uses it once to complete
@@ -587,7 +587,7 @@ class PlanBuilderV2:
         allow_agent_clarifications: bool = False,
         tool_call_limit: int = 25,
         model: str | GenerativeModel | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step that uses a ReAct agent with multiple tools.
 
         The ReAct agent uses reasoning and acting cycles to complete complex tasks
@@ -621,7 +621,7 @@ class PlanBuilderV2:
         )
         return self
 
-    def user_verify(self, *, message: str, step_name: str | None = None) -> PlanBuilderV2:
+    def user_verify(self, *, message: str, step_name: str | None = None) -> PlanBuilder:
         """Add a user confirmation step.
 
         This pauses plan execution and asks the user to confirm or reject the provided
@@ -658,7 +658,7 @@ class PlanBuilderV2:
         message: str,
         options: list[Serializable] | None = None,
         step_name: str | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step that requests input from the user.
 
         This pauses plan execution and prompts the user to provide input. If options are
@@ -694,15 +694,15 @@ class PlanBuilderV2:
         )
         return self
 
-    def add_step(self, step: StepV2) -> PlanBuilderV2:
+    def add_step(self, step: Step) -> PlanBuilder:
         """Add a pre-built step to the plan.
 
         This allows you to integrate custom step types that you've created by subclassing
-        StepV2, or to reuse steps that were created elsewhere. The step is added as-is
+        Step, or to reuse steps that were created elsewhere. The step is added as-is
         to the plan without any modification.
 
         Args:
-            step: A pre-built step instance that inherits from StepV2.
+            step: A pre-built step instance that inherits from Step.
 
         """
         self.plan.steps.append(step)
@@ -710,10 +710,10 @@ class PlanBuilderV2:
 
     def add_sub_plan(
         self,
-        plan: PlanV2 | Iterable[StepV2],
+        plan: Plan | Iterable[Step],
         input_values: dict[str, Any] | None = None,
         step_name: str | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add a step that runs a sub-plan and returns its final output.
 
         The sub-plan executes completely as an independent workflow with its own step sequence.
@@ -724,7 +724,7 @@ class PlanBuilderV2:
         Args:
             plan: The sub-plan to run.
             input_values: Optional mapping of inputs in the sub-plan to values. This is
-               only used when plan is a PlanV2, and is useful if a sub-plan has an input
+               only used when plan is a Plan, and is useful if a sub-plan has an input
                and you want to provide a value for it from a step in the top-level plan.
                For example:
 
@@ -739,8 +739,8 @@ class PlanBuilderV2:
                 referenced via StepOutput("name_of_step") rather than by index.
 
         """
-        if not isinstance(plan, PlanV2):
-            builder = PlanBuilderV2()
+        if not isinstance(plan, Plan):
+            builder = PlanBuilder()
             for step in plan:
                 builder.add_step(step)
             plan = builder.build()
@@ -785,7 +785,7 @@ class PlanBuilderV2:
         message: str = "",
         error: bool = False,
         step_name: str | None = None,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Add an exit step to the plan.
 
         This step will cause the plan to exit gracefully when executed.
@@ -812,7 +812,7 @@ class PlanBuilderV2:
         self,
         output_schema: type[BaseModel] | None = None,
         summarize: bool = False,
-    ) -> PlanBuilderV2:
+    ) -> PlanBuilder:
         """Define the final output schema for the plan.
 
         This configures how the plan's final result should be structured. The final output is
@@ -832,7 +832,7 @@ class PlanBuilderV2:
         self.plan.summarize = summarize
         return self
 
-    def build(self) -> PlanV2:
+    def build(self) -> Plan:
         """Finalize and return the built plan.
 
         Raises:
@@ -852,7 +852,7 @@ class PlanBuilderV2:
 
         telemetry = ProductTelemetry()
         telemetry.capture(
-            PlanV2BuildTelemetryEvent(
+            PlanBuildTelemetryEvent(
                 plan_length=len(self.plan.steps), step_type_counts=step_type_counts
             )
         )

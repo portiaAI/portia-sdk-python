@@ -6,12 +6,12 @@ from portia.builder.conditional_step import ConditionalStep
 from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.llm_step import LLMStep
 from portia.builder.loop_step import LoopStep
-from portia.builder.plan_builder_v2 import PlanBuilderV2
-from portia.builder.plan_v2 import PlanV2
+from portia.builder.plan import Plan as BuilderPlan
+from portia.builder.plan_builder import PlanBuilder
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Input, StepOutput
 from portia.builder.single_tool_agent_step import SingleToolAgentStep
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step as BuilderStep
 from portia.builder.user_input import UserInputStep
 from portia.builder.user_verify import UserVerifyStep
 
@@ -93,8 +93,13 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
+from portia.plan import PlanContext, PlanInput, PlanUUID, Variable
+from portia.plan import Step as StepData
 from portia.plan_run import PlanRun, PlanRunState
+
+# Aliasing BuilderPlan to Plan for the main API
+Plan = BuilderPlan
+Step = BuilderStep
 
 # Core classes
 from portia.portia import ExecutionHooks, Portia
@@ -159,7 +164,6 @@ __all__ = [
     "Output",
     "Plan",
     "PlanBuilder",
-    "PlanBuilderV2",
     "PlanContext",
     "PlanCostEstimate",
     "PlanError",
@@ -169,7 +173,6 @@ __all__ = [
     "PlanRunNotFoundError",
     "PlanRunState",
     "PlanUUID",
-    "PlanV2",
     "PlanningAgentType",
     "Portia",
     "PortiaBaseError",
@@ -181,8 +184,8 @@ __all__ = [
     "StdioMcpClientConfig",
     "Step",
     "StepCostEstimate",
+    "StepData",
     "StepOutput",
-    "StepV2",
     "StorageClass",
     "StorageError",
     "Tool",
