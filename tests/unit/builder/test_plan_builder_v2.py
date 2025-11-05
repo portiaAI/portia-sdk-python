@@ -843,6 +843,27 @@ def test_add_step_and_add_sub_plan_integration() -> None:
     assert isinstance(builder.plan.steps[3], SingleToolAgentStep)
 
 
+def test_on_error_attaches_handler_and_ignore_errors_sets_none() -> None:
+    """Ensure on_error attaches to previous step and ignore_errors sets None handler."""
+    builder = (
+        PlanBuilderV2()
+        .function_step(function=lambda: "ok", step_name="will_be_overridden")
+        .on_error(lambda e: "handled")
+    )
+    assert callable(builder.plan.steps[-1].on_error)
+
+    builder.ignore_errors()
+    assert callable(builder.plan.steps[-1].on_error)
+    # Call to verify lambda signature works
+    assert builder.plan.steps[-1].on_error(Exception("x")) is None  # type: ignore[union-attr]
+
+
+def test_on_error_without_previous_step_raises() -> None:
+    """Calling on_error before adding any steps should raise PlanBuilderError."""
+    with pytest.raises(PlanBuilderError, match="on_error must be called after adding a step"):
+        PlanBuilderV2().on_error(lambda e: None)
+
+
 def test_basic_if_endif_block() -> None:
     """Test basic if-endif conditional block."""
     builder = PlanBuilderV2()
