@@ -85,6 +85,7 @@ from portia.open_source_tools.llm_tool import LLMTool
 from portia.open_source_tools.local_file_reader_tool import FileReaderTool
 from portia.open_source_tools.local_file_writer_tool import FileWriterTool
 from portia.open_source_tools.map_tool import MapTool
+from portia.open_source_tools.openai_search_tool import OpenAISearchTool
 from portia.open_source_tools.registry import (
     example_tool_registry,
     open_source_tool_registry,
@@ -156,6 +157,7 @@ __all__ = [
     "McpToolRegistry",
     "Message",
     "MultipleChoiceClarification",
+    "OpenAISearchTool",
     "Output",
     "Plan",
     "PlanBuilder",

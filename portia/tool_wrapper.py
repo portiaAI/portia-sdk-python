@@ -182,7 +182,9 @@ class ToolCallWrapper(Tool):
             else input_str
         )
         logger().info(
-            f"Invoking {record.tool_name!s} with args: {truncated_input}",
+            "Invoking tool with args",
+            tool_name=record.tool_name,
+            args=truncated_input,
         )
         return record
 
