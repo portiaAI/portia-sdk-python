@@ -277,6 +277,40 @@ class CustomClarification(Clarification):
     )
 
 
+class HostedClarification(BaseModel):
+    """Hosted clarification with a shareable URL.
+
+    Represents a clarification that has been created on the backend and can be accessed
+    via a unique, unguessable URL. This is raised by the SDK when use_hosted_clarifications
+    is enabled in the configuration.
+
+    Attributes:
+        url (HttpUrl): The unique URL where the clarification can be resolved.
+        clarification_id (str): The unique identifier for the hosted clarification.
+
+    """
+
+    url: HttpUrl = Field(
+        description="The unique URL where the clarification can be resolved",
+    )
+    clarification_id: str = Field(
+        description="The unique identifier for the hosted clarification",
+    )
+
+    @field_serializer("url")
+    def serialize_url(self, url: HttpUrl) -> str:
+        """Serialize the URL to a string.
+
+        Args:
+            url (HttpUrl): The URL to be serialized.
+
+        Returns:
+            str: The serialized string representation of the URL.
+
+        """
+        return str(url)
+
+
 """Type that encompasses all possible clarification types."""
 ClarificationType = (
     Clarification
@@ -286,6 +320,7 @@ ClarificationType = (
     | ValueConfirmationClarification
     | UserVerificationClarification
     | CustomClarification
+    | HostedClarification
 )
 
 

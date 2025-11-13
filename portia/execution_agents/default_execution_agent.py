@@ -581,7 +581,7 @@ class ToolCallingModel:
                 )
                 logger().debug("Finished before_tool_call execution hook")
                 if clarification:
-                    self.agent.new_clarifications.append(clarification)
+                    self.agent.add_clarification(clarification)
             if self.agent.new_clarifications:
                 return {"messages": []}
 
@@ -665,14 +665,14 @@ class DefaultExecutionAgent(BaseExecutionAgent):
             matching_clarification = self.get_last_resolved_clarification(arg.name)
 
             if not matching_clarification:
-                self.new_clarifications.append(
+                self.add_clarification(
                     InputClarification(
                         plan_run_id=self.plan_run.id,
                         argument_name=arg.name,
                         user_guidance=f"Missing Argument: {arg.name}",
                         step=self.plan_run.current_step_index,
                         source="Default execution agent",
-                    ),
+                    )
                 )
         if self.new_clarifications:
             return END

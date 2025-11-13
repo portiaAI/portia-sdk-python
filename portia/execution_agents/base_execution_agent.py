@@ -136,6 +136,37 @@ class BaseExecutionAgent:
             step_inputs,
         )
 
+    def add_clarification(self, clarification: Clarification) -> None:
+        """Add a clarification, converting to hosted if configured.
+
+        If use_hosted_clarifications is enabled in the config, this method will
+        create a hosted clarification via the backend API and add the HostedClarification
+        object to new_clarifications. Otherwise, it adds the standard clarification.
+
+        Args:
+            clarification: The clarification to add.
+
+        """
+        if self.config.use_hosted_clarifications:
+            try:
+                from portia.cloud import PortiaCloudClient  # noqa: PLC0415
+
+                client = PortiaCloudClient(self.config)
+                hosted_clarification = client.create_hosted_clarification(
+                    plan_run_id=self.plan_run.id,
+                    clarification=clarification,
+                )
+                self.new_clarifications.append(hosted_clarification)
+                logger().info(
+                    f"Created hosted clarification with URL: {hosted_clarification.url}"
+                )
+            except Exception:  # noqa: BLE001
+                # Fall back to local clarification on error
+                logger().exception("Failed to create hosted clarification, falling back to local")
+                self.new_clarifications.append(clarification)
+        else:
+            self.new_clarifications.append(clarification)
+
     def next_state_after_tool_call(
         self,
         config: Config,
@@ -182,7 +213,7 @@ class BaseExecutionAgent:
                 )
                 logger().debug("Finished after_tool_call execution hook")
                 if clarification:
-                    self.new_clarifications.append(clarification)
+                    self.add_clarification(clarification)
                     return END
 
         # Prefers the step's structured output schema, if available.
