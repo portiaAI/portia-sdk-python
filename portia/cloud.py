@@ -1,8 +1,16 @@
 """Core client for interacting with portia cloud."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import httpx
 
 from portia.config import Config
+
+if TYPE_CHECKING:
+    from portia.clarification import Clarification, HostedClarification
+    from portia.prefixed_uuid import PlanRunUUID
 
 
 class PortiaCloudClient:
@@ -77,4 +85,43 @@ class PortiaCloudClient:
             headers=headers,
             timeout=httpx.Timeout(60),
             limits=httpx.Limits(max_connections=10),
+        )
+
+    def create_hosted_clarification(
+        self,
+        plan_run_id: PlanRunUUID,
+        clarification: Clarification,
+    ) -> HostedClarification:
+        """Create a hosted clarification via the API.
+
+        Args:
+            plan_run_id: The ID of the plan run.
+            clarification: The clarification to be hosted.
+
+        Returns:
+            HostedClarification: The hosted clarification with URL.
+
+        Raises:
+            httpx.HTTPError: If the API request fails.
+
+        """
+        from portia.clarification import HostedClarification
+
+        client = self.new_client(self.config)
+
+        # Serialize the clarification to JSON
+        clarification_data = clarification.model_dump(mode="json")
+
+        # Make the API call
+        response = client.post(
+            f"/api/v0/plan_runs/{plan_run_id}/hosted_clarifications/",
+            json={"clarification_data": clarification_data},
+        )
+        response.raise_for_status()
+
+        # Parse the response
+        data = response.json()
+        return HostedClarification(
+            url=data["url"],
+            clarification_id=data["id"],
         )

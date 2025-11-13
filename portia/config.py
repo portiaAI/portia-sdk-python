@@ -516,6 +516,13 @@ class Config(BaseModel):
             "ask clarifying questions to the user about the arguments to a tool call."
         ),
     )
+    use_hosted_clarifications: bool = Field(
+        default=False,
+        description=(
+            "Whether to use hosted clarifications. When enabled, clarifications are created via "
+            "the backend API and return a shareable URL instead of being handled locally."
+        ),
+    )
 
     @model_validator(mode="after")
     def parse_feature_flags(self) -> Self:

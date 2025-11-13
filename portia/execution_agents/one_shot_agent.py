@@ -224,7 +224,7 @@ class OneShotToolCallingModel:
                 )
                 logger().debug("Finished before_tool_call execution hook")
                 if clarification:
-                    self.agent.new_clarifications.append(clarification)
+                    self.agent.add_clarification(clarification)
             if self.agent.new_clarifications:
                 return {"messages": []}
         return None
