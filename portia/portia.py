@@ -46,6 +46,7 @@ from portia.config import (
     PlanningAgentType,
     StorageClass,
 )
+from portia.context import PortiaContext
 from portia.end_user import EndUser
 from portia.errors import (
     InvalidPlanRunStateError,
@@ -75,6 +76,7 @@ from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
 from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
+from portia.planning.service import PlanningService
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
 from portia.storage import (
@@ -160,6 +162,15 @@ class Portia:
                 self.storage = DiskFileStorage(storage_dir=self.config.storage_dir)
             case StorageClass.CLOUD:
                 self.storage = PortiaCloudStorage(config=self.config)
+
+        # Create PortiaContext and PlanningService
+        self.context = PortiaContext(
+            storage=self.storage,
+            tool_registry=self.tool_registry,
+            config=self.config,
+            telemetry=self.telemetry,
+        )
+        self.planning_service = PlanningService(context=self.context)
 
     def initialize_end_user(self, end_user: str | EndUser | None = None) -> EndUser:
         """Handle initializing the end_user based on the provided type."""
@@ -663,64 +674,15 @@ class Portia:
             PlanError: If there is an error while generating the plan.
 
         """
-        if use_cached_plan:
-            try:
-                return self.storage.get_plan_by_query(query)
-            except StorageError as e:
-                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
-
-        if isinstance(tools, list):
-            tools = [
-                self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
-                for tool in tools
-            ]
-
-        if not tools:
-            tools = self.tool_registry.match_tools(query)
-
-        resolved_example_plans = self._resolve_example_plans(example_plans)
-
-        end_user = self.initialize_end_user(end_user)
-        logger().info(f"Running planning_agent for query - {query}")
-        planning_agent = self._get_planning_agent()
-        coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
-
-        outcome = planning_agent.generate_steps_or_error(
+        return self.planning_service.generate_plan(
             query=query,
-            tool_list=tools,
+            tools=tools,
+            example_plans=example_plans,
             end_user=end_user,
-            examples=resolved_example_plans,
-            plan_inputs=coerced_plan_inputs,
-        )
-
-        if outcome.error:
-            self._log_replan_with_portia_cloud_tools(
-                outcome.error,
-                query,
-                end_user,
-                resolved_example_plans,
-            )
-            logger().error(f"Error in planning - {outcome.error}")
-            raise PlanError(outcome.error)
-
-        plan = Plan(
-            plan_context=PlanContext(
-                query=query,
-                tool_ids=[tool.id for tool in tools],
-            ),
-            steps=outcome.steps,
-            plan_inputs=coerced_plan_inputs or [],
+            plan_inputs=plan_inputs,
             structured_output_schema=structured_output_schema,
+            use_cached_plan=use_cached_plan,
         )
-
-        self.storage.save_plan(plan)
-        logger().info(
-            f"Plan created with {len(plan.steps)} steps",
-            plan=str(plan.id),
-        )
-        logger().debug(plan.pretty_print())
-
-        return plan
 
     async def _aplan(
         self,
@@ -765,63 +727,15 @@ class Portia:
             PlanError: If there is an error while generating the plan.
 
         """
-        if use_cached_plan:
-            try:
-                return await self.storage.aget_plan_by_query(query)
-            except StorageError as e:
-                logger().warning(f"Error getting cached plan. Using new plan instead: {e}")
-
-        if isinstance(tools, list):
-            tools = [
-                self.tool_registry.get_tool(tool) if isinstance(tool, str) else tool
-                for tool in tools
-            ]
-
-        if not tools:
-            tools = self.tool_registry.match_tools(query)
-
-        resolved_example_plans = await self._aresolve_example_plans(example_plans)
-
-        end_user = await self.ainitialize_end_user(end_user)
-        logger().info(f"Running planning_agent for query - {query}")
-        planning_agent = self._get_planning_agent()
-        coerced_plan_inputs = self._coerce_plan_inputs(plan_inputs)
-        outcome = await planning_agent.agenerate_steps_or_error(
+        return await self.planning_service.generate_plan_async(
             query=query,
-            tool_list=tools,
+            tools=tools,
+            example_plans=example_plans,
             end_user=end_user,
-            examples=resolved_example_plans,
-            plan_inputs=coerced_plan_inputs,
-        )
-
-        if outcome.error:
-            self._log_replan_with_portia_cloud_tools(
-                outcome.error,
-                query,
-                end_user,
-                resolved_example_plans,
-            )
-            logger().error(f"Error in planning - {outcome.error}")
-            raise PlanError(outcome.error)
-
-        plan = Plan(
-            plan_context=PlanContext(
-                query=query,
-                tool_ids=[tool.id for tool in tools],
-            ),
-            steps=outcome.steps,
-            plan_inputs=coerced_plan_inputs or [],
+            plan_inputs=plan_inputs,
             structured_output_schema=structured_output_schema,
+            use_cached_plan=use_cached_plan,
         )
-
-        await self.storage.asave_plan(plan)
-        logger().info(
-            f"Plan created with {len(plan.steps)} steps",
-            plan=str(plan.id),
-        )
-        logger().debug(plan.pretty_print())
-
-        return plan
 
     def _coerce_plan_inputs(
         self, plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None
