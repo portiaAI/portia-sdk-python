@@ -1,68 +1,24 @@
 <p align="center">
-    <a href="https://docs.portialabs.ai/steel-thread-intro">
-       <img alt="SteelThread banner" src="assets/steelthread_banner.png" width="75%">
-    </a></br>
-<strong>Our flexible evaluation framework is out!</strong></br>
-  🧪 Ingest test cases directly from your agent runs rather than building datasets from scratch.</br>
-  🛰️ Monitor in real-time or with offline evals.</br>
-  📊 Use custom metric definitions including both deterministic and LLM-based judging.</br></br>
-</p>
-
----
-
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/Logo_Portia_Line_White.png">
     <source media="(prefers-color-scheme: light)" srcset="assets/Logo_Portia_Line_Black.png">
     <img alt="Portia AI logo" src="https://raw.githubusercontent.com/portiaAI/portia-sdk-python/main/assets/Logo_Portia_Line_Black.png"  width="50%">
   </picture>
 </p>
-<p align="center">
-  <a href="https://github.com/mahseema/awesome-ai-tools">
-    <img src="https://awesome.re/mentioned-badge-flat.svg" alt="Mentioned in Awesome">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://www.youtube.com/@PortiaAI">
-    <img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white">
-  </a>
-  <a href="https://discord.gg/DvAJz9ffaR">
-    <img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white">
-  </a>
-  <a href="https://x.com/RealPortiaAI">
-    <img src="https://img.shields.io/badge/  X  -000000?logo=twitter&logoColor=white">
-  </a>
-  <a href="https://www.reddit.com/r/PortiaAI/">
-    <img src="https://img.shields.io/badge/Reddit-FF4500?logo=reddit&logoColor=white">
-  </a>
-  <a href="https://www.linkedin.com/company/portiaai">
-    <img src="https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white">
-  </a>
-  <br>
-  <a href="https://app.portialabs.ai">
-    <img src="https://img.shields.io/badge/Dashboard-059669">
-  </a>
-  <a href="https://docs.portialabs.ai">
-    <img src="https://img.shields.io/badge/Docs-38BDF8">
-  </a>
-  <a href="https://blog.portialabs.ai">
-    <img src="https://img.shields.io/badge/Blog-2D3748">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://www.producthunt.com/products/portia-ai?embed=true&utm_source=badge-top-post-badge&utm_medium=badge&utm_source=badge-portia&#0045;ai&#0045;2" target="_blank">
-    <img src="https://api.producthunt.com/widgets/embed-image/v1/top-post-badge.svg?post_id=983741&theme=light&period=daily&t=1751531459759" alt="Portia&#0032;AI - Secure&#0032;AI&#0032;agents&#0032;with&#0032;tools&#0044;&#0032;auth&#0044;&#0032;and&#0032;smart&#0032;control | Product Hunt" style="width: 200px; height: 43.2px;" width="200" height="43.2"/>
-  </a>
-</p>
 
 # Portia SDK Python
 
-Portia AI is an open source developer framework for predictable, stateful, authenticated agentic workflows. We allow developers to have as much or as little oversight as they’d like over their multi-agent deployments and we are obsessively focused on production readiness.
-Play around, break things and tell us how you're getting on in our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>. Most importantly please be kind to your fellow humans (<a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noopener noreferrer">**Code of Conduct (↗)**</a>).
-
-If you want to dive straight in with an example, dive into one of our examples in our **[Examples Repo (↗)](https://github.com/portiaAI/portia-agent-examples)**.
+> **⚠️ Important Notice: Repository Deprecation and Transition to Closed Source**
+> 
+> A commonly known secret in the open source industry is that most companies have an uncomfortable relationship with their open source product at some point in their lifetime. As the Portia product has evolved, it has become increasingly clear that the product that we've built works best for real scaled production deployments. For this reason, we've made the difficult decision to no longer be open source.
+> 
+> To our open source users, firstly, thank you for your contributions and investment in making Portia what it is today. We have yanked all versions on pip but not deleted them – our cut off date for doing so will be the end of November. Likewise, the repository will change to private at the end of November and future evolutions of Portia will be closed source.
+> 
+> If you are using the cloud based product, please get in touch at hello@portialabs.ai to discuss your specific usecase.
+> 
+> Thank you again,
+> 
+> The Portia Team
 
 ## Key features
 
@@ -85,7 +41,6 @@ If you want to dive straight in with an example, dive into one of our examples i
 💾 Large inputs and outputs are automatically stored / retrieved in [Agent memory](https://docs.portialabs.ai/agent-memory) at runtime.</br>
 🔗 Connect [any LLM](https://docs.portialabs.ai/manage-config#configure-llm-options) including local ones, and use your own Redis server for [caching](https://docs.portialabs.ai/manage-config#manage-caching).</br>
 
-<p align="center"><strong>🌟 Star Portia AI to stay updated on new releases!</strong></p>
 
 ## Demo
 To clickthrough at your own pace, please follow this [link](https://snappify.com/view/3d721d6c-c5ff-4e84-b770-83e93bd1a8f1)</br>
@@ -101,6 +56,7 @@ Ensure you have python 3.11 or higher installed using `python --version`. If you
 ```bash
 pip install portia-sdk-python 
 ```
+> **Note:** All versions have been yanked from pip. Existing installations may continue to work, but no new versions will be published. The repository will become private at the end of November.
 
 **Step 2:** Ensure you have an LLM API key set up
 ```bash
@@ -159,20 +115,7 @@ Here is another example where we use our open browser tool. It uses clarificatio
 
 ## Learn more
 - Head over to our docs at <a href="https://docs.portialabs.ai" target="_blank">**docs.portialabs.ai (↗)**</a>.
-- Join the conversation on our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a>.
-- Watch us embarrass ourselves on our <a href="https://www.youtube.com/@PortiaAI" target="_blank">**YouTube channel (↗)**</a>.
-- Follow us on <a href="https://www.producthunt.com/posts/portia-ai" target="_blank">**Product Hunt (↗)**</a>.
-
-## Paid contributions & contribution guidelines
-Head on over to our <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a> for details.
-
-Portia offers a **PAID** contribution program by fixing issues on our 'Issues' list. You can read all about this in the <a href="https://github.com/portiaAI/portia-sdk-python/blob/main/CONTRIBUTING.md" target="_blank">**contribution guide (↗)**</a>.
-
-# ⭐ Support
-You can support our work best by leaving a star!
-![star](https://github.com/user-attachments/assets/8df5e1d9-a0d4-40b4-9c51-945841744050)
-
-We love feedback and suggestions. Please join our <a href="https://discord.gg/DvAJz9ffaR" target="_blank">**Discord channel (↗)**</a> to chat with us.
+- For questions about the cloud-based product, please contact us at hello@portialabs.ai.
 
 # ❤️ Contributors
 A heartfelt thank you to our growing list of contributors!
