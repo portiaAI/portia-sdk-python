@@ -25,10 +25,11 @@ from portia.config_loader import (
     ensure_config_directory,
     get_config_file_path,
 )
-from portia.errors import ConfigNotFoundError, InvalidConfigError
+from portia.errors import ConfigNotFoundError, InvalidConfigError, PlanNotFoundError
 from portia.logger import logger
 from portia.model import LLMProvider
 from portia.portia import ExecutionHooks, Portia
+from portia.storage import StorageError
 from portia.tool_registry import DefaultToolRegistry
 from portia.version import get_version
 
@@ -208,11 +209,11 @@ def run(
     click.echo(plan_run.model_dump_json(indent=4))
 
 
-@click.command()
+@click.command(name="plan")
 @common_options
 @click.argument("query")
 @click.pass_context
-def plan(
+def plan_query(
     ctx: click.Context,
     query: str,
     **kwargs: Any,
@@ -448,6 +449,81 @@ def path() -> None:
     click.echo(f"Exists: {'Yes' if config_file.exists() else 'No'}")
 
 
+@click.group(name="plan-cmd")
+def plan_cmd() -> None:
+    """Manage plans (upvote, downvote, etc.)."""
+
+
+@plan_cmd.command(name="upvote")
+@common_options
+@click.argument("plan_id")
+@click.pass_context
+def upvote(
+    ctx: click.Context,
+    plan_id: str,
+    **kwargs: Any,
+) -> None:
+    """Upvote a plan by its ID.
+
+    This command allows you to upvote a plan stored in Portia Cloud.
+    Only plans stored in cloud storage are eligible for upvoting.
+
+    Example:
+        portia-cli plan-cmd upvote plan_abc123
+
+    """
+    profile = ctx.obj.get("profile") if ctx.obj else None
+    cli_config, config = _get_config(profile=profile, **kwargs)
+
+    portia = Portia(config=config)
+
+    try:
+        portia.upvote_plan(plan_id)
+        click.echo(f"✅ Successfully upvoted plan {plan_id}")
+    except PlanNotFoundError:
+        click.echo(f"❌ Error: Plan with ID '{plan_id}' not found.", err=True)
+        sys.exit(1)
+    except StorageError as e:
+        click.echo(f"❌ Error upvoting plan: {e}", err=True)
+        logger().error(str(e))
+        sys.exit(1)
+
+
+@plan_cmd.command(name="downvote")
+@common_options
+@click.argument("plan_id")
+@click.pass_context
+def downvote(
+    ctx: click.Context,
+    plan_id: str,
+    **kwargs: Any,
+) -> None:
+    """Downvote a plan by its ID.
+
+    This command allows you to downvote a plan stored in Portia Cloud.
+    Only plans stored in cloud storage are eligible for downvoting.
+
+    Example:
+        portia-cli plan-cmd downvote plan_abc123
+
+    """
+    profile = ctx.obj.get("profile") if ctx.obj else None
+    cli_config, config = _get_config(profile=profile, **kwargs)
+
+    portia = Portia(config=config)
+
+    try:
+        portia.downvote_plan(plan_id)
+        click.echo(f"✅ Successfully downvoted plan {plan_id}")
+    except PlanNotFoundError:
+        click.echo(f"❌ Error: Plan with ID '{plan_id}' not found.", err=True)
+        sys.exit(1)
+    except StorageError as e:
+        click.echo(f"❌ Error downvoting plan: {e}", err=True)
+        logger().error(str(e))
+        sys.exit(1)
+
+
 @config.command()
 @click.argument("profile_name", required=False)
 def validate(profile_name: str | None = None) -> None:
@@ -539,9 +615,10 @@ def _get_config(
 
 cli.add_command(version)
 cli.add_command(run)
-cli.add_command(plan)
+cli.add_command(plan_query)
 cli.add_command(list_tools)
 cli.add_command(config)
+cli.add_command(plan_cmd)
 
 if __name__ == "__main__":
     cli(obj={})

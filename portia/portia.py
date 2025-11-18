@@ -2930,6 +2930,82 @@ class Portia:
                 branch_stack.pop()
         return None
 
+    def upvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Upvote a plan stored in Portia Cloud.
+
+        This method allows users to upvote a plan as part of the User-Led Learning (ULL)
+        feedback mechanism. Only plans stored in cloud storage are eligible for upvoting.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to upvote.
+
+        Raises:
+            PlanNotFoundError: If the plan with the given ID is not found.
+            StorageError: If the plan is not stored in cloud storage or if the API request fails.
+
+        """
+        # Ensure we're using cloud storage
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise StorageError(
+                "Upvoting plans is only supported for cloud storage. "
+                "Set storage_class to CLOUD in your configuration."
+            )
+
+        # Convert to string for API call
+        plan_id_str = str(plan_id)
+
+        try:
+            response = self.storage.client.post(
+                url=f"/api/v0/plans/{plan_id_str}/upvote/",
+            )
+            self.storage.check_response(response)
+            logger().info(f"Successfully upvoted plan {plan_id_str}")
+        except Exception as e:
+            logger().error(f"Failed to upvote plan {plan_id_str}: {e}")
+            if "404" in str(e) or "not found" in str(e).lower():
+                # Convert back to PlanUUID for the error
+                uuid_for_error = plan_id if isinstance(plan_id, PlanUUID) else PlanUUID(uuid=UUID(plan_id_str.split("-", 1)[1] if "-" in plan_id_str else plan_id_str))  # noqa: E501
+                raise PlanNotFoundError(uuid_for_error) from e
+            raise StorageError(f"Failed to upvote plan: {e}") from e
+
+    def downvote_plan(self, plan_id: PlanUUID | str) -> None:
+        """Downvote a plan stored in Portia Cloud.
+
+        This method allows users to downvote a plan as part of the User-Led Learning (ULL)
+        feedback mechanism. Only plans stored in cloud storage are eligible for downvoting.
+
+        Args:
+            plan_id (PlanUUID | str): The ID of the plan to downvote.
+
+        Raises:
+            PlanNotFoundError: If the plan with the given ID is not found.
+            StorageError: If the plan is not stored in cloud storage or if the API request fails.
+
+        """
+        # Ensure we're using cloud storage
+        if not isinstance(self.storage, PortiaCloudStorage):
+            raise StorageError(
+                "Downvoting plans is only supported for cloud storage. "
+                "Set storage_class to CLOUD in your configuration."
+            )
+
+        # Convert to string for API call
+        plan_id_str = str(plan_id)
+
+        try:
+            response = self.storage.client.post(
+                url=f"/api/v0/plans/{plan_id_str}/downvote/",
+            )
+            self.storage.check_response(response)
+            logger().info(f"Successfully downvoted plan {plan_id_str}")
+        except Exception as e:
+            logger().error(f"Failed to downvote plan {plan_id_str}: {e}")
+            if "404" in str(e) or "not found" in str(e).lower():
+                # Convert back to PlanUUID for the error
+                uuid_for_error = plan_id if isinstance(plan_id, PlanUUID) else PlanUUID(uuid=UUID(plan_id_str.split("-", 1)[1] if "-" in plan_id_str else plan_id_str))  # noqa: E501
+                raise PlanNotFoundError(uuid_for_error) from e
+            raise StorageError(f"Failed to downvote plan: {e}") from e
+
     @staticmethod
     def _log_models(config: Config) -> None:
         """Log the models set in the configuration."""

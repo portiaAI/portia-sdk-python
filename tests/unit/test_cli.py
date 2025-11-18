@@ -212,3 +212,77 @@ def test_cli_version() -> None:
     result = runner.invoke(cli, ["version"], input="")
     assert result.exit_code == 0
     assert re.match(r"\d+\.\d+\.\d+-?\w*", result.output) is not None
+
+
+def test_cli_plan_cmd_upvote(mock_portia_cls: MagicMock) -> None:
+    """Test the CLI plan-cmd upvote command.
+
+    This test verifies that the upvote subcommand correctly calls the
+    upvote_plan method on the Portia instance with the provided plan ID.
+    """
+    runner = CliRunner()
+    mock_portia = mock_portia_cls.return_value
+
+    result = runner.invoke(cli, ["plan-cmd", "upvote", "plan_test123"], input="")
+
+    assert result.exit_code == 0
+    assert mock_portia.upvote_plan.call_count == 1
+    assert mock_portia.upvote_plan.call_args[0][0] == "plan_test123"
+    assert "Successfully upvoted plan plan_test123" in result.output
+
+
+def test_cli_plan_cmd_downvote(mock_portia_cls: MagicMock) -> None:
+    """Test the CLI plan-cmd downvote command.
+
+    This test verifies that the downvote subcommand correctly calls the
+    downvote_plan method on the Portia instance with the provided plan ID.
+    """
+    runner = CliRunner()
+    mock_portia = mock_portia_cls.return_value
+
+    result = runner.invoke(cli, ["plan-cmd", "downvote", "plan_test456"], input="")
+
+    assert result.exit_code == 0
+    assert mock_portia.downvote_plan.call_count == 1
+    assert mock_portia.downvote_plan.call_args[0][0] == "plan_test456"
+    assert "Successfully downvoted plan plan_test456" in result.output
+
+
+def test_cli_plan_cmd_upvote_plan_not_found(mock_portia_cls: MagicMock) -> None:
+    """Test the CLI plan-cmd upvote command when plan is not found.
+
+    This test simulates a PlanNotFoundError being raised and verifies that
+    the CLI handles it gracefully with an appropriate error message.
+    """
+    from portia.errors import PlanNotFoundError
+    from portia.prefixed_uuid import PlanUUID
+
+    runner = CliRunner()
+    mock_portia = mock_portia_cls.return_value
+    plan_uuid = PlanUUID.from_string("plan-123e4567-e89b-12d3-a456-426614174000")
+    mock_portia.upvote_plan.side_effect = PlanNotFoundError(plan_uuid)
+
+    result = runner.invoke(cli, ["plan-cmd", "upvote", "plan_notfound"], input="")
+
+    assert result.exit_code == 1
+    assert "Plan with ID 'plan_notfound' not found" in result.output
+
+
+def test_cli_plan_cmd_downvote_storage_error(mock_portia_cls: MagicMock) -> None:
+    """Test the CLI plan-cmd downvote command when a storage error occurs.
+
+    This test simulates a StorageError (e.g., not using cloud storage) and
+    verifies that the CLI handles it gracefully with an appropriate error message.
+    """
+    from portia.storage import StorageError
+
+    runner = CliRunner()
+    mock_portia = mock_portia_cls.return_value
+    mock_portia.downvote_plan.side_effect = StorageError(
+        "Downvoting plans is only supported for cloud storage."
+    )
+
+    result = runner.invoke(cli, ["plan-cmd", "downvote", "plan_test789"], input="")
+
+    assert result.exit_code == 1
+    assert "Error downvoting plan" in result.output
