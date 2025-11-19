@@ -58,6 +58,7 @@ from portia.tool_call import ToolCallRecord, ToolCallStatus
 
 if TYPE_CHECKING:
     from portia.config import Config
+    from portia.run_context import PlanRunV2
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -321,6 +322,55 @@ class RunStorage(ABC):
         """
         return await asyncio.to_thread(self.get_plan_runs, run_state, page)
 
+    # PlanRunV2 storage methods
+    def save_plan_run_v2(self, plan_run: PlanRunV2) -> None:
+        """Save a PlanRunV2.
+
+        Args:
+            plan_run (PlanRunV2): The PlanRunV2 object to save.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("save_plan_run_v2 is not implemented")
+
+    def get_plan_run_v2(self, plan_run_id: PlanRunUUID) -> PlanRunV2:
+        """Retrieve PlanRunV2 by its ID.
+
+        Args:
+            plan_run_id (PlanRunUUID): The UUID of the run to retrieve.
+
+        Returns:
+            PlanRunV2: The PlanRunV2 object associated with the provided plan_run_id.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+
+        """
+        raise NotImplementedError("get_plan_run_v2 is not implemented")
+
+    async def asave_plan_run_v2(self, plan_run: PlanRunV2) -> None:
+        """Save a PlanRunV2 asynchronously using threaded execution.
+
+        Args:
+            plan_run (PlanRunV2): The PlanRunV2 object to save.
+
+        """
+        await asyncio.to_thread(self.save_plan_run_v2, plan_run)
+
+    async def aget_plan_run_v2(self, plan_run_id: PlanRunUUID) -> PlanRunV2:
+        """Retrieve PlanRunV2 by its ID asynchronously using threaded execution.
+
+        Args:
+            plan_run_id (PlanRunUUID): The UUID of the run to retrieve.
+
+        Returns:
+            PlanRunV2: The PlanRunV2 object associated with the provided plan_run_id.
+
+        """
+        return await asyncio.to_thread(self.get_plan_run_v2, plan_run_id)
+
 
 class AdditionalStorage(ABC):
     """Abstract base class for additional storage.
@@ -524,6 +574,7 @@ class InMemoryStorage(Storage):
 
     plans: dict[PlanUUID, Plan]
     runs: dict[PlanRunUUID, PlanRun]
+    runs_v2: dict[PlanRunUUID, PlanRunV2]
     outputs: defaultdict[PlanRunUUID, dict[str, LocalDataValue]]
     end_users: dict[str, EndUser]
 
@@ -531,6 +582,7 @@ class InMemoryStorage(Storage):
         """Initialize Storage."""
         self.plans = {}
         self.runs = {}
+        self.runs_v2 = {}
         self.outputs = defaultdict(dict)
         self.end_users = {}
 
@@ -716,6 +768,34 @@ class InMemoryStorage(Storage):
         if external_id in self.end_users:
             return self.end_users[external_id]
         return None
+
+    def save_plan_run_v2(self, plan_run: PlanRunV2) -> None:
+        """Add PlanRunV2 to dict.
+
+        Args:
+            plan_run (PlanRunV2): The PlanRunV2 object to save.
+
+        """
+        from portia.run_context import PlanRunV2
+
+        self.runs_v2[plan_run.id] = plan_run
+
+    def get_plan_run_v2(self, plan_run_id: PlanRunUUID) -> PlanRunV2:
+        """Get PlanRunV2 from dict.
+
+        Args:
+            plan_run_id (PlanRunUUID): The UUID of the PlanRunV2 to retrieve.
+
+        Returns:
+            PlanRunV2: The PlanRunV2 object associated with the provided plan_run_id.
+
+        Raises:
+            PlanRunNotFoundError: If the PlanRunV2 is not found.
+
+        """
+        if plan_run_id in self.runs_v2:
+            return self.runs_v2[plan_run_id]
+        raise PlanRunNotFoundError(plan_run_id)
 
 
 class DiskFileStorage(Storage):
@@ -972,6 +1052,37 @@ class DiskFileStorage(Storage):
             return self._read(f"{external_id}.json", EndUser)
         except (ValidationError, FileNotFoundError):
             return None
+
+    def save_plan_run_v2(self, plan_run: PlanRunV2) -> None:
+        """Save PlanRunV2 object to the storage.
+
+        Args:
+            plan_run (PlanRunV2): The PlanRunV2 object to save.
+
+        """
+        from portia.run_context import PlanRunV2
+
+        self._write(f"v2_{plan_run.id}.json", plan_run)
+
+    def get_plan_run_v2(self, plan_run_id: PlanRunUUID) -> PlanRunV2:
+        """Retrieve PlanRunV2 object by its ID.
+
+        Args:
+            plan_run_id (PlanRunUUID): The ID of the PlanRunV2 to retrieve.
+
+        Returns:
+            PlanRunV2: The retrieved PlanRunV2 object.
+
+        Raises:
+            PlanRunNotFoundError: If the PlanRunV2 is not found or validation fails.
+
+        """
+        from portia.run_context import PlanRunV2
+
+        try:
+            return self._read(f"v2_{plan_run_id}.json", PlanRunV2)
+        except (ValidationError, FileNotFoundError) as e:
+            raise PlanRunNotFoundError(plan_run_id) from e
 
 
 class PortiaCloudStorage(Storage):
@@ -1945,3 +2056,11 @@ class PortiaCloudStorage(Storage):
                 phone_number=response_json["phone_number"],
                 additional_data=response_json["additional_data"],
             )
+
+    def save_plan_run_v2(self, plan_run: 'PlanRunV2') -> None:
+        """Save PlanRunV2 to Portia Cloud (stub)."""
+        raise NotImplementedError("PlanRunV2 cloud storage not yet implemented")
+
+    def get_plan_run_v2(self, plan_run_id: PlanRunUUID) -> 'PlanRunV2':
+        """Retrieve PlanRunV2 from Portia Cloud (stub)."""
+        raise NotImplementedError("PlanRunV2 cloud storage not yet implemented")
