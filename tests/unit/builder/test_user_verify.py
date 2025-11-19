@@ -25,14 +25,14 @@ def test_user_verify_step_str() -> None:
     assert str(step) == "UserVerifyStep(message='Please confirm this action')"
 
 
-def test_user_verify_step_to_legacy_step() -> None:
-    """Test UserVerifyStep to_legacy_step method."""
+def test_user_verify_step_to_step_data() -> None:
+    """Test UserVerifyStep to_step_data method."""
     step = UserVerifyStep(message="Confirm deletion", step_name="confirm_delete")
 
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$confirm_delete_output"
 
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
 
     assert isinstance(legacy_step, PlanStep)
     assert legacy_step.task == "User verification: Confirm deletion"

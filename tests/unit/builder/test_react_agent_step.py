@@ -120,7 +120,7 @@ def test_react_agent_step_with_tool_objects() -> None:
 
     mock_plan = Mock()
     mock_plan.step_output_name.return_value = "$react_output"
-    legacy_step = step.to_legacy_step(mock_plan)
+    legacy_step = step.to_step_data(mock_plan)
     assert legacy_step.tool_id == "mock_tool,calculator_tool"
 
 
@@ -144,8 +144,8 @@ def test_react_agent_step_adds_tool_to_registry() -> None:
     assert tool_instance.id in run_data.tool_registry
 
 
-def test_react_agent_step_to_legacy_step() -> None:
-    """Test ReActAgentStep to_legacy_step method."""
+def test_react_agent_step_to_step_data() -> None:
+    """Test ReActAgentStep to_step_data method."""
     inputs = [Input("query"), StepOutput(0)]
     tools = ["search_tool", "calculator_tool"]
     step = ReActAgentStep(
@@ -166,7 +166,7 @@ def test_react_agent_step_to_legacy_step() -> None:
         mock_input_name.return_value = "query"
         mock_step_output_name.return_value = "step_0_output"
 
-        legacy_step = step.to_legacy_step(mock_plan)
+        legacy_step = step.to_step_data(mock_plan)
 
         assert isinstance(legacy_step, PlanStep)
         assert legacy_step.task == "Research and calculate"

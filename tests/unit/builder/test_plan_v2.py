@@ -33,8 +33,8 @@ class MockStepV2(StepV2):
         """Mock run method."""
         return "mock result"
 
-    def to_legacy_step(self, plan: PlanV2) -> Step:  # noqa: ARG002
-        """Mock to_legacy_step method."""
+    def to_step_data(self, plan: PlanV2) -> Step:  # noqa: ARG002
+        """Mock to_step_data method."""
         return Step(
             task=f"Mock task for {self.step_name}",
             output=f"${self.step_name}_output",

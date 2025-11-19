@@ -596,7 +596,7 @@ def test_step_conversion_failure_coverage(estimator: CostEstimator) -> None:
     mock_step.__class__.__name__ = "LLMStep"
     mock_step.task = "Test task"
 
-    mock_step.to_legacy_step = Mock(side_effect=ValueError("Conversion failed"))
+    mock_step.to_step_data = Mock(side_effect=ValueError("Conversion failed"))
 
     result = estimator._estimate_v2_step_cost(mock_step, "gpt-4o")
 
