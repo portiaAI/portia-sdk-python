@@ -12,13 +12,13 @@ else:
 from langsmith import traceable
 from pydantic import Field
 
-from portia.builder.plan_v2 import PlanV2
-from portia.builder.step_v2 import StepV2
-from portia.plan import Step
+from portia.builder.plan import Plan
+from portia.builder.step import Step
+from portia.plan import Step as StepData
 from portia.run_context import RunContext
 
 
-class ExitStep(StepV2):
+class ExitStep(Step):
     """A step that causes the plan to exit gracefully.
 
     This step allows for early termination of a plan with an optional message and error flag. When
@@ -44,7 +44,7 @@ class ExitStep(StepV2):
         return ExitStepResult(message=message, error=self.error)
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this ExitStep to a legacy Step."""
         if self.error:
             task = f"Exit plan with error: {self.message}"

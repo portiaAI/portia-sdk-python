@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from typing import TYPE_CHECKING
 
-from portia.builder.step_v2 import StepV2
+from portia.builder.step import Step
 
 if sys.version_info >= (3, 12):
     from typing import override
@@ -20,14 +20,14 @@ from portia.clarification import (
     UserVerificationClarification,
 )
 from portia.errors import PlanRunExitError
-from portia.plan import Step
+from portia.plan import Step as StepData
 
 if TYPE_CHECKING:
-    from portia.builder.plan_v2 import PlanV2
+    from portia.builder.plan import Plan
     from portia.run_context import RunContext
 
 
-class UserVerifyStep(StepV2):
+class UserVerifyStep(Step):
     """A step that requests user confirmation before proceeding with plan execution.
 
     This step pauses execution to ask the user to verify or approve a message.
@@ -85,7 +85,7 @@ class UserVerifyStep(StepV2):
         return True
 
     @override
-    def to_legacy_step(self, plan: PlanV2) -> Step:
+    def to_step_data(self, plan: Plan) -> StepData:
         """Convert this UserVerifyStep to a legacy Step."""
         return Step(
             task=f"User verification: {self.message}",
