@@ -31,9 +31,10 @@ from portia.execution_agents.execution_utils import (
 )
 from portia.execution_agents.memory_extraction import MemoryExtractionStep
 from portia.execution_agents.utils.step_summarizer import StepSummarizer
+from portia.builder.plan_v2 import PlanV2
 from portia.logger import logger
 from portia.model import GenerativeModel, Message
-from portia.plan import Plan, ReadOnlyStep
+from portia.plan import ReadOnlyStep
 from portia.plan_run import PlanRun, ReadOnlyPlanRun
 from portia.telemetry.views import ExecutionAgentUsageTelemetryEvent, ToolCallTelemetryEvent
 from portia.tool import Tool, ToolRunContext

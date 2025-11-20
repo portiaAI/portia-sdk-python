@@ -18,7 +18,8 @@ from portia.common import PortiaEnum
 from portia.errors import ToolHardError
 from portia.execution_agents.output import Output
 from portia.logger import logger
-from portia.plan import Plan, Step
+from portia.builder.plan_v2 import PlanV2
+from portia.plan import Step
 from portia.plan_run import PlanRun
 from portia.tool import Tool
 
@@ -53,7 +54,7 @@ class ExecutionHooks(BaseModel):
     clarification_handler: ClarificationHandler | None = None
     """Handler for clarifications raised during execution."""
 
-    before_step_execution: Callable[[Plan, PlanRun, Step], BeforeStepExecutionOutcome] | None = None
+    before_step_execution: Callable[[PlanV2, PlanRun, Step], BeforeStepExecutionOutcome] | None = None
     """Called before executing each step.
 
     Args:
@@ -66,7 +67,7 @@ class ExecutionHooks(BaseModel):
             If None is returned, the default behaviour is to continue with the step execution.
     """
 
-    after_step_execution: Callable[[Plan, PlanRun, Step, Output], None] | None = None
+    after_step_execution: Callable[[PlanV2, PlanRun, Step, Output], None] | None = None
     """Called after executing each step.
 
     When there's an error, this is called with the error as the output value.
@@ -78,7 +79,7 @@ class ExecutionHooks(BaseModel):
         output: The output from the step execution
     """
 
-    before_plan_run: Callable[[Plan, PlanRun], None] | None = None
+    before_plan_run: Callable[[PlanV2, PlanRun], None] | None = None
     """Called before executing the first step of the plan run.
 
     Args:
@@ -86,7 +87,7 @@ class ExecutionHooks(BaseModel):
         plan_run: The current plan run
     """
 
-    after_plan_run: Callable[[Plan, PlanRun, Output], None] | None = None
+    after_plan_run: Callable[[PlanV2, PlanRun, Output], None] | None = None
     """Called after executing the plan run.
 
     This is not called if a clarification is raised, as it is expected that the plan
@@ -217,7 +218,7 @@ def _clarify_on_tool_call_hook(
     return None
 
 
-def log_step_outputs(plan: Plan, plan_run: PlanRun, step: Step, output: Output) -> None:  # noqa: ARG001
+def log_step_outputs(plan: PlanV2, plan_run: PlanRun, step: Step, output: Output) -> None:  # noqa: ARG001
     """Log the output of a step in the plan."""
     logger().info(
         f"Step with task {step.task} using tool {step.tool_id} completed with result: {output}"

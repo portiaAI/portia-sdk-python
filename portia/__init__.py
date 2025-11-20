@@ -93,8 +93,11 @@ from portia.open_source_tools.search_tool import SearchTool
 from portia.open_source_tools.weather import WeatherTool
 
 # Plan and execution related classes
-from portia.plan import Plan, PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
+from portia.plan import PlanBuilder, PlanContext, PlanInput, PlanUUID, Step, Variable
 from portia.plan_run import PlanRun, PlanRunState
+
+# Type alias for backward compatibility - Plan now points to PlanV2
+Plan = PlanV2
 
 # Core classes
 from portia.portia import ExecutionHooks, Portia

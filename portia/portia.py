@@ -73,7 +73,10 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.logger import logger, logger_manager, truncate_message
 from portia.open_source_tools.llm_tool import LLMTool
-from portia.plan import Plan, PlanContext, PlanInput, PlanUUID, ReadOnlyPlan, ReadOnlyStep, Step
+from portia.plan import PlanContext, PlanInput, PlanUUID, ReadOnlyStep, Step
+
+if TYPE_CHECKING:
+    from portia.plan import Plan, ReadOnlyPlan
 from portia.plan_run import PlanRun, PlanRunState, PlanRunUUID, ReadOnlyPlanRun
 from portia.planning_agents.default_planning_agent import DefaultPlanningAgent
 from portia.run_context import RunContext, StepOutputValue
@@ -201,7 +204,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -215,8 +218,8 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects,
+            example_plans (Sequence[Plan | PlanV2 | PlanUUID | str] | None): Optional list of example
+            plans or plan IDs. This can include Plan objects, PlanV2 objects, PlanUUID objects,
             or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
             storage. If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
@@ -267,7 +270,7 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_run_inputs: list[PlanInput] | list[dict[str, str]] | dict[str, str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
@@ -281,8 +284,8 @@ class Portia:
             query (str): The query to be executed.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
-            plans or plan IDs. This can include Plan objects, PlanUUID objects,
+            example_plans (Sequence[Plan | PlanV2 | PlanUUID | str] | None): Optional list of example
+            plans or plan IDs. This can include Plan objects, PlanV2 objects, PlanUUID objects,
             or plan ID strings (starting with "plan-"). Plan IDs will be loaded from
             storage. If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The end user for this plan run.
@@ -366,21 +369,21 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
-    ) -> Plan:
+    ) -> Plan | PlanV2:
         """Plans how to do the query given the set of tools and any examples.
 
         Args:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (Sequence[Plan | PlanUUID | str] | None): Optional list of example
+            example_plans (Sequence[Plan | PlanV2 | PlanUUID | str] | None): Optional list of example
             plans or plan IDs.
-            This can include Plan objects, PlanUUID objects, or plan ID strings
+            This can include Plan objects, PlanV2 objects, PlanUUID objects, or plan ID strings
             (starting with "plan-"). Plan IDs will be loaded from storage.
             If not provided, a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
@@ -397,7 +400,7 @@ class Portia:
             use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
-            Plan: The plan for executing the query.
+            Plan | PlanV2: The plan for executing the query.
 
         Raises:
             PlanError: If there is an error while generating the plan.
@@ -429,19 +432,19 @@ class Portia:
         )
 
     def _resolve_example_plans(
-        self, example_plans: Sequence[Plan | PlanUUID | str] | None
-    ) -> list[Plan] | None:
+        self, example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None
+    ) -> list[Plan | PlanV2] | None:
         """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
 
         Args:
-            example_plans (Sequence[Plan | PlanUUID | str] | None): List of example plans or
+            example_plans (Sequence[Plan | PlanV2 | PlanUUID | str] | None): List of example plans or
             plan IDs.
-                - Plan objects are used directly
+                - Plan and PlanV2 objects are used directly
                 - PlanUUID objects are loaded from storage
                 - String objects must be plan ID strings (starting with "plan-")
 
         Returns:
-            list[Plan] | None: List of resolved Plan objects, or None if input was None.
+            list[Plan | PlanV2] | None: List of resolved Plan or PlanV2 objects, or None if input was None.
 
         Raises:
             PlanNotFoundError: If a plan ID cannot be found in storage.
@@ -460,19 +463,19 @@ class Portia:
         return resolved_plans
 
     async def _aresolve_example_plans(
-        self, example_plans: Sequence[Plan | PlanUUID | str] | None
-    ) -> list[Plan] | None:
+        self, example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None
+    ) -> list[Plan | PlanV2] | None:
         """Resolve example plans from Plan objects, PlanUUIDs and planID strings.
 
         Args:
-            example_plans (Sequence[Plan | PlanUUID | str] | None): List of example plans or
+            example_plans (Sequence[Plan | PlanV2 | PlanUUID | str] | None): List of example plans or
             plan IDs.
-                - Plan objects are used directly
+                - Plan and PlanV2 objects are used directly
                 - PlanUUID objects are loaded from storage
                 - String objects must be plan ID strings (starting with "plan-")
 
         Returns:
-            list[Plan] | None: List of resolved Plan objects, or None if input was None.
+            list[Plan | PlanV2] | None: List of resolved Plan or PlanV2 objects, or None if input was None.
 
         Raises:
             PlanNotFoundError: If a plan ID cannot be found in storage.
@@ -490,44 +493,44 @@ class Portia:
 
         return resolved_plans
 
-    def _resolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
+    def _resolve_single_example_plan(self, example_plan: Plan | PlanV2 | PlanUUID | str) -> Plan | PlanV2:
         """Resolve a single example plan from various input types."""
-        if isinstance(example_plan, Plan):
+        if isinstance(example_plan, (Plan, PlanV2)):
             return example_plan
         if isinstance(example_plan, PlanUUID):
             return self._load_plan_by_uuid(example_plan)
         if isinstance(example_plan, str):
             return self._resolve_string_example_plan(example_plan)
         raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
+            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanV2, PlanUUID, or str."
         )
 
-    async def _aresolve_single_example_plan(self, example_plan: Plan | PlanUUID | str) -> Plan:
-        if isinstance(example_plan, Plan):
+    async def _aresolve_single_example_plan(self, example_plan: Plan | PlanV2 | PlanUUID | str) -> Plan | PlanV2:
+        if isinstance(example_plan, (Plan, PlanV2)):
             return example_plan
         if isinstance(example_plan, PlanUUID):
             return await self._aload_plan_by_uuid(example_plan)
         if isinstance(example_plan, str):
             return await self._aresolve_string_example_plan(example_plan)
         raise TypeError(
-            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanUUID, or str."
+            f"Invalid example plan type: {type(example_plan)}. Expected Plan, PlanV2, PlanUUID, or str."
         )
 
-    def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
+    def _load_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan | PlanV2:
         """Load a plan from storage by UUID."""
         try:
             return self.storage.get_plan(plan_uuid)
         except Exception as e:
             raise PlanNotFoundError(plan_uuid) from e
 
-    async def _aload_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan:
+    async def _aload_plan_by_uuid(self, plan_uuid: PlanUUID) -> Plan | PlanV2:
         """Load a plan from storage by UUID asynchronously."""
         try:
             return await self.storage.aget_plan(plan_uuid)
         except Exception as e:
             raise PlanNotFoundError(plan_uuid) from e
 
-    def _resolve_string_example_plan(self, example_plan: str) -> Plan:
+    def _resolve_string_example_plan(self, example_plan: str) -> Plan | PlanV2:
         """Resolve a string example plan - must be a plan ID string."""
         # Only support plan ID strings, not query strings
         if not example_plan.startswith("plan-"):
@@ -542,7 +545,7 @@ class Portia:
         except Exception as e:
             raise PlanNotFoundError(plan_uuid) from e
 
-    async def _aresolve_string_example_plan(self, example_plan: str) -> Plan:
+    async def _aresolve_string_example_plan(self, example_plan: str) -> Plan | PlanV2:
         """Resolve a string example plan - must be a plan ID string."""
         # Only support plan ID strings, not query strings
         if not example_plan.startswith("plan-"):
@@ -561,19 +564,19 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
-    ) -> Plan:
+    ) -> Plan | PlanV2:
         """Plans how to do the query given the set of tools and any examples asynchronously.
 
         Args:
             query (str): The query to generate the plan for.
             tools (list[Tool] | list[str] | None): List of tools to use for the query.
             If not provided all tools in the registry will be used.
-            example_plans (list[Plan] | None): Optional list of example plans. If not
+            example_plans (list[Plan | PlanV2] | None): Optional list of example plans. If not
             provide a default set of example plans will be used.
             end_user (str | EndUser | None = None): The optional end user for this plan.
             plan_inputs (list[PlanInput] | list[dict[str, str]] | list[str] | None): Optional list
@@ -589,7 +592,7 @@ class Portia:
             use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
-            Plan: The plan for executing the query.
+            Plan | PlanV2: The plan for executing the query.
 
         Raises:
             PlanError: If there is an error while generating the plan.
@@ -624,12 +627,12 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
-    ) -> Plan:
+    ) -> Plan | PlanV2:
         """Implement synchronous planning logic.
 
         This is used when we're already in an event loop and can't use asyncio.run().
@@ -657,7 +660,7 @@ class Portia:
             use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
-            Plan: The plan for executing the query.
+            Plan | PlanV2: The plan for executing the query.
 
         Raises:
             PlanError: If there is an error while generating the plan.
@@ -726,12 +729,12 @@ class Portia:
         self,
         query: str,
         tools: list[Tool] | list[str] | None = None,
-        example_plans: Sequence[Plan | PlanUUID | str] | None = None,
+        example_plans: Sequence[Plan | PlanV2 | PlanUUID | str] | None = None,
         end_user: str | EndUser | None = None,
         plan_inputs: list[PlanInput] | list[dict[str, str]] | list[str] | None = None,
         structured_output_schema: type[BaseModel] | None = None,
         use_cached_plan: bool = False,
-    ) -> Plan:
+    ) -> Plan | PlanV2:
         """Async implementation of planning logic.
 
         This is the core async implementation that both sync and async methods use.
@@ -759,7 +762,7 @@ class Portia:
             use_cached_plan (bool): Whether to use a cached plan if it exists.
 
         Returns:
-            Plan: The plan for executing the query.
+            Plan | PlanV2: The plan for executing the query.
 
         Raises:
             PlanError: If there is an error while generating the plan.

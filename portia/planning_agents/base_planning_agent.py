@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from portia.builder.plan_v2 import PlanV2
 from portia.plan import Plan, PlanInput, Step
 
 if TYPE_CHECKING:
@@ -51,7 +52,7 @@ class BasePlanningAgent(ABC):
         query: str,
         tool_list: list[Tool],
         end_user: EndUser,
-        examples: list[Plan] | None = None,
+        examples: list[PlanV2 | Plan] | None = None,
         plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
         """Generate a list of steps for the given query.
@@ -63,7 +64,7 @@ class BasePlanningAgent(ABC):
             query (str): The user query to generate a list of steps for.
             tool_list (list[Tool]): A list of tools available for the plan.
             end_user (EndUser): The end user for this plan
-            examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.
+            examples (list[PlanV2 | Plan] | None): Optional list of example plans to guide the PlanningAgent.
             plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
                 the inputs required for the plan.
 
@@ -78,7 +79,7 @@ class BasePlanningAgent(ABC):
         query: str,
         tool_list: list[Tool],
         end_user: EndUser,
-        examples: list[Plan] | None = None,
+        examples: list[PlanV2 | Plan] | None = None,
         plan_inputs: list[PlanInput] | None = None,
     ) -> StepsOrError:
         """Generate a list of steps for the given query asynchronously.
@@ -90,7 +91,7 @@ class BasePlanningAgent(ABC):
             query (str): The user query to generate a list of steps for.
             tool_list (list[Tool]): A list of tools available for the plan.
             end_user (EndUser): The end user for this plan
-            examples (list[Plan] | None): Optional list of example plans to guide the PlanningAgent.
+            examples (list[PlanV2 | Plan] | None): Optional list of example plans to guide the PlanningAgent.
             plan_inputs (list[PlanInput] | None): Optional list of PlanInput objects defining
                 the inputs required for the plan.
 

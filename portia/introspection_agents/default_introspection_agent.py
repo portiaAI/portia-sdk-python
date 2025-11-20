@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import SystemMessage
 
+from portia.builder.plan_v2 import PlanV2
 from portia.config import Config
 from portia.introspection_agents.introspection_agent import (
     BaseIntrospectionAgent,
@@ -16,7 +17,6 @@ from portia.introspection_agents.introspection_agent import (
 )
 from portia.logger import logger
 from portia.model import Message
-from portia.plan import Plan
 from portia.plan_run import PlanRun
 from portia.storage import AgentMemory, AgentMemoryValue
 
@@ -100,11 +100,13 @@ Return the outcome and reason in the given format.
 
     def pre_step_introspection(
         self,
-        plan: Plan,
+        plan: PlanV2,
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """Ask the LLM whether to continue, skip or fail the plan_run."""
-        introspection_condition = plan.steps[plan_run.current_step_index].condition
+        # Convert PlanV2 steps to legacy Step objects for introspection
+        legacy_steps = [step.to_legacy_step(plan) for step in plan.steps]
+        introspection_condition = legacy_steps[plan_run.current_step_index].condition
 
         memory_outputs = [
             self.agent_memory.get_plan_run_output(output.output_name, plan_run.id)
@@ -126,28 +128,30 @@ Return the outcome and reason in the given format.
                     prev_step_outputs=plan_run.outputs.model_dump_json(),
                     plan_run_inputs=plan_run.plan_run_inputs,
                     memory_outputs=memory_outputs,
-                    query=plan.plan_context.query,
-                    condition=plan.steps[plan_run.current_step_index].condition,
+                    query=plan.label,
+                    condition=legacy_steps[plan_run.current_step_index].condition,
                     current_step_idex=plan_run.current_step_index + 1,
                     total_steps_count=len(plan.steps),
-                    plan=self._get_plan_steps_pretty(plan),
+                    plan=self._get_plan_steps_pretty(legacy_steps),
                 )
             ],
         )
 
-    def _get_plan_steps_pretty(self, plan: Plan) -> str:
+    def _get_plan_steps_pretty(self, steps: list) -> str:
         """Get the pretty print representation of the plan steps."""
         return "\n".join(
-            [f"Step {i+1}: {step.pretty_print()}" for i, step in enumerate(plan.steps)]
+            [f"Step {i+1}: {step.pretty_print()}" for i, step in enumerate(steps)]
         )
 
     async def apre_step_introspection(
         self,
-        plan: Plan,
+        plan: PlanV2,
         plan_run: PlanRun,
     ) -> PreStepIntrospection:
         """pre_step_introspection is introspection run before a plan happens.."""
-        introspection_condition = plan.steps[plan_run.current_step_index].condition
+        # Convert PlanV2 steps to legacy Step objects for introspection
+        legacy_steps = [step.to_legacy_step(plan) for step in plan.steps]
+        introspection_condition = legacy_steps[plan_run.current_step_index].condition
 
         memory_outputs = [
             await self.agent_memory.aget_plan_run_output(output.output_name, plan_run.id)
@@ -169,11 +173,11 @@ Return the outcome and reason in the given format.
                     prev_step_outputs=plan_run.outputs.model_dump_json(),
                     plan_run_inputs=plan_run.plan_run_inputs,
                     memory_outputs=memory_outputs,
-                    query=plan.plan_context.query,
-                    condition=plan.steps[plan_run.current_step_index].condition,
+                    query=plan.label,
+                    condition=legacy_steps[plan_run.current_step_index].condition,
                     current_step_idex=plan_run.current_step_index + 1,
                     total_steps_count=len(plan.steps),
-                    plan=self._get_plan_steps_pretty(plan),
+                    plan=self._get_plan_steps_pretty(legacy_steps),
                 )
             ],
         )
