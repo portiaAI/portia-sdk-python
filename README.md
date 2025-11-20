@@ -196,17 +196,17 @@ A heartfelt thank you to our growing list of contributors!
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/hemanthkotaprolu">
-                    <img src="https://avatars.githubusercontent.com/u/92506047?v=4" width="100;" alt="hemanthkotaprolu"/>
+                <a href="https://github.com/account">
+                    <img src="https://avatars.githubusercontent.com/u/186828738?v=4" width="100;" alt="account"/>
                     <br />
-                    <sub><b>Kotaprolu Hemanth</b></sub>
+                    <sub><b>Swagatika Beura</b></sub>
                 </a>
             </td>
             <td align="center">
-                <a href="https://github.com/sangwaboi">
-                    <img src="https://avatars.githubusercontent.com/u/182721678?v=4" width="100;" alt="sangwaboi"/>
+                <a href="https://github.com/account">
+                    <img src="https://avatars.githubusercontent.com/u/186828738?v=4" width="100;" alt="account"/>
                     <br />
-                    <sub><b>Vishvendra Sangwan</b></sub>
+                    <sub><b>Swagatika Beura</b></sub>
                 </a>
             </td>
 		</tr>
