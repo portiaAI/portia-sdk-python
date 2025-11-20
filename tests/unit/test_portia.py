@@ -50,7 +50,6 @@ from portia.introspection_agents.introspection_agent import (
 from portia.open_source_tools.registry import open_source_tool_registry
 from portia.plan import (
     Plan,
-    PlanBuilder,
     PlanContext,
     PlanInput,
     PlanUUID,
@@ -2368,7 +2367,10 @@ def test_portia_tool_ready_not_ready(
         config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
         tools=[portia_tool],
     )
-    plan = PlanBuilder().step("", portia_tool.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[portia_tool.id]),
+        steps=[Step(task="", tool_id=portia_tool.id, output="$output_0")],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
     action_url = HttpUrl("https://example.com/auth")
@@ -2408,7 +2410,13 @@ def test_portia_tool_ready_multiple_tools_not_ready(
         config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
         tools=[portia_tool, portia_tool_2],
     )
-    plan = PlanBuilder().step("", portia_tool.id).step("", portia_tool_2.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[portia_tool.id, portia_tool_2.id]),
+        steps=[
+            Step(task="", tool_id=portia_tool.id, output="$output_0"),
+            Step(task="", tool_id=portia_tool_2.id, output="$output_1"),
+        ],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
     action_url = HttpUrl("https://example.com/auth")
@@ -2457,7 +2465,10 @@ def test_custom_tool_ready_not_ready() -> None:
         config=get_test_config(),
         tools=[ready_tool],
     )
-    plan = PlanBuilder().step("", ready_tool.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[ready_tool.id]),
+        steps=[Step(task="", tool_id=ready_tool.id, output="$output_0")],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
 
@@ -2481,7 +2492,13 @@ def test_custom_tool_ready_resume_multiple_instances_of_same_tool() -> None:
         config=get_test_config(),
         tools=[ready_tool, ready_tool],
     )
-    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[ready_tool.id]),
+        steps=[
+            Step(task="1", tool_id=ready_tool.id, output="$output_0"),
+            Step(task="2", tool_id=ready_tool.id, output="$output_1"),
+        ],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
 
@@ -2500,7 +2517,13 @@ def test_custom_tool_ready_resume_multiple_custom_tools() -> None:
     ready_tool = ReadyTool(id="ready_tool", auth_url="https://fake.portiaai.test/auth")
     ready_tool_2 = ReadyTool(id="ready_tool_2", auth_url="https://fake.portiaai.test/auth2")
     portia = Portia(config=get_test_config(), tools=[ready_tool, ready_tool_2])
-    plan = PlanBuilder().step("1", ready_tool.id).step("2", ready_tool_2.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[ready_tool.id, ready_tool_2.id]),
+        steps=[
+            Step(task="1", tool_id=ready_tool.id, output="$output_0"),
+            Step(task="2", tool_id=ready_tool_2.id, output="$output_1"),
+        ],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
 
@@ -2534,7 +2557,13 @@ def test_portia_and_custom_tool_not_ready(
         config=get_test_config(portia_api_endpoint=str(mock_cloud_client.base_url)),
         tools=[portia_tool, ready_tool],
     )
-    plan = PlanBuilder().step("", portia_tool.id).step("", ready_tool.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[portia_tool.id, ready_tool.id]),
+        steps=[
+            Step(task="", tool_id=portia_tool.id, output="$output_0"),
+            Step(task="", tool_id=ready_tool.id, output="$output_1"),
+        ],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
     action_url = HttpUrl("https://example.com/auth")
@@ -2597,7 +2626,13 @@ def test_portia_tool_not_ready_with_clarification_handler(
         tools=[portia_tool, ready_tool],
         execution_hooks=execution_hooks,
     )
-    plan = PlanBuilder().step("", ready_tool.id).step("", portia_tool.id).build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[ready_tool.id, portia_tool.id]),
+        steps=[
+            Step(task="", tool_id=ready_tool.id, output="$output_0"),
+            Step(task="", tool_id=portia_tool.id, output="$output_1"),
+        ],
+    )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
     action_url = HttpUrl("https://example.com/auth")
@@ -2702,11 +2737,12 @@ def test_tool_raise_clarification_all_remaining_tool_ready_status_rechecked() ->
             )
         ],
     )
-    plan = (
-        PlanBuilder()
-        .step("raise_clarification", ready_tool.id)
-        .step("2", ready_once_tool.id)
-        .build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[ready_tool.id, ready_once_tool.id]),
+        steps=[
+            Step(task="raise_clarification", tool_id=ready_tool.id, output="$output_0"),
+            Step(task="2", tool_id=ready_once_tool.id, output="$output_1"),
+        ],
     )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test
@@ -2747,12 +2783,13 @@ def test_portia_tool_readiness_rechecked_after_raised_clarification(
             )
         ],
     )
-    plan = (
-        PlanBuilder()
-        .step("raise_clarification", portia_tool.id)
-        .step("1", portia_tool.id)
-        .step("2", portia_tool_2.id)
-        .build()
+    plan = Plan(
+        plan_context=PlanContext(query="", tool_ids=[portia_tool.id, portia_tool_2.id]),
+        steps=[
+            Step(task="raise_clarification", tool_id=portia_tool.id, output="$output_0"),
+            Step(task="1", tool_id=portia_tool.id, output="$output_1"),
+            Step(task="2", tool_id=portia_tool_2.id, output="$output_2"),
+        ],
     )
     plan_run = portia.create_plan_run(plan, end_user="123")
     portia.storage.save_plan(plan)  # Explicitly save plan for test

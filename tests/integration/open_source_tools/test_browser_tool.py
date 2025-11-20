@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 
-from portia import LLMProvider, PlanBuilder, PlanRunState, Portia, ToolRegistry, ToolRunContext
+from portia import LLMProvider, PlanRunState, Portia, ToolRegistry, ToolRunContext
+from portia.plan import Plan, PlanContext, Step
 from portia.config import (
     Config,
     StorageClass,
@@ -125,21 +126,33 @@ def test_portia_multi_step_from_plan() -> None:
         ),
     )
 
-    plan = (
-        PlanBuilder()
-        .step(
-            "Retrieve the title of the first section of the homepage, it should contain the "
-            "word 'environments'",
-            "browser_tool_for_url_www_portialabs_ai",
-            "page_title",
-        )
-        .step("Find the price of gold", "search_tool", "search_result")
-        .step(
-            "Find the title of the first blog that was published chronologically",
-            "browser_tool_for_url_blog_portialabs_ai",
-            "blog_title",
-        )
-        .build()
+    plan = Plan(
+        plan_context=PlanContext(
+            query="",
+            tool_ids=[
+                "browser_tool_for_url_www_portialabs_ai",
+                "search_tool",
+                "browser_tool_for_url_blog_portialabs_ai",
+            ],
+        ),
+        steps=[
+            Step(
+                task="Retrieve the title of the first section of the homepage, it should contain the "
+                "word 'environments'",
+                tool_id="browser_tool_for_url_www_portialabs_ai",
+                output="page_title",
+            ),
+            Step(
+                task="Find the price of gold",
+                tool_id="search_tool",
+                output="search_result",
+            ),
+            Step(
+                task="Find the title of the first blog that was published chronologically",
+                tool_id="browser_tool_for_url_blog_portialabs_ai",
+                output="blog_title",
+            ),
+        ],
     )
 
     plan_run = portia.run_plan(plan)
