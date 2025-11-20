@@ -9,6 +9,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from portia import Config, LogLevel, Portia
+from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.plan_builder_v2 import PlanBuilderError, PlanBuilderV2
 from portia.builder.reference import Input, StepOutput
 from portia.clarification import UserVerificationClarification
@@ -2004,3 +2005,124 @@ async def test_react_agent_weather_with_clarifications() -> None:
 
     # Verify step has summary
     assert weather_step_output.get_summary() is not None
+
+
+@pytest.mark.asyncio
+async def test_parallel_step_concurrent_execution() -> None:
+    """Test parallel step executes multiple independent steps concurrently.
+
+    This test demonstrates the concurrent execution of two independent tool invocations
+    and validates the correctness of the aggregated output. The test uses search tools
+    to fetch different information in parallel and then uses the results.
+    """
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    portia = Portia(config=config)
+
+    # Create a plan with parallel steps
+    plan = (
+        PlanBuilderV2("Search for Python and JavaScript information in parallel")
+        .add_parallel(
+            steps=[
+                InvokeToolStep(
+                    tool="search_tool",
+                    step_name="search_python",
+                    args={"search_query": "What is Python programming language?"},
+                ),
+                InvokeToolStep(
+                    tool="search_tool",
+                    step_name="search_javascript",
+                    args={"search_query": "What is JavaScript programming language?"},
+                ),
+            ],
+            step_name="parallel_search",
+        )
+        .llm_step(
+            task="Compare the two programming languages based on the search results",
+            inputs=[
+                StepOutput("parallel_search", path="0"),
+                StepOutput("parallel_search", path="1"),
+            ],
+            step_name="compare_languages",
+        )
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    assert plan_run.state == PlanRunState.COMPLETE
+    assert plan_run.outputs.final_output is not None
+
+    # Verify the parallel step output exists and is a list
+    parallel_output = plan_run.outputs.step_outputs["$parallel_search_output"]
+    assert parallel_output is not None
+    parallel_value = parallel_output.get_value()
+    assert isinstance(parallel_value, list)
+    assert len(parallel_value) == 2
+
+    # Verify both search results contain relevant content
+    python_result = parallel_value[0]
+    javascript_result = parallel_value[1]
+
+    assert isinstance(python_result, str)
+    assert isinstance(javascript_result, str)
+    assert len(python_result) > 0
+    assert len(javascript_result) > 0
+
+    # The results should mention the respective languages
+    python_lower = python_result.lower()
+    javascript_lower = javascript_result.lower()
+    assert "python" in python_lower
+    assert "javascript" in javascript_lower or "js" in javascript_lower
+
+    # Verify the comparison step used the parallel outputs
+    comparison_output = plan_run.outputs.step_outputs["$compare_languages_output"]
+    assert comparison_output is not None
+    comparison_value = comparison_output.get_value()
+    assert isinstance(comparison_value, str)
+    assert len(comparison_value) > 0
+
+    # The comparison should mention both languages
+    comparison_lower = comparison_value.lower()
+    assert "python" in comparison_lower
+    assert "javascript" in comparison_lower or "js" in comparison_lower
+
+
+@pytest.mark.asyncio
+async def test_parallel_step_with_error_handling() -> None:
+    """Test that parallel step handles errors correctly by cancelling other tasks."""
+    config = Config.from_default(
+        default_log_level=LogLevel.DEBUG,
+        storage_class=StorageClass.MEMORY,
+    )
+
+    portia = Portia(config=config)
+
+    # Create a plan where one parallel step will fail
+    plan = (
+        PlanBuilderV2("Test parallel execution with error")
+        .add_parallel(
+            steps=[
+                InvokeToolStep(
+                    tool="search_tool",
+                    step_name="valid_search",
+                    args={"search_query": "Valid query"},
+                ),
+                InvokeToolStep(
+                    tool="nonexistent_tool",  # This will fail
+                    step_name="failing_step",
+                    args={"arg": "value"},
+                ),
+            ],
+            step_name="parallel_with_error",
+        )
+        .build()
+    )
+
+    plan_run = await portia.arun_plan(plan)
+
+    # The plan should fail due to the error in one of the parallel steps
+    assert plan_run.state == PlanRunState.FAILED

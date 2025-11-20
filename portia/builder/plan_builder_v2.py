@@ -18,6 +18,7 @@ from portia.builder.invoke_tool_step import InvokeToolStep
 from portia.builder.llm_step import LLMStep
 from portia.builder.loop_step import LoopStep
 from portia.builder.loops import LoopBlock, LoopStepType, LoopType
+from portia.builder.parallel_step import ParallelStep
 from portia.builder.plan_v2 import PlanV2
 from portia.builder.react_agent_step import ReActAgentStep
 from portia.builder.reference import Reference, default_step_name
@@ -777,6 +778,66 @@ class PlanBuilderV2:
         # Add the plan inputs from the sub-plan to the parent plan
         self.plan.plan_inputs.extend(plan.plan_inputs)
 
+        return self
+
+    def add_parallel(
+        self,
+        steps: list[StepV2],
+        step_name: str | None = None,
+    ) -> PlanBuilderV2:
+        """Add a parallel execution step to the plan.
+
+        This creates a step that executes multiple child steps concurrently using
+        asyncio.gather. All child steps are executed in parallel, and their outputs
+        are collected into a list. This is useful for performance optimization when
+        you have independent operations that can run simultaneously.
+
+        The output of the parallel step is a list containing the outputs of all child
+        steps in the order they were provided. You can reference individual outputs
+        using path notation: StepOutput("parallel_step_name", path="0") for the first
+        child step's output, path="1" for the second, and so on.
+
+        If any child step fails during execution, all other running steps are cancelled
+        and the parallel step fails, propagating the error.
+
+        Args:
+            steps: List of fully defined StepV2 instances to execute in parallel.
+                These steps should be independent with no data dependencies on each other.
+            step_name: Optional explicit name for the step. This allows its output to be
+                referenced via StepOutput("name_of_step") rather than by index.
+
+        Returns:
+            Self for method chaining.
+
+        Example:
+            ```python
+            from portia.builder import PlanBuilderV2
+            from portia.builder.invoke_tool_step import InvokeToolStep
+            from portia.builder.reference import StepOutput
+
+            builder = PlanBuilderV2()
+            builder.add_parallel(
+                steps=[
+                    InvokeToolStep(tool="search_tool", step_name="search1",
+                                   args={"query": "Python"}),
+                    InvokeToolStep(tool="search_tool", step_name="search2",
+                                   args={"query": "JavaScript"}),
+                ],
+                step_name="parallel_search"
+            )
+            # Reference first result: StepOutput("parallel_search", path="0")
+            # Reference second result: StepOutput("parallel_search", path="1")
+            ```
+
+        """
+        self.plan.steps.append(
+            ParallelStep(
+                steps=steps,
+                step_name=step_name or default_step_name(len(self.plan.steps)),
+                conditional_block=self._current_conditional_block,
+                loop_block=self._current_loop_block,
+            )
+        )
         return self
 
     def exit(
