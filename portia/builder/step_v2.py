@@ -5,6 +5,7 @@ from __future__ import annotations
 import itertools
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -38,6 +39,14 @@ class StepV2(BaseModel, ABC):
     )
     loop_block: LoopBlock | None = Field(
         default=None, description="The loop block this step is part of, if any."
+    )
+    on_error: Callable[[Exception], Any] | None = Field(
+        default=None,
+        description=(
+            "Optional error handler. If set and the step raises, this callable is invoked with "
+            "the Exception. If it returns a value, that value is used as the step output and "
+            "execution continues. Re-raise to propagate the error."
+        ),
     )
 
     @abstractmethod

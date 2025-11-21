@@ -2756,16 +2756,42 @@ class Portia:
             try:
                 result = await step.run(run_data)
             except Exception as e:  # noqa: BLE001
-                self.telemetry.capture(
-                    PlanV2StepExecutionTelemetryEvent(
-                        step_type=step.__class__.__name__,
-                        success=False,
-                        tool_id=step.to_legacy_step(plan).tool_id,
+                # If an on_error handler is attached to the step, allow it to handle the error
+                handler = getattr(step, "on_error", None)
+                if handler is not None:
+                    try:
+                        result = handler(e)
+                        # Treat as a successful step execution with handled result
+                        self.telemetry.capture(
+                            PlanV2StepExecutionTelemetryEvent(
+                                step_type=step.__class__.__name__,
+                                success=True,
+                                tool_id=step.to_legacy_step(plan).tool_id,
+                            )
+                        )
+                    except Exception as inner_e:  # noqa: BLE001
+                        # Handler chose to re-raise or failed; propagate as normal failure
+                        self.telemetry.capture(
+                            PlanV2StepExecutionTelemetryEvent(
+                                step_type=step.__class__.__name__,
+                                success=False,
+                                tool_id=step.to_legacy_step(plan).tool_id,
+                            )
+                        )
+                        return self._handle_execution_error(
+                            run_data.plan_run, run_data.legacy_plan, index, legacy_step, inner_e
+                        )
+                else:
+                    self.telemetry.capture(
+                        PlanV2StepExecutionTelemetryEvent(
+                            step_type=step.__class__.__name__,
+                            success=False,
+                            tool_id=step.to_legacy_step(plan).tool_id,
+                        )
                     )
-                )
-                return self._handle_execution_error(
-                    run_data.plan_run, run_data.legacy_plan, index, legacy_step, e
-                )
+                    return self._handle_execution_error(
+                        run_data.plan_run, run_data.legacy_plan, index, legacy_step, e
+                    )
             else:
                 self.telemetry.capture(
                     PlanV2StepExecutionTelemetryEvent(
